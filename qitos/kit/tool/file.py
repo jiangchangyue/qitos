@@ -9,6 +9,13 @@ from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
 
 
 class WriteFile(BaseTool):
+    """Write UTF-8 text to a workspace file, creating parent directories when needed.
+
+    Use this tool when the agent needs to create or fully overwrite a file. The
+    path is resolved relative to the configured workspace root and is rejected if
+    it escapes that boundary.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -23,6 +30,16 @@ class WriteFile(BaseTool):
         )
 
     def run(self, filename: str, content: str, runtime_context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        Write text content to a file under the workspace root.
+
+        :param filename: Path relative to the workspace root.
+        :param content: Full text content to write into the file.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Creates parent directories automatically. Rejects paths that escape the
+        configured workspace boundary.
+        """
         runtime_context = runtime_context or {}
         ops = runtime_context.get("ops", {})
         file_ops = ops.get("file")
@@ -47,6 +64,13 @@ class WriteFile(BaseTool):
 
 
 class ReadFile(BaseTool):
+    """Read the full UTF-8 text content of a workspace file.
+
+    Use this tool to inspect a specific file before editing, summarizing, or
+    reasoning over its contents. The tool returns both the raw text and basic
+    metadata such as the path and size.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -61,6 +85,14 @@ class ReadFile(BaseTool):
         )
 
     def run(self, filename: str, runtime_context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        Read the full text content of a file under the workspace root.
+
+        :param filename: Path relative to the workspace root.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns the file content together with path and size metadata.
+        """
         runtime_context = runtime_context or {}
         ops = runtime_context.get("ops", {})
         file_ops = ops.get("file")
@@ -84,6 +116,13 @@ class ReadFile(BaseTool):
 
 
 class ListFiles(BaseTool):
+    """List files and directories under a workspace-relative path.
+
+    Use this tool to discover what exists in the current workspace before
+    deciding which files to inspect or edit. The output distinguishes files from
+    directories and includes file sizes when available.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -98,6 +137,15 @@ class ListFiles(BaseTool):
         )
 
     def run(self, path: str = ".", runtime_context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        List files and directories under a workspace-relative path.
+
+        :param path: Directory path relative to the workspace root.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns one entry per file or directory, including type information and
+        file sizes where available.
+        """
         runtime_context = runtime_context or {}
         ops = runtime_context.get("ops", {})
         file_ops = ops.get("file")

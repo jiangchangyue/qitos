@@ -56,6 +56,19 @@ class ThinkingToolSet:
         branch_id: Optional[str] = None,
         needs_more_thoughts: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        """
+        Record one structured thought step, optionally as a revision or branch.
+
+        :param thought: Thought content to record.
+        :param thought_number: One-based index of this thought.
+        :param total_thoughts: Planned total number of thoughts in the sequence.
+        :param next_thought_needed: Whether another thought step should follow.
+        :param is_revision: Whether this thought revises an earlier one.
+        :param revises_thought: One-based index of the thought being revised.
+        :param branch_from_thought: One-based index where a branch starts.
+        :param branch_id: Optional branch identifier.
+        :param needs_more_thoughts: Whether the current total should be expanded.
+        """
         if thought_number < 1:
             return {"status": "error", "message": "thought_number must be a positive integer"}
         if total_thoughts < 1:
@@ -131,6 +144,11 @@ class ThinkingToolSet:
 
     @tool(name="get_thoughts", description="Return thought history and branch traces")
     def get_thoughts(self) -> Dict[str, Any]:
+        """
+        Return the full recorded thought history and all branch traces.
+
+        Exposes the internal state accumulated by `sequential_thinking`.
+        """
         return {
             "status": "success",
             "history": [asdict(item) for item in self.thought_history],
@@ -141,6 +159,11 @@ class ThinkingToolSet:
 
     @tool(name="clear_thoughts", description="Clear all recorded thoughts and branches")
     def clear_thoughts(self) -> Dict[str, Any]:
+        """
+        Clear all stored thoughts and branch metadata from the toolset state.
+
+        Use this to reset the thinking toolset between independent tasks.
+        """
         self.thought_history = []
         self.branches = {}
         return {"status": "success", "message": "cleared"}

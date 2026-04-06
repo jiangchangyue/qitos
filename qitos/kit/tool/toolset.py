@@ -6,6 +6,8 @@ from typing import Any, Protocol
 
 
 class ToolSet(Protocol):
+    """Protocol for grouped tools that may need setup and teardown hooks."""
+
     name: str
     version: str
 

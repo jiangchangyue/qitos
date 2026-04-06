@@ -8,7 +8,11 @@ from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
 
 
 class SubmitAnswer(BaseTool):
-    """Record one answer candidate for CyBench evaluation."""
+    """Record one answer candidate for the current CyBench objective.
+
+    Use this tool when the agent has reached a final answer proposal for the
+    active CyBench task or subtask and wants to surface it for evaluation.
+    """
 
     def __init__(self):
         super().__init__(
@@ -26,6 +30,15 @@ class SubmitAnswer(BaseTool):
         )
 
     def run(self, answer: str, subtask_index: Optional[int] = None, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Submit one final answer candidate for the active CyBench task.
+
+        :param answer: Proposed answer text.
+        :param subtask_index: Optional subtask index for multi-part tasks.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        This tool records an answer proposal for evaluation; it does not grade it.
+        """
         return {
             "status": "success",
             "type": "answer_submission",

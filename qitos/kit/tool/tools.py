@@ -15,14 +15,27 @@ from qitos.kit.tool.web import HTTPGet, HTTPPost, HTTPRequest, HTMLExtractText, 
 
 
 def math_tools() -> ToolRegistry:
+    """Build a tiny registry of arithmetic example tools."""
     registry = ToolRegistry()
 
     @tool(name="add")
     def add(a: int, b: int) -> int:
+        """
+        Return the sum of two integers.
+
+        :param a: First integer.
+        :param b: Second integer.
+        """
         return a + b
 
     @tool(name="multiply")
     def multiply(a: int, b: int) -> int:
+        """
+        Return the product of two integers.
+
+        :param a: First integer.
+        :param b: Second integer.
+        """
         return a * b
 
     registry.register(add)
@@ -31,12 +44,14 @@ def math_tools() -> ToolRegistry:
 
 
 def editor_tools(workspace_root: str) -> ToolRegistry:
+    """Build a registry containing only the editor toolset."""
     registry = ToolRegistry()
     registry.include(EditorToolSet(workspace_root=workspace_root))
     return registry
 
 
 def codebase_tools(workspace_root: str) -> ToolRegistry:
+    """Build a registry for code search plus basic file read and write tools."""
     registry = ToolRegistry()
     registry.register_toolset(CodebaseToolSet(workspace_root=workspace_root))
     registry.register(ListFiles(root_dir=workspace_root))
@@ -46,12 +61,14 @@ def codebase_tools(workspace_root: str) -> ToolRegistry:
 
 
 def notebook_tools(workspace_root: str) -> ToolRegistry:
+    """Build a registry containing notebook-specific tools."""
     registry = ToolRegistry()
     registry.register_toolset(NotebookToolSet(workspace_root=workspace_root))
     return registry
 
 
 def web_tools() -> ToolRegistry:
+    """Build a registry containing HTTP and HTML extraction tools."""
     registry = ToolRegistry()
     registry.register(HTTPRequest())
     registry.register(HTTPGet())
@@ -62,6 +79,7 @@ def web_tools() -> ToolRegistry:
 
 
 def coding_tools(workspace_root: str, shell_timeout: int = 30, include_notebook: bool = True) -> ToolRegistry:
+    """Build a registry with the standard coding-oriented tool bundle."""
     registry = ToolRegistry()
     registry.register_toolset(
         CodingToolSet(
@@ -75,6 +93,7 @@ def coding_tools(workspace_root: str, shell_timeout: int = 30, include_notebook:
 
 
 def task_tools(workspace_root: str, board_relpath: str = ".qitos/task_board.json") -> ToolRegistry:
+    """Build a registry containing the external task-board tools."""
     registry = ToolRegistry()
     registry.register_toolset(TaskToolSet(workspace_root=workspace_root, board_relpath=board_relpath), namespace="")
     return registry

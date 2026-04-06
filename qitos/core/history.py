@@ -22,11 +22,15 @@ class HistoryPolicy:
     roles: List[str] = field(default_factory=lambda: ["user", "assistant"])
     max_messages: int = 24
     step_window: Optional[int] = None
+    max_tokens: Optional[int] = None
 
-    def build_query(self, step_id: int) -> Dict[str, Any]:
+    def build_query(self, step_id: int, **kwargs: Any) -> Dict[str, Any]:
         query: Dict[str, Any] = {"roles": list(self.roles), "max_items": int(self.max_messages)}
         if self.step_window is not None and self.step_window > 0:
             query["step_min"] = max(0, int(step_id) - int(self.step_window) + 1)
+        if self.max_tokens is not None and int(self.max_tokens) > 0:
+            query["max_tokens"] = int(self.max_tokens)
+        query.update({str(key): value for key, value in kwargs.items()})
         return query
 
 

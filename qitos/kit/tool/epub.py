@@ -12,7 +12,7 @@ from qitos.core.tool import tool
 
 
 class EpubToolSet:
-    """Toolset for EPUB chapter listing, reading, and search."""
+    """Bundle tools for listing, reading, and searching EPUB chapters."""
 
     name = "epub"
     version = "1.0"
@@ -31,6 +31,13 @@ class EpubToolSet:
 
     @tool(name="list_chapters", description="List chapter files and titles from an EPUB")
     def list_chapters(self, path: str) -> Dict[str, Any]:
+        """
+        List chapter files and detected titles from one EPUB archive.
+
+        :param path: EPUB path relative to the workspace root.
+
+        Returns chapter indices, internal chapter hrefs, and best-effort titles.
+        """
         try:
             epub_path = self._resolve(path)
             chapter_files = self._chapter_files(epub_path)
@@ -45,6 +52,15 @@ class EpubToolSet:
 
     @tool(name="read_chapter", description="Read one chapter text from an EPUB")
     def read_chapter(self, path: str, chapter_index: int, max_chars: int = 8000) -> Dict[str, Any]:
+        """
+        Read one EPUB chapter as plain text.
+
+        :param path: EPUB path relative to the workspace root.
+        :param chapter_index: Zero-based chapter index to read.
+        :param max_chars: Maximum number of characters to keep in the output.
+
+        Converts the chapter HTML into plain text and truncates overly long output.
+        """
         try:
             epub_path = self._resolve(path)
             chapter_files = self._chapter_files(epub_path)
@@ -67,6 +83,14 @@ class EpubToolSet:
 
     @tool(name="search", description="Search keyword in EPUB chapters")
     def search(self, path: str, query: str, top_k: int = 3, snippet_chars: int = 240) -> Dict[str, Any]:
+        """
+        Search all EPUB chapters for a keyword and return matching snippets.
+
+        :param path: EPUB path relative to the workspace root.
+        :param query: Keyword or phrase to search for.
+        :param top_k: Maximum number of search hits to return.
+        :param snippet_chars: Approximate snippet length around each match.
+        """
         if not query.strip():
             return {"status": "error", "message": "query cannot be empty"}
         try:

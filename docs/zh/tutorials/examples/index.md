@@ -19,8 +19,13 @@
 - 关键设计轴是什么
 - 下一步应该看哪个示例
 
+## 额外的 preset 示例
+
+- Compact-enabled ReAct agent：`examples/real/react_compact_agent.py`
+
 ## Source Index
 
 - [docs/tutorials/examples/index.md](https://github.com/Qitor/qitos/blob/main/docs/tutorials/examples/index.md)
 - [docs/tutorials/examples/react.md](https://github.com/Qitor/qitos/blob/main/docs/tutorials/examples/react.md)
 - [docs/tutorials/examples/planact.md](https://github.com/Qitor/qitos/blob/main/docs/tutorials/examples/planact.md)
+- [examples/real/react_compact_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/react_compact_agent.py)

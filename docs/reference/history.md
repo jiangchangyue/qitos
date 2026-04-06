@@ -43,6 +43,8 @@ Configure on the runtime call:
 - `roles`
 - `max_messages`
 - `step_window`
+- `max_tokens`
+- extra query context such as `pending_content`, `model_name`, `phase`, and `query_kind`
 
 Typical happy path:
 
@@ -54,8 +56,39 @@ agent.run(
 )
 ```
 
+## CompactHistory
+
+Use `CompactHistory` when you want the framework to compact model-facing context automatically instead of relying on a raw sliding window.
+
+`CompactHistory` is opt-in and adds:
+
+- threshold warning metadata before the history exceeds the budget
+- microcompact for older long messages and tool-heavy blobs
+- continuation summary compaction for earlier rounds
+- compact runtime events in trace/qita via normal Engine events
+
+Typical usage:
+
+```python
+from qitos import HistoryPolicy
+from qitos.kit import CompactHistory
+
+agent.history = CompactHistory(llm=llm, max_tokens=2200, keep_last_rounds=2)
+
+agent.run(
+    task="fix the bug",
+    workspace="./playground",
+    history_policy=HistoryPolicy(max_messages=16, max_tokens=2200),
+)
+```
+
+See the focused example:
+
+- `examples/real/react_compact_agent.py`
+
 ## Source Index
 
 - [qitos/core/history.py](https://github.com/Qitor/qitos/blob/main/qitos/core/history.py)
 - [qitos/engine/engine.py](https://github.com/Qitor/qitos/blob/main/qitos/engine/engine.py)
 - [qitos/kit/history/window_history.py](https://github.com/Qitor/qitos/blob/main/qitos/kit/history/window_history.py)
+- [qitos/kit/history/compact_history.py](https://github.com/Qitor/qitos/blob/main/qitos/kit/history/compact_history.py)

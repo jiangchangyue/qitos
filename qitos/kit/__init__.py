@@ -2,10 +2,10 @@
 
 from . import critic, env, evaluate, history, memory, metric, parser, planning, prompts, state, tool
 from .critic import ReActSelfReflectionCritic
-from .env import HostEnv, RepoEnv, TextWebEnv
-from .history import WindowHistory
+from .env import HostEnv, RepoEnv, TextWebEnv, TmuxEnv
+from .history import CompactConfig, CompactHistory, TokenBudgetSummaryHistory, WindowHistory, compact_history
 from .memory import MarkdownFileMemory, WindowMemory
-from .parser import JsonDecisionParser, ReActTextParser, XmlDecisionParser
+from .parser import JsonDecisionParser, ReActTextParser, TerminusJsonParser, TerminusXmlParser, XmlDecisionParser
 from .planning import DynamicTreeSearch, NumberedPlanBuilder, format_action
 from .prompts import (
     JSON_DECISION_SYSTEM_PROMPT,
@@ -13,6 +13,9 @@ from .prompts import (
     PLAN_EXEC_SYSTEM_PROMPT,
     REACT_SYSTEM_PROMPT,
     SWE_AGENT_SYSTEM_PROMPT,
+    TERMINUS_JSON_SYSTEM_PROMPT,
+    TERMINUS_TIMEOUT_PROMPT,
+    TERMINUS_XML_SYSTEM_PROMPT,
     XML_DECISION_SYSTEM_PROMPT,
     render_prompt,
 )
@@ -24,6 +27,7 @@ from .tool import (
     HTTPGet,
     ReadFile,
     RunCommand,
+    SendTerminalKeys,
     TaskToolSet,
     WriteFile,
 )
@@ -43,16 +47,22 @@ __all__ = [
     "ReActTextParser",
     "JsonDecisionParser",
     "XmlDecisionParser",
+    "TerminusJsonParser",
+    "TerminusXmlParser",
     "REACT_SYSTEM_PROMPT",
     "PLAN_DRAFT_PROMPT",
     "PLAN_EXEC_SYSTEM_PROMPT",
     "XML_DECISION_SYSTEM_PROMPT",
     "JSON_DECISION_SYSTEM_PROMPT",
     "SWE_AGENT_SYSTEM_PROMPT",
+    "TERMINUS_JSON_SYSTEM_PROMPT",
+    "TERMINUS_XML_SYSTEM_PROMPT",
+    "TERMINUS_TIMEOUT_PROMPT",
     "render_prompt",
     "EditorToolSet",
     "CodingToolSet",
     "RunCommand",
+    "SendTerminalKeys",
     "HTTPGet",
     "HTMLExtractText",
     "ReadFile",
@@ -62,6 +72,10 @@ __all__ = [
     "MarkdownFileMemory",
     "WindowMemory",
     "WindowHistory",
+    "TokenBudgetSummaryHistory",
+    "CompactConfig",
+    "CompactHistory",
+    "compact_history",
     "NumberedPlanBuilder",
     "DynamicTreeSearch",
     "format_action",
@@ -69,4 +83,5 @@ __all__ = [
     "HostEnv",
     "RepoEnv",
     "TextWebEnv",
+    "TmuxEnv",
 ]

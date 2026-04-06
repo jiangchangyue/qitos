@@ -24,7 +24,7 @@ def _collect_object_tools(obj: Any) -> List[Any]:
 
 
 class CodingToolSet:
-    """A batteries-included toolset for coding agents."""
+    """Bundle editor, codebase, notebook, shell, and file primitives for coding agents."""
 
     name = "coding"
     version = "1"

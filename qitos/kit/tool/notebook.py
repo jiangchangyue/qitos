@@ -33,6 +33,12 @@ def _normalize_source(source: Any) -> str:
 
 
 class ReadNotebook(BaseTool):
+    """Read a slice of notebook cells from a `.ipynb` file in the workspace.
+
+    Use this tool when the agent needs to inspect markdown or code cells without
+    manually parsing notebook JSON.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -56,6 +62,16 @@ class ReadNotebook(BaseTool):
         cell_limit: int = 20,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Read a window of cells from a notebook file.
+
+        :param path: Notebook path relative to the workspace root.
+        :param cell_start: Zero-based index of the first cell to return.
+        :param cell_limit: Maximum number of cells to return.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns simplified cell records with index, type, and source text.
+        """
         _ = runtime_context
         try:
             resolved, data = _load_notebook(self._root_dir, path)
@@ -86,6 +102,12 @@ class ReadNotebook(BaseTool):
 
 
 class ReplaceNotebookCell(BaseTool):
+    """Replace the source content of one notebook cell.
+
+    Use this tool to update an existing markdown or code cell in place while
+    preserving the rest of the notebook structure.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -109,6 +131,16 @@ class ReplaceNotebookCell(BaseTool):
         source: str,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Replace the source text of one notebook cell.
+
+        :param path: Notebook path relative to the workspace root.
+        :param cell_index: Zero-based index of the cell to replace.
+        :param source: New source text for the target cell.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Preserves the notebook structure and only rewrites the selected cell.
+        """
         _ = runtime_context
         try:
             resolved, data = _load_notebook(self._root_dir, path)
@@ -129,6 +161,12 @@ class ReplaceNotebookCell(BaseTool):
 
 
 class InsertNotebookCell(BaseTool):
+    """Insert a new notebook cell at a chosen position.
+
+    Use this tool to add explanatory markdown, new code cells, or raw cells into
+    an existing notebook without rebuilding the file manually.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -154,6 +192,18 @@ class InsertNotebookCell(BaseTool):
         index: int = -1,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Insert a new notebook cell into a `.ipynb` file.
+
+        :param path: Notebook path relative to the workspace root.
+        :param cell_type: Cell type to insert: `code`, `markdown`, or `raw`.
+        :param source: Source text for the new cell.
+        :param index: Zero-based insertion index, or `-1` to append.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Creates a valid notebook cell structure and returns the final inserted
+        position.
+        """
         _ = runtime_context
         normalized_type = str(cell_type or "").strip().lower()
         if normalized_type not in {"code", "markdown", "raw"}:
@@ -183,6 +233,8 @@ class InsertNotebookCell(BaseTool):
 
 
 class NotebookToolSet:
+    """Bundle common notebook inspection and editing tools."""
+
     name = "notebook"
     version = "1"
 

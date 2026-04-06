@@ -7,6 +7,7 @@ from .epub import EpubToolSet
 from .file import WriteFile, ReadFile, ListFiles
 from .notebook import NotebookToolSet, ReadNotebook, ReplaceNotebookCell, InsertNotebookCell
 from .shell import RunCommand
+from .terminal import SendTerminalKeys
 from .taskboard import TaskToolSet, TaskBoardStore, TaskRecord, TaskNote
 from .cybench import SubmitAnswer
 from .thinking import ThinkingToolSet, ThoughtData
@@ -38,6 +39,7 @@ __all__ = [
     "TaskRecord",
     "TaskNote",
     "RunCommand",
+    "SendTerminalKeys",
     "SubmitAnswer",
     "ThinkingToolSet",
     "ThoughtData",

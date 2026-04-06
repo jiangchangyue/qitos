@@ -50,6 +50,11 @@ class SkillToolSet:
 
     @tool(name="check_skill_hub")
     def check_skill_hub(self, runtime_context: Optional[dict[str, Any]] = None) -> str:
+        """
+        Report whether the configured skill provider is available for use.
+
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         return (
             f"Skill provider '{manager.default_provider}' is configured and ready. "
@@ -58,6 +63,12 @@ class SkillToolSet:
 
     @tool(name="install_skill_hub")
     def install_skill_hub(self, hub_url: str, runtime_context: Optional[dict[str, Any]] = None) -> str:
+        """
+        Install a skill hub manifest from a local or remote provider URL.
+
+        :param hub_url: Provider manifest location.
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         installed = manager.install(f"local:{hub_url}", activate=False)
         return f"Installed hub manifest '{installed.manifest.name}' from {hub_url}."
@@ -70,6 +81,14 @@ class SkillToolSet:
         limit: int = 5,
         runtime_context: Optional[dict[str, Any]] = None,
     ) -> str:
+        """
+        Search the configured skill provider for installable skills.
+
+        :param query: Search query text.
+        :param provider: Optional provider override.
+        :param limit: Maximum number of results to return.
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         results = manager.search(query=query, provider=provider or None, limit=limit)
         if not results:
@@ -88,6 +107,14 @@ class SkillToolSet:
         activate: bool = True,
         runtime_context: Optional[dict[str, Any]] = None,
     ) -> str:
+        """
+        Install one skill by reference and optionally activate it immediately.
+
+        :param skill_ref: Fully qualified skill reference.
+        :param skill_name: Alternate plain skill name if no reference is provided.
+        :param activate: Whether the installed skill should be activated.
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         resolved_ref = skill_ref or skill_name
         installed = manager.install(resolved_ref, activate=activate)
@@ -100,6 +127,12 @@ class SkillToolSet:
         skill_ref: str,
         runtime_context: Optional[dict[str, Any]] = None,
     ) -> str:
+        """
+        Activate one already-installed skill so it can be injected into agents.
+
+        :param skill_ref: Installed skill reference.
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         if manager.activate(skill_ref):
             return f"Activated skill '{skill_ref}'."
@@ -107,6 +140,11 @@ class SkillToolSet:
 
     @tool(name="list_installed_skills")
     def list_installed_skills(self, runtime_context: Optional[dict[str, Any]] = None) -> str:
+        """
+        List all skills installed in the current workspace context.
+
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         installed = manager.list_installed()
         if not installed:
@@ -124,6 +162,13 @@ class SkillToolSet:
         skill_name: str = "",
         runtime_context: Optional[dict[str, Any]] = None,
     ) -> str:
+        """
+        Describe one installed or discoverable skill by reference.
+
+        :param skill_ref: Fully qualified skill reference.
+        :param skill_name: Alternate plain skill name if no reference is provided.
+        :param runtime_context: Optional runtime context with env information.
+        """
         manager = self._manager_from_runtime(runtime_context)
         resolved_ref = skill_ref or skill_name
         installed = manager.get_installed(resolved_ref)

@@ -10,6 +10,13 @@ from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
 
 
 class RunCommand(BaseTool):
+    """Run one shell command inside the configured workspace directory.
+
+    Use this tool for build steps, tests, linters, repository inspection, or
+    other command-line tasks that are easier to express as a shell command than
+    as file edits. The tool returns stdout, stderr, return code, and cwd.
+    """
+
     def __init__(self, timeout: int = 30, cwd: str = ".", env: Optional[Dict[str, str]] = None):
         self._timeout = timeout
         self._cwd = os.path.abspath(cwd) if cwd else os.getcwd()
@@ -26,6 +33,15 @@ class RunCommand(BaseTool):
         )
 
     def run(self, command: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute one shell command inside the configured working directory.
+
+        :param command: Shell command string to execute.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns stdout, stderr, the exit status, and the working directory used
+        for execution.
+        """
         runtime_context = runtime_context or {}
         ops = runtime_context.get("ops", {})
         process_ops = ops.get("process")

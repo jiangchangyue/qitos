@@ -114,6 +114,40 @@ class CommandCapability(ABC):
         """Run one command and return standardized result payload."""
 
 
+class TerminalCapability(ABC):
+    """Interactive terminal capability contract used by env implementations."""
+
+    @abstractmethod
+    def send_keys(
+        self,
+        keys: str | list[str],
+        min_timeout_sec: float = 0.0,
+        block: bool = False,
+        max_timeout_sec: float = 180.0,
+    ) -> Dict[str, Any]:
+        """Send raw keystrokes to the terminal and optionally wait."""
+
+    @abstractmethod
+    def capture_screen(self) -> str:
+        """Return the currently visible terminal screen."""
+
+    @abstractmethod
+    def capture_buffer(self) -> str:
+        """Return the full terminal scrollback buffer when available."""
+
+    @abstractmethod
+    def get_incremental_output(self) -> str:
+        """Return new output since the previous capture, or the current screen."""
+
+    @abstractmethod
+    def is_session_alive(self) -> bool:
+        """Whether the interactive terminal session is still alive."""
+
+    @abstractmethod
+    def get_timestamp(self) -> float | None:
+        """Return a backend-specific timestamp if available."""
+
+
 __all__ = [
     "EnvSpec",
     "EnvObservation",
@@ -121,4 +155,5 @@ __all__ = [
     "Env",
     "FileSystemCapability",
     "CommandCapability",
+    "TerminalCapability",
 ]

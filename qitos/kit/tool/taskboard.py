@@ -51,6 +51,8 @@ class TaskRecord:
 
 
 class TaskBoardStore:
+    """Persist a lightweight external task board as JSON inside the workspace."""
+
     def __init__(self, workspace_root: str = ".", board_relpath: str = ".qitos/task_board.json"):
         self._workspace_root = os.path.abspath(workspace_root)
         self._board_path = Path(_resolve_workspace_path(self._workspace_root, board_relpath))
@@ -128,6 +130,12 @@ class TaskBoardStore:
 
 
 class CreateTask(BaseTool):
+    """Create a new task record in the shared task board.
+
+    Use this tool to externalize a plan item, subtask, or work package that
+    should be tracked independently of the agent's scratchpad.
+    """
+
     def __init__(self, store: TaskBoardStore):
         self._store = store
         super().__init__(
@@ -155,6 +163,18 @@ class CreateTask(BaseTool):
         status: str = "pending",
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Create a new task record in the task board.
+
+        :param subject: Short task title.
+        :param description: Longer task description or objective.
+        :param active_form: Optional active-form wording such as "implement parser".
+        :param metadata: Optional structured metadata to attach to the task.
+        :param status: Initial task status.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns the created task record and the task board location.
+        """
         _ = runtime_context
         normalized = str(status or "pending").strip()
         if normalized not in TASK_STATUSES:
@@ -172,6 +192,12 @@ class CreateTask(BaseTool):
 
 
 class ListTaskBoard(BaseTool):
+    """List tasks from the external task board with optional status filtering.
+
+    Use this tool to review the current plan, check progress, or decide which
+    task should be worked on next.
+    """
+
     def __init__(self, store: TaskBoardStore):
         self._store = store
         super().__init__(
@@ -193,6 +219,15 @@ class ListTaskBoard(BaseTool):
         include_completed: bool = True,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        List task records from the task board.
+
+        :param status: Optional status filter such as `pending` or `blocked`.
+        :param include_completed: Whether completed tasks should remain in the result.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns the filtered task list and the backing board path.
+        """
         _ = runtime_context
         tasks = self._store.list_tasks()
         if status:
@@ -208,6 +243,8 @@ class ListTaskBoard(BaseTool):
 
 
 class GetTask(BaseTool):
+    """Fetch one task record by id from the external task board."""
+
     def __init__(self, store: TaskBoardStore):
         self._store = store
         super().__init__(
@@ -221,6 +258,14 @@ class GetTask(BaseTool):
         )
 
     def run(self, task_id: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Fetch one task record by id.
+
+        :param task_id: Unique task identifier.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns the matching task and the task board location.
+        """
         _ = runtime_context
         task = self._store.get_task(task_id)
         if task is None:
@@ -229,6 +274,12 @@ class GetTask(BaseTool):
 
 
 class UpdateTask(BaseTool):
+    """Update task metadata, status, ownership, or dependency links.
+
+    Use this tool to keep the task board synchronized with what the agent has
+    already completed, blocked on, or delegated into smaller steps.
+    """
+
     def __init__(self, store: TaskBoardStore):
         self._store = store
         super().__init__(
@@ -268,6 +319,24 @@ class UpdateTask(BaseTool):
         metadata: Optional[Dict[str, Any]] = None,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Update fields, status, ownership, or dependency links for one task.
+
+        :param task_id: Unique task identifier.
+        :param subject: Optional replacement subject.
+        :param description: Optional replacement description.
+        :param active_form: Optional replacement active-form wording.
+        :param status: Optional replacement status.
+        :param owner: Optional owner label.
+        :param add_blocks: Dependency ids this task now blocks.
+        :param remove_blocks: Dependency ids to remove from `blocks`.
+        :param add_blocked_by: Dependency ids that now block this task.
+        :param remove_blocked_by: Dependency ids to remove from `blocked_by`.
+        :param metadata: Metadata keys to merge into the task record.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Metadata keys with value `None` are removed from the record.
+        """
         _ = runtime_context
         task = self._store.get_task(task_id)
         if task is None:
@@ -309,6 +378,8 @@ class UpdateTask(BaseTool):
 
 
 class AppendTaskNote(BaseTool):
+    """Append a timestamped note or progress update to one task record."""
+
     def __init__(self, store: TaskBoardStore):
         self._store = store
         super().__init__(
@@ -332,6 +403,16 @@ class AppendTaskNote(BaseTool):
         kind: str = "note",
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Append a timestamped note to one task record.
+
+        :param task_id: Unique task identifier.
+        :param text: Note text to append.
+        :param kind: Note type such as `note`, `progress`, or `decision`.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns the updated note count for the task.
+        """
         _ = runtime_context
         task = self._store.get_task(task_id)
         if task is None:
@@ -348,6 +429,8 @@ class AppendTaskNote(BaseTool):
 
 
 class TaskToolSet:
+    """Bundle task-board tools for planning, decomposition, and progress tracking."""
+
     name = "task"
     version = "1"
 

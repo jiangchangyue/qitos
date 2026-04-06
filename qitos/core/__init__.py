@@ -11,7 +11,7 @@ from .errors import (
 from .state import StateSchema, StateMigrationRegistry, StateValidationError, StateMigrationError
 from .memory import Memory, MemoryRecord
 from .history import History, HistoryMessage, HistoryPolicy
-from .env import Env, EnvSpec, EnvObservation, EnvStepResult, FileSystemCapability, CommandCapability
+from .env import Env, EnvSpec, EnvObservation, EnvStepResult, FileSystemCapability, CommandCapability, TerminalCapability
 from .task import (
     Task,
     TaskResource,
@@ -51,6 +51,7 @@ __all__ = [
     "EnvStepResult",
     "FileSystemCapability",
     "CommandCapability",
+    "TerminalCapability",
     "Task",
     "TaskResource",
     "TaskBudget",

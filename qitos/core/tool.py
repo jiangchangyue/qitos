@@ -41,6 +41,9 @@ class BaseTool:
     """Base abstraction for callable tools."""
 
     def __init__(self, spec: ToolSpec):
+        description = inspect.getdoc(self.run) or inspect.getdoc(self.__class__)
+        if description:
+            spec.description = inspect.cleandoc(description)
         self.spec = spec
 
     @property
@@ -70,6 +73,9 @@ class FunctionTool(BaseTool):
         self.meta = meta or get_tool_meta(func) or ToolMeta()
         spec = build_tool_spec(func, self.meta)
         super().__init__(spec)
+        description = inspect.getdoc(func) or self.meta.description
+        if description:
+            self.spec.description = inspect.cleandoc(description)
 
     def run(self, **kwargs: Any) -> Any:
         return self.func(**kwargs)
@@ -142,12 +148,12 @@ def build_tool_spec(func: Callable[..., Any], meta: ToolMeta) -> ToolSpec:
         if p.default is inspect.Parameter.empty:
             required.append(name)
 
-    desc = meta.description or (inspect.getdoc(func) or "")
+    desc = inspect.getdoc(func) or meta.description or ""
     tool_name = meta.name or getattr(func, "__name__", "tool")
 
     return ToolSpec(
         name=tool_name,
-        description=desc.splitlines()[0] if desc else "",
+        description=inspect.cleandoc(desc) if desc else "",
         parameters=params,
         required=required,
         timeout_s=meta.timeout_s,

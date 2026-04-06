@@ -78,7 +78,15 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         engine = self.engine
         if engine.agent.llm is None:
             raise ValueError("No llm configured and Agent.decide returned None")
-        prepared = engine.agent.prepare(state)
+        setattr(engine.agent, "_runtime_observation", observation)
+        setattr(engine.agent, "_runtime_step_id", record.step_id)
+        try:
+            prepared = engine.agent.prepare(state)
+        finally:
+            if hasattr(engine.agent, "_runtime_observation"):
+                delattr(engine.agent, "_runtime_observation")
+            if hasattr(engine.agent, "_runtime_step_id"):
+                delattr(engine.agent, "_runtime_step_id")
         system_prompt = engine.agent.build_system_prompt(state)
         messages: List[Dict[str, str]] = []
         if isinstance(system_prompt, str) and system_prompt.strip():
@@ -88,12 +96,34 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 engine._history_append("system", system, record.step_id, metadata={"source": "engine"})
                 engine._last_system_prompt = system
         history: List[Dict[str, str]] = []
-        query = engine.history_policy.build_query(step_id=record.step_id)
+        query = engine.history_policy.build_query(
+            step_id=record.step_id,
+            phase=RuntimePhase.DECIDE.value,
+            query_kind="decide",
+        )
+        if isinstance(query, dict):
+            query.setdefault("pending_content", str(prepared))
+            query.setdefault("model_name", getattr(getattr(engine.agent, "llm", None), "model", None))
+            query.setdefault("step_id", record.step_id)
         try:
-            retrieved = engine._history().retrieve(state=state, observation=observation, query=query)
+            history_impl = engine._history()
+            retrieved = history_impl.retrieve(state=state, observation=observation, query=query)
             history = engine._normalize_history_messages(retrieved)
+            compact_events = []
+            consume_runtime_events = getattr(history_impl, "consume_runtime_events", None)
+            if callable(consume_runtime_events):
+                compact_events = list(consume_runtime_events() or [])
+            history_metadata = []
+            get_last_message_metadata = getattr(history_impl, "get_last_message_metadata", None)
+            if callable(get_last_message_metadata):
+                history_metadata = list(get_last_message_metadata() or [])
+            for compact_event in compact_events:
+                if not isinstance(compact_event, dict):
+                    continue
+                engine._emit(record.step_id, RuntimePhase.DECIDE, payload=compact_event)
         except Exception:
             history = []
+            history_metadata = []
         current_user = {"role": "user", "content": str(prepared)}
         messages.extend(history)
         messages.append(current_user)
@@ -104,6 +134,7 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 "stage": "model_input",
                 "prepared": str(prepared),
                 "history_message_count": len(history),
+                "history_messages_meta": history_metadata,
                 "messages": messages,
             },
         )

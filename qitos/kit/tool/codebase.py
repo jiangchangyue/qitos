@@ -38,6 +38,12 @@ def _read_text(path: Path) -> str:
 
 
 class GlobFiles(BaseTool):
+    """Find workspace files whose names or relative paths match a glob pattern.
+
+    Use this tool to quickly discover candidate files, such as all test files,
+    source files, or configuration files that match a naming pattern.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -64,6 +70,18 @@ class GlobFiles(BaseTool):
         limit: int = 100,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Find files under the workspace that match a glob pattern.
+
+        :param pattern: Glob pattern such as `*.py` or `src/**/*.md`.
+        :param path: Directory path, relative to the workspace root, to search in.
+        :param include_hidden: Whether to include hidden files and directories.
+        :param limit: Maximum number of matching files to return.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Matches both relative paths and file basenames, and reports whether the
+        result list was truncated by the requested limit.
+        """
         _ = runtime_context
         if not pattern.strip():
             return {"status": "error", "message": "Pattern cannot be empty"}
@@ -92,6 +110,13 @@ class GlobFiles(BaseTool):
 
 
 class GrepFiles(BaseTool):
+    """Search workspace files for a regex or plain-text pattern.
+
+    Use this tool to locate symbols, error messages, TODOs, or repeated strings
+    across many files. It can return either line-level matches or only the file
+    paths that contain at least one match.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -124,6 +149,21 @@ class GrepFiles(BaseTool):
         limit: int = 100,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Search workspace files for a regex or plain-text pattern.
+
+        :param pattern: Regex or literal text to search for.
+        :param path: Directory path, relative to the workspace root, to search in.
+        :param glob: Optional glob filter applied before reading candidate files.
+        :param case_sensitive: Whether matching should preserve case.
+        :param regex: Whether `pattern` should be interpreted as a regex.
+        :param files_with_matches: If true, return only one entry per matching file.
+        :param limit: Maximum number of returned matches.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns either line-level matches or matching file paths, depending on
+        `files_with_matches`.
+        """
         _ = runtime_context
         if not pattern.strip():
             return {"status": "error", "message": "Pattern cannot be empty"}
@@ -176,6 +216,12 @@ class GrepFiles(BaseTool):
 
 
 class ReadFileRange(BaseTool):
+    """Read a bounded line range from one workspace file.
+
+    Use this tool when the full file would be too large or when the agent only
+    needs a localized code or text snippet around a known region.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -200,6 +246,16 @@ class ReadFileRange(BaseTool):
         limit: int = 200,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Read a bounded line range from one workspace file.
+
+        :param filename: File path relative to the workspace root.
+        :param offset: Zero-based starting line offset.
+        :param limit: Maximum number of lines to return.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Returns both the concatenated text chunk and a structured per-line view.
+        """
         _ = runtime_context
         try:
             resolved = Path(_resolve_workspace_path(self._root_dir, filename))
@@ -223,6 +279,12 @@ class ReadFileRange(BaseTool):
 
 
 class AppendFile(BaseTool):
+    """Append new text to the end of a workspace file.
+
+    Use this tool for additive updates such as log notes, generated snippets, or
+    report sections when replacing the whole file would be unnecessary.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -242,6 +304,15 @@ class AppendFile(BaseTool):
         content: str,
         runtime_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Append text to the end of a workspace file.
+
+        :param filename: File path relative to the workspace root.
+        :param content: Text to append.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Creates the file and any missing parent directories when needed.
+        """
         _ = runtime_context
         try:
             resolved = Path(_resolve_workspace_path(self._root_dir, filename))
@@ -259,6 +330,12 @@ class AppendFile(BaseTool):
 
 
 class MakeDirectory(BaseTool):
+    """Create a directory tree inside the workspace if it does not already exist.
+
+    Use this tool before writing files into a new folder structure or preparing
+    output locations for generated artifacts.
+    """
+
     def __init__(self, root_dir: str = "."):
         self._root_dir = os.path.abspath(root_dir)
         super().__init__(
@@ -272,6 +349,15 @@ class MakeDirectory(BaseTool):
         )
 
     def run(self, path: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Create a directory inside the workspace.
+
+        :param path: Directory path relative to the workspace root.
+        :param runtime_context: Optional runtime ops injected by the engine.
+
+        Creates parent directories automatically and succeeds if the directory
+        already exists.
+        """
         _ = runtime_context
         try:
             resolved = Path(_resolve_workspace_path(self._root_dir, path))
@@ -282,6 +368,8 @@ class MakeDirectory(BaseTool):
 
 
 class CodebaseToolSet:
+    """Bundle common code-search and lightweight file-mutation tools for coding agents."""
+
     name = "codebase"
     version = "1"
 

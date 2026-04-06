@@ -19,6 +19,8 @@ def test_canonical_examples_exist_and_parse() -> None:
         "examples/real/swe_agent.py",
         "examples/real/computer_use_agent.py",
         "examples/real/epub_reader_agent.py",
+        "examples/real/react_compact_agent.py",
+        "examples/real/terminus_2.py",
         "examples/benchmarks/gaia_eval.py",
         "examples/benchmarks/tau_bench_eval.py",
         "examples/benchmarks/cybench_eval.py",

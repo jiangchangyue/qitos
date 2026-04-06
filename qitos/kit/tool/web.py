@@ -82,6 +82,22 @@ class HTTPRequest(BaseTool):
         allow_redirects: bool = True,
         max_content_chars: int = 120_000,
     ) -> Dict[str, Any]:
+        """
+        Execute an HTTP request and return a structured response payload.
+
+        :param method: HTTP method such as `GET` or `POST`.
+        :param url: Absolute `http` or `https` URL.
+        :param params: Optional query parameters.
+        :param data: Optional form-like request body.
+        :param json_data: Optional JSON request body.
+        :param headers: Optional per-request headers.
+        :param timeout: Optional timeout override in seconds.
+        :param verify_tls: Whether TLS certificates should be verified.
+        :param allow_redirects: Whether redirects should be followed automatically.
+        :param max_content_chars: Maximum number of response characters to keep.
+
+        Returns status code, headers, body text, and parsed JSON when available.
+        """
         method = str(method or "").upper().strip()
         if method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}:
             return {"status": "error", "message": f"Unsupported HTTP method: {method}"}
@@ -174,6 +190,12 @@ class HTTPRequest(BaseTool):
 
 
 class HTTPGet(BaseTool):
+    """Issue one HTTP GET request and return a structured response payload.
+
+    Use this tool when the agent needs raw page content, API data, headers, or
+    status codes without browser-style stateful navigation.
+    """
+
     def __init__(self, headers: Optional[Dict[str, str]] = None, timeout: int = 30, max_retries: int = 2):
         self._request = HTTPRequest(headers=headers, timeout=timeout, max_retries=max_retries)
         super().__init__(
@@ -202,6 +224,16 @@ class HTTPGet(BaseTool):
         verify_tls: bool = True,
         allow_redirects: bool = True,
     ) -> Dict[str, Any]:
+        """
+        Execute one HTTP GET request.
+
+        :param url: Absolute URL to request.
+        :param params: Optional query parameters.
+        :param headers: Optional request headers.
+        :param timeout: Optional timeout override in seconds.
+        :param verify_tls: Whether TLS certificates should be verified.
+        :param allow_redirects: Whether redirects should be followed automatically.
+        """
         return self._request.run(
             method="GET",
             url=url,
@@ -214,6 +246,12 @@ class HTTPGet(BaseTool):
 
 
 class HTTPPost(BaseTool):
+    """Issue one HTTP POST request and return a structured response payload.
+
+    Use this tool for form-like submissions or JSON API calls where the agent
+    needs direct control over request bodies and headers.
+    """
+
     def __init__(self, headers: Optional[Dict[str, str]] = None, timeout: int = 30, max_retries: int = 2):
         self._request = HTTPRequest(headers=headers, timeout=timeout, max_retries=max_retries)
         super().__init__(
@@ -244,6 +282,17 @@ class HTTPPost(BaseTool):
         verify_tls: bool = True,
         allow_redirects: bool = True,
     ) -> Dict[str, Any]:
+        """
+        Execute one HTTP POST request.
+
+        :param url: Absolute URL to request.
+        :param data: Optional form-like request body.
+        :param json_data: Optional JSON request body.
+        :param headers: Optional request headers.
+        :param timeout: Optional timeout override in seconds.
+        :param verify_tls: Whether TLS certificates should be verified.
+        :param allow_redirects: Whether redirects should be followed automatically.
+        """
         return self._request.run(
             method="POST",
             url=url,
@@ -275,6 +324,15 @@ class HTMLExtractText(BaseTool):
         )
 
     def run(self, html: str, max_chars: int = 6000, keep_links: bool = False) -> Dict[str, Any]:
+        """
+        Extract readable text from raw HTML.
+
+        :param html: Raw HTML document text.
+        :param max_chars: Maximum number of output characters to keep.
+        :param keep_links: Whether anchor URLs should be preserved inline.
+
+        Returns cleaned text and the detected page title when available.
+        """
         if not html:
             return {"status": "error", "message": "html cannot be empty"}
         try:
@@ -354,6 +412,17 @@ class WebFetch(BaseTool):
         max_chars: int = 20_000,
         timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """
+        Fetch a web page and optionally extract readable text from it.
+
+        :param url: Absolute URL to fetch.
+        :param extract_text: Whether HTML should be converted into readable text.
+        :param keep_links: Whether extracted text should preserve anchor URLs.
+        :param max_chars: Maximum number of extracted characters to keep.
+        :param timeout: Optional timeout override in seconds.
+
+        Combines one HTTP GET with optional HTML-to-text extraction.
+        """
         response = self._http.run(url=url, timeout=timeout)
         if response.get("status") == "error":
             return response

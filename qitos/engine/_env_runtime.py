@@ -194,6 +194,15 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 return DockerEnv(container=container, workspace_root=container_workspace)
             except Exception:
                 return None
+        if env_type in {"tmux", "terminal"}:
+            try:
+                from ..kit.env import TmuxEnv
+
+                session_name = str(config.get("session_name") or "").strip() or None
+                auto_kill = bool(config.get("auto_kill", True))
+                return TmuxEnv(workspace_root=workspace_root, session_name=session_name, auto_kill=auto_kill)
+            except Exception:
+                return None
         return None
 
     def teardown_env(self) -> None:

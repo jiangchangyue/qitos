@@ -9,6 +9,8 @@ from qitos.kit.tool import (
     NotebookToolSet,
     TaskToolSet,
     WebFetch,
+    WriteFile,
+    math_tools,
     coding_tools,
     codebase_tools,
     notebook_tools,
@@ -128,6 +130,21 @@ def test_coding_toolset_collects_editor_shell_and_codebase(tmp_path):
     assert "view" in names
     assert "glob_files" in names
     assert "read_notebook" in names
+
+
+def test_tool_descriptions_come_from_docstrings():
+    write_file = WriteFile()
+    assert "Write text content to a file under the workspace root." in write_file.spec.description
+    assert ":param filename:" in write_file.spec.description
+
+    registry = web_tools()
+    spec = next(item for item in registry.get_all_specs() if item["function"]["name"] == "extract_web_text")
+    assert "Extract readable text from raw HTML." in spec["function"]["description"]
+    assert ":param html:" in spec["function"]["description"]
+
+    math_spec = math_tools().describe_tool("add")
+    assert "Return the sum of two integers." in math_spec["description"]
+    assert ":param a:" in math_spec["description"]
 
 
 def test_task_toolset_persists_board_updates(tmp_path):
