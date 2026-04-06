@@ -7,8 +7,10 @@ Run your first QitOS agent and inspect one complete execution.
 ## Prerequisites
 
 ```bash
-pip install -e .
+pip install qitos
 ```
+
+If you are contributing to QitOS itself, use editable install instead.
 
 Model/API configuration first:
 

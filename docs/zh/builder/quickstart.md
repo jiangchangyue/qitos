@@ -7,8 +7,10 @@
 ## 前置条件
 
 ```bash
-pip install -e .
+pip install qitos
 ```
+
+如果你是在参与 QitOS 本身的开发，再改用 editable install。
 
 请先完成模型配置：
 - [配置与 API Key](configuration.md)

@@ -2,23 +2,42 @@
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.9+
 
-## Install QitOS (editable)
+## For Users
+
+Install the package from PyPI:
 
 ```bash
-pip install -e .
+pip install qitos
 ```
 
-## Docs dependencies (optional)
+Optional extras:
+
+```bash
+pip install "qitos[models,benchmarks]"
+```
+
+## For Contributors
+
+Clone the repository and install in editable mode:
+
+```bash
+git clone https://github.com/Qitor/qitos.git
+cd qitos
+pip install -e ".[dev,models,benchmarks]"
+```
+
+Run the supported test suite from the repo root:
+
+```bash
+python -m pytest -q
+```
+
+## For Docs Work
 
 ```bash
 pip install -r docs/requirements.txt
-```
-
-## Run the docs locally
-
-```bash
 mkdocs serve
 ```
 

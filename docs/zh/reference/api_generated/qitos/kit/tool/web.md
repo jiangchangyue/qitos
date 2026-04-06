@@ -11,6 +11,7 @@
 - [Class: `HTTPGet`](#class-httpget)
 - [Class: `HTTPPost`](#class-httppost)
 - [Class: `HTTPRequest`](#class-httprequest)
+- [Class: `WebFetch`](#class-webfetch)
 
 ## Classes
 
@@ -29,6 +30,10 @@
 <a id="class-httprequest"></a>
 ???+ note "Class: `HTTPRequest(self, headers: 'Optional[Dict[str, str]]' = None, timeout: 'int' = 30, max_retries: 'int' = 2, backoff_factor: 'float' = 0.4, user_agent: 'str' = 'QitOS-WebTool/1.0')`"
     Generic HTTP request tool with retries, timeout, and structured output.
+
+<a id="class-webfetch"></a>
+???+ note "Class: `WebFetch(self, headers: 'Optional[Dict[str, str]]' = None, timeout: 'int' = 30, max_retries: 'int' = 2)`"
+    Fetch a web page and optionally return extracted readable text.
 
 ## Functions
 

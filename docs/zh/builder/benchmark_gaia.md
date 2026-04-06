@@ -7,7 +7,7 @@ QitOS 已完成 GAIA 的可运行适配链路：
 - 适配器：`qitos/benchmark/gaia/adapter.py`
 - 标准转换：GAIA 样本 -> `Task`
 - 执行内核：统一 `Engine` 循环（不做 benchmark 特化 runtime）
-- 示例入口：`examples/real/open_deep_research_gaia_agent.py`
+- 示例入口：`examples/benchmarks/gaia_eval.py`
 
 ## 价值
 
@@ -24,7 +24,7 @@ QitOS 已完成 GAIA 的可运行适配链路：
 ### 跑单题
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -34,7 +34,7 @@ python examples/real/open_deep_research_gaia_agent.py \
 ### 跑整集合
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -44,7 +44,7 @@ python examples/real/open_deep_research_gaia_agent.py \
 ### 跑区间子集
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -66,4 +66,4 @@ qita board --logdir runs
 ## Source Index
 
 - [qitos/benchmark/gaia/adapter.py](https://github.com/Qitor/qitos/blob/main/qitos/benchmark/gaia/adapter.py)
-- [examples/real/open_deep_research_gaia_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/open_deep_research_gaia_agent.py)
+- [examples/benchmarks/gaia_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/gaia_eval.py)

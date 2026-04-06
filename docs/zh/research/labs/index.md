@@ -17,10 +17,12 @@
 ## 环境准备
 
 ```bash
-pip install -e .
+pip install qitos
 export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_key>"
 ```
+
+如果你一边做实验课一边修改 QitOS 源码，再改用 editable install。
 
 如果还没配好，请先看：
 

@@ -2,23 +2,42 @@
 
 ## 环境要求
 
-- Python 3.10+
+- Python 3.9+
 
-## 安装（editable）
+## 普通用户安装
+
+直接从 PyPI 安装：
 
 ```bash
-pip install -e .
+pip install qitos
 ```
 
-## 文档依赖（可选）
+可选扩展：
+
+```bash
+pip install "qitos[models,benchmarks]"
+```
+
+## 贡献者安装
+
+克隆仓库并以 editable 模式安装：
+
+```bash
+git clone https://github.com/Qitor/qitos.git
+cd qitos
+pip install -e ".[dev,models,benchmarks]"
+```
+
+在仓库根目录运行支持的测试集：
+
+```bash
+python -m pytest -q
+```
+
+## 文档开发
 
 ```bash
 pip install -r docs/requirements.txt
-```
-
-## 本地预览文档
-
-```bash
 mkdocs serve
 ```
 

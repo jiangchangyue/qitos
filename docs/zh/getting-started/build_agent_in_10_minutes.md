@@ -193,9 +193,21 @@ state -> prepare -> model -> decision -> action/env -> observation -> reduce -> 
 
 QiTOS 的设计目标，就是把这条链做得显式、可组合、可追踪。
 
+## 下一步看什么
+
+建议按这条 canonical 顺序继续：
+
+- `examples/quickstart/minimal_agent.py`
+- `examples/patterns/react.py`
+- `examples/patterns/planact.py`
+- `examples/real/coding_agent.py`
+
+之后再进入其它 `examples/real/` 示例；当你需要批量评测与恢复运行时，再看 `examples/benchmarks/`。
+
 ## Source Index
 
 - [qitos/core/agent_module.py](https://github.com/Qitor/qitos/blob/main/qitos/core/agent_module.py)
 - [qitos/core/state.py](https://github.com/Qitor/qitos/blob/main/qitos/core/state.py)
+- [examples/quickstart/minimal_agent.py](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py)
 - [examples/patterns/react.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/react.py)
 - [examples/real/coding_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/coding_agent.py)

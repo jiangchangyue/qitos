@@ -193,9 +193,21 @@ state -> prepare -> model -> decision -> action/env -> observation -> reduce -> 
 
 QiTOS keeps that loop explicit, typed, and traceable.
 
+## Where to go next
+
+Follow the canonical examples in this order:
+
+- `examples/quickstart/minimal_agent.py`
+- `examples/patterns/react.py`
+- `examples/patterns/planact.py`
+- `examples/real/coding_agent.py`
+
+Then move to the other `examples/real/` agents for richer workflows, and to `examples/benchmarks/` when you need operational eval runners.
+
 ## Source Index
 
 - [qitos/core/agent_module.py](https://github.com/Qitor/qitos/blob/main/qitos/core/agent_module.py)
 - [qitos/core/state.py](https://github.com/Qitor/qitos/blob/main/qitos/core/state.py)
+- [examples/quickstart/minimal_agent.py](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py)
 - [examples/patterns/react.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/react.py)
 - [examples/real/coding_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/coding_agent.py)

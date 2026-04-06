@@ -10,6 +10,38 @@ If you only “run the script”, you will miss the core value of QitOS:
 - comparable behavior via explicit lifecycle phases
 - reproducible evidence via trace + qita
 
+## Walkthrough Template
+
+Every walkthrough aims to answer the same questions:
+
+- What this example shows
+- When to use it
+- How to run it
+- What design axis it changes
+- What to modify next
+- Which example to read after it
+
+## Recommended order
+
+1. `examples/quickstart/minimal_agent.py`
+2. `examples/patterns/react.py`
+3. `examples/patterns/planact.py`
+4. `examples/real/coding_agent.py`
+5. then the other `real/` examples and `benchmarks/` runners
+
+## Canonical structure
+
+- `examples/quickstart/`: smallest runnable agent
+- `examples/patterns/`: one design axis per example
+- `examples/real/`: practical single-task agents on the same authoring path
+- `examples/benchmarks/`: operational evaluation runners, not teaching-first walkthroughs
+
+The shared runtime loop is:
+
+```text
+StateSchema -> prepare -> Engine/Model decide -> tool/env -> reduce -> trace/qita
+```
+
 ## Pattern examples
 
 - ReAct (text protocol): [ReAct Walkthrough](react.md)
@@ -26,6 +58,7 @@ If you only “run the script”, you will miss the core value of QitOS:
 
 ## Source Index
 
+- [examples/quickstart/minimal_agent.py](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py)
 - [examples/patterns/react.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/react.py)
 - [examples/patterns/planact.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/planact.py)
 - [examples/patterns/reflexion.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/reflexion.py)
@@ -34,3 +67,6 @@ If you only “run the script”, you will miss the core value of QitOS:
 - [examples/real/swe_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/swe_agent.py)
 - [examples/real/computer_use_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/computer_use_agent.py)
 - [examples/real/epub_reader_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/epub_reader_agent.py)
+- [examples/benchmarks/gaia_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/gaia_eval.py)
+- [examples/benchmarks/tau_bench_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/tau_bench_eval.py)
+- [examples/benchmarks/cybench_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/cybench_eval.py)

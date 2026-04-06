@@ -7,7 +7,7 @@ QitOS has a working GAIA adapter and runnable agent pipeline:
 - Adapter: `qitos/benchmark/gaia/adapter.py`
 - Canonical conversion: GAIA row -> `Task`
 - Runtime: standard `Engine` loop (no benchmark-specific runtime fork)
-- Example runner: `examples/real/open_deep_research_gaia_agent.py`
+- Example runner: `examples/benchmarks/gaia_eval.py`
 
 ## Why this matters
 
@@ -24,7 +24,7 @@ This keeps research and engineering on one path.
 ### Run one GAIA sample
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -34,7 +34,7 @@ python examples/real/open_deep_research_gaia_agent.py \
 ### Run a full split
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -44,7 +44,7 @@ python examples/real/open_deep_research_gaia_agent.py \
 ### Run only a subset window
 
 ```bash
-python examples/real/open_deep_research_gaia_agent.py \
+python examples/benchmarks/gaia_eval.py \
   --workspace ./qitos_gaia_workspace \
   --gaia-download-snapshot \
   --gaia-split validation \
@@ -66,4 +66,4 @@ qita board --logdir runs
 ## Source Index
 
 - [qitos/benchmark/gaia/adapter.py](https://github.com/Qitor/qitos/blob/main/qitos/benchmark/gaia/adapter.py)
-- [examples/real/open_deep_research_gaia_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/open_deep_research_gaia_agent.py)
+- [examples/benchmarks/gaia_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/gaia_eval.py)

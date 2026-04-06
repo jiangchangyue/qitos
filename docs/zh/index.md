@@ -2,65 +2,60 @@
 
 <div class="qitos-hero">
 
-QitOS 是一个面向研究与工程落地的 **Agent 内核框架**。
+QitOS 是一个面向研究与工程落地的 **LLM Agent 框架**。
 
-- 单主线：`AgentModule + Engine`
-- 显式循环：`prepare -> decide -> act -> reduce -> check_stop`
-- 可复现：hooks + trace 作为一等公民
+- 清晰内核：`AgentModule + Engine`
+- canonical 主线：`prepare -> decide -> act -> reduce -> check_stop`
+- 内建可观测：`qita` board、replay、export 与 traces
 
 <div class="qitos-actions">
-  <a class="qitos-btn qitos-btn-glow" href="zh/getting-started/">开始构建</a>
-  <a class="qitos-btn" href="zh/research/kernel/">先读内核</a>
-  <a class="qitos-btn" href="zh/builder/qita/">用 qita 复盘</a>
+  <a class="qitos-btn qitos-btn-glow" href="start-here.md">Start Here</a>
+  <a class="qitos-btn" href="getting-started/build_agent_in_10_minutes.md">10 分钟搭一个 Agent</a>
+  <a class="qitos-btn" href="tutorials/examples/index.md">查看示例</a>
 </div>
 
 </div>
 
-<div class="qitos-section">
+## 选择你的路径
+
 <div class="qitos-grid">
   <div class="qitos-card">
-    <h3>研究者</h3>
-    <p>复现论文、做方法创新、在统一口径下做严格对比。</p>
-    <p><a href="zh/research/kernel/">从内核开始</a></p>
+    <h3>我想先跑通一个 demo</h3>
+    <p>安装 QitOS，运行最小 agent，再用 qita 查看运行结果。</p>
+    <p><a href="getting-started/index.md">打开快速上手</a></p>
   </div>
   <div class="qitos-card">
-    <h3>开发者</h3>
-    <p>快速跑通、接入工具与环境、稳定上线并可观测。</p>
-    <p><a href="zh/getting-started/">从快速上手开始</a></p>
+    <h3>我想自己写 agent</h3>
+    <p>沿着从 state 到 <code>agent.run(...)</code> 的 canonical 主线开始。</p>
+    <p><a href="getting-started/build_agent_in_10_minutes.md">打开 10 分钟教程</a></p>
   </div>
   <div class="qitos-card">
-    <h3>可观测与复盘</h3>
-    <p>用 qita 做 board/view/replay/export 全链路分析。</p>
-    <p><a href="zh/builder/qita/">打开 qita 使用指南</a></p>
+    <h3>我想理解内核</h3>
+    <p>理解 decision、tool、state、trace 背后的运行时契约。</p>
+    <p><a href="research/kernel.md">打开内核文档</a></p>
   </div>
   <div class="qitos-card">
-    <h3>基准评测就绪</h3>
-    <p>GAIA 已通过 qitos.benchmark -> Task 完成适配。</p>
-    <p><a href="zh/builder/benchmark_gaia/">使用 QitOS 跑 GAIA</a></p>
+    <h3>我想跑 benchmark</h3>
+    <p>在与真实 agent 相同的内核上运行 GAIA 与 Tau-Bench。</p>
+    <p><a href="builder/benchmark_gaia.md">打开 benchmark 指南</a></p>
   </div>
 </div>
-</div>
 
-<div class="qitos-section">
-<h2>2 分钟跑通</h2>
+## 2 分钟跑通
 
-```bash
-pip install -e .
-```
+在仓库根目录执行：
 
 ```bash
-export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
+pip install qitos
 export OPENAI_API_KEY="<your_key>"
-```
-
-```bash
-python examples/patterns/react.py --workspace ./playground
+python examples/quickstart/minimal_agent.py
+qita board --logdir runs
 ```
 
 <div class="qitos-actions">
-  <a class="qitos-btn qitos-btn-glow" href="zh/builder/configuration/">配置模型</a>
-  <a class="qitos-btn" href="research/labs/">查看教程</a>
-</div>
+  <a class="qitos-btn qitos-btn-glow" href="getting-started/first_run.md">第一次运行</a>
+  <a class="qitos-btn" href="builder/configuration.md">配置模型</a>
+  <a class="qitos-btn" href="builder/qita.md">用 qita 复盘</a>
 </div>
 
 ## 产品界面截图
@@ -76,6 +71,13 @@ python examples/patterns/react.py --workspace ./playground
 ### qita 轨迹视图
 
 ![qita trajectory view](../assets/qita_traj_snapshot.png)
+
+## 接下来读什么
+
+- 想快速定向： [Start Here](start-here.md)
+- 想看典型场景： [Use Cases](use-cases.md)
+- 想理解框架保证： [Contracts & Guarantees](reference/contracts.md)
+- 想看 walkthrough： [Example Walkthroughs](tutorials/examples/index.md)
 
 ## Source Index
 

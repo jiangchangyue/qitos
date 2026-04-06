@@ -1,23 +1,42 @@
 """Concrete tool implementations and tool libraries."""
 
+from .codebase import CodebaseToolSet, GlobFiles, GrepFiles, ReadFileRange, AppendFile, MakeDirectory
+from .coding import CodingToolSet
 from .editor import EditorToolSet
 from .epub import EpubToolSet
 from .file import WriteFile, ReadFile, ListFiles
+from .notebook import NotebookToolSet, ReadNotebook, ReplaceNotebookCell, InsertNotebookCell
 from .shell import RunCommand
+from .taskboard import TaskToolSet, TaskBoardStore, TaskRecord, TaskNote
 from .cybench import SubmitAnswer
 from .thinking import ThinkingToolSet, ThoughtData
-from .web import HTTPRequest, HTTPGet, HTTPPost, HTMLExtractText
+from .web import HTTPRequest, HTTPGet, HTTPPost, HTMLExtractText, WebFetch
 from .text_web_browser import WebSearch, VisitURL, PageDown, PageUp, FindInPage, FindNext, ArchiveSearch
 from .library import InMemoryToolLibrary, ToolArtifact, BaseToolLibrary
 from .skill_tools import SkillToolSet
-from .tools import math_tools, editor_tools
+from .tools import math_tools, editor_tools, codebase_tools, notebook_tools, web_tools, coding_tools, task_tools
 
 __all__ = [
+    "CodebaseToolSet",
+    "CodingToolSet",
+    "GlobFiles",
+    "GrepFiles",
+    "ReadFileRange",
+    "AppendFile",
+    "MakeDirectory",
     "EditorToolSet",
     "EpubToolSet",
     "WriteFile",
     "ReadFile",
     "ListFiles",
+    "NotebookToolSet",
+    "ReadNotebook",
+    "ReplaceNotebookCell",
+    "InsertNotebookCell",
+    "TaskToolSet",
+    "TaskBoardStore",
+    "TaskRecord",
+    "TaskNote",
     "RunCommand",
     "SubmitAnswer",
     "ThinkingToolSet",
@@ -26,6 +45,7 @@ __all__ = [
     "HTTPGet",
     "HTTPPost",
     "HTMLExtractText",
+    "WebFetch",
     "WebSearch",
     "VisitURL",
     "PageDown",
@@ -39,4 +59,9 @@ __all__ = [
     "SkillToolSet",
     "math_tools",
     "editor_tools",
+    "codebase_tools",
+    "notebook_tools",
+    "web_tools",
+    "coding_tools",
+    "task_tools",
 ]

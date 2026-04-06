@@ -14,10 +14,12 @@ The objective is to **design and build** agent methods using QitOS contracts, th
 ## Setup
 
 ```bash
-pip install -e .
+pip install qitos
 export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_key>"
 ```
+
+If you are modifying QitOS itself while doing the labs, switch to editable install.
 
 If not configured yet:
 

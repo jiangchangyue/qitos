@@ -21,7 +21,7 @@
 ## 30 分钟起步
 
 ```bash
-pip install -e .
+pip install qitos
 python examples/patterns/react.py
 python examples/patterns/planact.py
 ```

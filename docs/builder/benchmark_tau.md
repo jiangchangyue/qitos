@@ -7,7 +7,7 @@ QitOS supports Tau-Bench through a canonical adapter path:
 - Adapter: `qitos/benchmark/tau_bench/adapter.py`
 - Self-contained runtime: `qitos/benchmark/tau_bench/runtime.py` + `qitos/benchmark/tau_bench/port/*`
 - Conversion: Tau task -> `qitos.core.task.Task`
-- Eval runner: `examples/real/tau_bench_eval.py`
+- Eval runner: `examples/benchmarks/tau_bench_eval.py`
 
 No external `tau_bench` python package is required.
 
@@ -24,7 +24,7 @@ You can evaluate agent scaffolds with the same QitOS kernel and observability st
 ### Single task
 
 ```bash
-python examples/real/tau_bench_eval.py \
+python examples/benchmarks/tau_bench_eval.py \
   --workspace ./qitos_tau_workspace \
   --tau-env retail --tau-split test \
   --task-index 0
@@ -33,7 +33,7 @@ python examples/real/tau_bench_eval.py \
 ### Full eval
 
 ```bash
-python examples/real/tau_bench_eval.py \
+python examples/benchmarks/tau_bench_eval.py \
   --workspace ./qitos_tau_workspace \
   --tau-env retail --tau-split test \
   --run-all --num-trials 1 --concurrency 4 --resume
@@ -42,7 +42,7 @@ python examples/real/tau_bench_eval.py \
 ### Pass@k-style repeated trials
 
 ```bash
-python examples/real/tau_bench_eval.py \
+python examples/benchmarks/tau_bench_eval.py \
   --workspace ./qitos_tau_workspace \
   --tau-env retail --tau-split test \
   --run-all --num-trials 3 --concurrency 6 --resume
@@ -57,6 +57,6 @@ python examples/real/tau_bench_eval.py \
 ## Source Index
 
 - [qitos/benchmark/tau_bench/adapter.py](https://github.com/Qitor/qitos/blob/main/qitos/benchmark/tau_bench/adapter.py)
-- [examples/real/tau_bench_eval.py](https://github.com/Qitor/qitos/blob/main/examples/real/tau_bench_eval.py)
+- [examples/benchmarks/tau_bench_eval.py](https://github.com/Qitor/qitos/blob/main/examples/benchmarks/tau_bench_eval.py)
 - [qitos/evaluate/base.py](https://github.com/Qitor/qitos/blob/main/qitos/evaluate/base.py)
 - [qitos/metric/base.py](https://github.com/Qitor/qitos/blob/main/qitos/metric/base.py)

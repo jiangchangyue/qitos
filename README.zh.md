@@ -8,24 +8,134 @@
 [![PyPI](https://img.shields.io/pypi/v/qitos.svg)](https://pypi.org/project/qitos/)
 [![Repo](https://img.shields.io/badge/github-Qitor%2Fqitos-black)](https://github.com/Qitor/qitos)
 
-**QitOS 是面向严肃智能体研发的 research-first 框架。**  
-它提供统一执行内核、可组合模块与 benchmark 原生工作流，让你从想法快速走到可复现结果，而不必重写整套基础设施。
+面向可复现 LLM Agent 的 research-first 框架。
 
-- English README: [README.md](README.md)
-- 文档站点: [https://qitor.github.io/qitos/](https://qitor.github.io/qitos/)
+QitOS 提供清晰的 `AgentModule + Engine` 内核、benchmark-ready 工作流，以及内建的 `qita` 运行可观测能力。
+
+[开始上手](https://qitor.github.io/qitos/zh/start-here/) · [10 分钟教程](https://qitor.github.io/qitos/zh/getting-started/build_agent_in_10_minutes/) · [示例总览](https://qitor.github.io/qitos/tutorials/examples/) · [English README](README.md)
+
+## QitOS 适合谁
+
+- **研究者**：用可复现运行快速试验 ReAct、PlanAct、ToT、Reflexion 和新方法。
+- **Agent 构建者**：在稳定执行循环上构建工具型 agent，而不是先写一堆框架胶水。
+- **评测使用者**：用与真实 agent 相同的内核跑 GAIA、Tau-Bench、CyBench。
+
+## 2 分钟跑起来
+
+在仓库根目录执行：
+
+```bash
+pip install qitos
+export OPENAI_API_KEY="<your_api_key>"
+python examples/quickstart/minimal_agent.py
+qita board --logdir runs
+```
+
+接下来可以继续：
+
+- 想看 ReAct：见 [`examples/patterns/react.py`](examples/patterns/react.py)
+- 想看 coding agent：见 [`examples/real/coding_agent.py`](examples/real/coding_agent.py)
+- 想看 benchmark：从 [评测指南](https://qitor.github.io/qitos/zh/builder/benchmark_gaia/) 开始
+
+## 为什么是 QitOS
+
+| 如果你想要... | QitOS 提供... |
+|---|---|
+| 可复现的 agent 研究 | 稳定的 `AgentModule + Engine` 内核 |
+| 强可观测性 | `qita` board、replay、export 与 trace 工件 |
+| benchmark 工作流 | GAIA、Tau-Bench、CyBench 适配 |
+| 更少框架胶水 | 一条 canonical 执行主线 |
+
+## 最小 Agent 形状
+
+```python
+from dataclasses import dataclass
+from typing import Any
+
+from qitos import Action, AgentModule, Decision, StateSchema
+
+
+@dataclass
+class DemoState(StateSchema):
+    pass
+
+
+class DemoAgent(AgentModule[DemoState, dict[str, Any], Action]):
+    def init_state(self, task: str, **kwargs: Any) -> DemoState:
+        return DemoState(task=task, max_steps=6)
+
+    def build_system_prompt(self, state: DemoState) -> str | None:
+        return "Solve the task step by step."
+
+    def prepare(self, state: DemoState) -> str:
+        return f"Task: {state.task}\nStep: {state.current_step}/{state.max_steps}"
+
+    def decide(self, state: DemoState, observation: dict[str, Any]):
+        return None
+
+    def reduce(self, state: DemoState, observation: dict[str, Any], decision: Decision[Action]) -> DemoState:
+        return state
+```
+
+完整的 coding agent 与 SWE walkthrough 请看：
+
+- [10 分钟搭一个 Agent](https://qitor.github.io/qitos/zh/getting-started/build_agent_in_10_minutes/)
+- [Coding Agent Walkthrough](https://qitor.github.io/qitos/tutorials/examples/real_coding/)
+- [SWE Agent Walkthrough](https://qitor.github.io/qitos/tutorials/examples/real_swe/)
+
+## 示例总览
+
+### 核心模式
+
+- **ReAct**：文本协议 + 每步一个动作的基线。
+- **PlanAct**：先显式规划，再逐步执行。
+- **Tree-of-Thought**：先分支，再选择，再行动。
+- **Reflexion**：actor-critic 式带证据重试。
+
+### 真实 Agent
+
+- **Coding agent**：编辑器、shell、memory 组成的实用编码循环。
+- **SWE agent**：更强的规划型软件工程工作流。
+- **Computer-use agent**：偏网页研究与 computer-use 风格。
+- **EPUB reader**：文档驱动、带分支推理的阅读 agent。
+
+### 评测
+
+- **GAIA**：运行在 QitOS 内核上的 benchmark runner。
+- **Tau-Bench**：标准 benchmark adapter 链路。
+- **CyBench**：带 guided metrics 的 CTF 式评测。
+
+canonical examples 目录：
+
+- [`examples/quickstart/`](examples/quickstart/)
+- [`examples/patterns/`](examples/patterns/)
+- [`examples/real/`](examples/real/)
+- [`examples/benchmarks/`](examples/benchmarks/)
+
+## 文档地图
+
+- 第一次接触： [Start Here](https://qitor.github.io/qitos/zh/start-here/)
+- 第一条成功路径： [快速上手](https://qitor.github.io/qitos/zh/getting-started/)
+- 写自己的 agent： [10 分钟搭一个 Agent](https://qitor.github.io/qitos/zh/getting-started/build_agent_in_10_minutes/)
+- 理解运行时： [Kernel](https://qitor.github.io/qitos/zh/research/kernel/)
+- 理解框架契约： [Contracts & Guarantees](https://qitor.github.io/qitos/zh/reference/contracts/)
+- 看典型场景： [Use Cases](https://qitor.github.io/qitos/zh/use-cases/)
+- 看 walkthrough： [Example Walkthroughs](https://qitor.github.io/qitos/tutorials/examples/)
+- 看 benchmark： [GAIA](https://qitor.github.io/qitos/zh/builder/benchmark_gaia/) / [Tau-Bench](https://qitor.github.io/qitos/zh/builder/benchmark_tau/)
+- 看 API： [API 参考](https://qitor.github.io/qitos/zh/reference/api_generated/)
 
 ## 界面预览
 
 <table>
   <tr>
-    <td align="center"><strong>QiTOS CLI</strong></td>
+    <td align="center"><strong>QitOS CLI</strong></td>
     <td align="center"><strong>qita Board</strong></td>
-    <td align="center"><strong>qita 轨迹视图</strong></td>
+    <td align="center"><strong>qita Trajectory View</strong></td>
   </tr>
   <tr>
     <td align="center">
       <a href="assets/qitos_cli_snapshot.png">
-        <img src="assets/qitos_cli_snapshot.png" alt="QiTOS CLI" width="100%" />
+        <img src="assets/qitos_cli_snapshot.png" alt="QitOS CLI" width="100%" />
       </a>
     </td>
     <td align="center">
@@ -41,244 +151,25 @@
   </tr>
 </table>
 
-## 为什么团队选择 QitOS
+## 当前阶段
 
-- **研究优先**：天然适配 ReAct、Plan-Act、ToT、Reflexion 及自定义 scaffolding 快速迭代。
-- **统一内核**：`AgentModule + Engine`，生命周期稳定、可推理、易扩展。
-- **模块化架构**：`core`、`engine`、`kit`、`benchmark`、`evaluate` 按需组合。
-- **生态兼容**：可自然接入 OpenAI 兼容模型接口、主机环境与工具注册机制。
-- **Benchmark 原生**：统一支持 GAIA、Tau-Bench、CyBench。
-- **生产级可观测性**：trace、hooks、回放、导出由 `qita` 一体化提供。
+QitOS 当前处于 **Alpha**。
 
-## 核心优势
+- 相对稳定：`AgentModule + Engine`、trace/qita、canonical examples、benchmark adapters。
+- 仍会演进：更高层 convenience API、部分 `kit` 模块、实验性 toolset。
+- 如果你正在评估接入，建议从 kernel 与 examples 开始，而不是假设所有高层表面都已冻结。
 
-```text
-Task -> Engine.run(...)
-     -> prepare -> decide -> act -> reduce -> check_stop -> ...
-     -> hooks + trace + replay + metrics
-```
+## 安装与版本
 
-一套架构同时覆盖研究、评测与真实部署。
+- 支持的 Python 版本：**3.9+**
+- 普通用户安装：`pip install qitos`
+- 仓库 quickstart：在克隆后的仓库根目录运行 examples
+- 源码开发安装：`pip install -e ".[dev,models,benchmarks]"`
+- 安装说明： [Installation](https://qitor.github.io/qitos/zh/getting-started/installation/)
 
-## 安装
+## 参与贡献
 
-```bash
-pip install qitos
-```
-
-开发模式：
-
-```bash
-pip install -e .
-pip install -e ".[models,yaml,benchmarks]"
-```
-
-在仓库根目录验证官方支持的测试集：
-
-```bash
-python -m pytest -q
-```
-
-## 快速开始
-
-运行最小端到端链路：
-
-```bash
-python examples/quickstart/minimal_agent.py
-```
-
-运行模式化智能体示例：
-
-```bash
-export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
-export OPENAI_API_KEY="<your_api_key>"
-python examples/patterns/react.py
-```
-
-查看轨迹与统计：
-
-```bash
-qita board --logdir runs
-```
-
-现在主示例都刻意保持为自包含脚本：
-
-- 顶部常量直接定义 task、workspace 与模型默认值
-- 常用组件统一从 `qitos.kit` 平铺导入
-- 直接调用 `agent.run(...)`
-- 终端 UI 与 trace 默认开启
-
-## AgentModule + Engine 思维方式
-
-QitOS 将职责拆分得非常清晰：
-
-- `AgentModule`：策略层。定义状态、提示词、决策策略与 reduce 逻辑。
-- `Engine`：执行层。统一驱动生命周期、工具调用、停止判定、trace 与 hooks。
-
-这种分层让你可以专注提升 agent 智能，而不需要反复重造 runtime 基础设施。
-
-## 最小 SWE Agent（需求到 PR）
-
-```python
-from dataclasses import dataclass, field
-from typing import Any
-
-from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
-from qitos.kit import EditorToolSet, MarkdownFileMemory, ReActTextParser, RunCommand
-
-SWE_REACT_SYSTEM_PROMPT = """
-你是资深软件工程师 Agent，目标是产出可直接提交 PR 的、满足需求的补丁。
-
-每一步都必须使用 ReAct 格式：
-Thought: 简洁说明下一步推理
-Action: 仅输出一个可执行的工具调用
-
-输出契约（必须严格遵守）：
-Thought: <你的推理>
-Action: <tool_name>(arg1="...", arg2="...")
-
-规则：
-- 修改前先阅读代码与上下文；
-- 优先小步、可验证的改动；
-- 每次修改后执行检查/测试；
-- 如果失败，先定位根因再修复并复测；
-- 所有动作必须基于当前 Observation，不得臆测。
-""".strip()
-
-
-@dataclass
-class SWEState(StateSchema):
-    scratchpad: list[str] = field(default_factory=list)
-    target_file: str = "buggy_module.py"
-    test_command: str = 'python -c "import buggy_module; assert buggy_module.add(20, 22) == 42"'
-
-
-class MinimalSWEAgent(AgentModule[SWEState, dict[str, Any], Action]):
-    def __init__(self, llm: Any, workspace_root: str):
-        reg = ToolRegistry()
-        reg.include(EditorToolSet(workspace_root=workspace_root))
-        reg.register(RunCommand(cwd=workspace_root))
-        super().__init__(
-            tool_registry=reg,
-            llm=llm,
-            model_parser=ReActTextParser(),
-            memory=MarkdownFileMemory(path=f"{workspace_root}/memory.md"),
-        )
-
-    def init_state(self, task: str, **kwargs: Any) -> SWEState:
-        return SWEState(task=task, max_steps=int(kwargs.get("max_steps", 12)))
-
-    def build_system_prompt(self, state: SWEState) -> str | None:
-        return SWE_REACT_SYSTEM_PROMPT
-
-    def prepare(self, state: SWEState) -> str:
-        return (
-            f"Task: {state.task}\n"
-            f"Target file: {state.target_file}\n"
-            f"Test command: {state.test_command}\n"
-            f"Step: {state.current_step}/{state.max_steps}"
-        )
-
-    def decide(self, state: SWEState, observation: dict[str, Any]):
-        return None  # Engine 默认模型路径：prepare -> llm -> parser
-
-    def reduce(self, state: SWEState, observation: dict[str, Any], decision: Decision[Action]) -> SWEState:
-        results = observation.get("action_results", [])
-        if decision.rationale:
-            state.scratchpad.append(f"Thought: {decision.rationale}")
-        if decision.actions:
-            state.scratchpad.append(f"Action: {decision.actions[0]}")
-        if results:
-            state.scratchpad.append(f"Observation: {results[0]}")
-            if isinstance(results[0], dict) and int(results[0].get("returncode", 1)) == 0:
-                state.final_result = "需求已实现，且验证通过。"
-        state.scratchpad = state.scratchpad[-40:]
-        return state
-
-
-# llm = ...
-# agent = MinimalSWEAgent(llm=llm, workspace_root="./playground")
-# result = agent.run(
-#     task="实现需求并让检查通过。",
-#     workspace="./playground",
-#     max_steps=12,
-#     return_state=True,
-# )
-# print(result.state.final_result)
-# print(result.state.stop_reason)
-```
-
-`agent.run(...)` 是推荐主线。默认就会提供：
-
-- 终端 render
-- 写入 `runs/` 的 trace 工件
-- 当传入 `workspace=...` 时自动写入本地 render event 日志
-
-## 提示词-解析器契约（关键）
-
-提示词输出格式与 parser 必须一一对应。这不是风格问题，而是运行正确性的前提。
-
-- `ReActTextParser` 期望模型输出 `Thought:` 与 `Action:` 文本格式。
-- 如果改成 XML 输出，必须同时切换到 XML parser，并在系统提示词中强制 XML 标签。
-- 如果改成 JSON 输出，必须切换 JSON parser，并在提示词中约束 JSON 结构。
-- 只改提示词或只改 parser 都会导致解析不稳定。
-
-快速映射：
-
-- ReAct 文本提示词 -> `ReActTextParser`
-- XML 提示词（`<think>...</think><action>...</action>`）-> `XML parser`
-- JSON 提示词（`{"thought":"...","action":{...}}`）-> `JSON parser`
-
-## 你可以构建什么
-
-模式示例：
-- `examples/patterns/react.py`
-- `examples/patterns/planact.py`
-- `examples/patterns/tot.py`
-- `examples/patterns/reflexion.py`
-
-真实场景：
-- `examples/real/coding_agent.py`
-- `examples/real/swe_agent.py`
-- `examples/real/computer_use_agent.py`
-- `examples/real/epub_reader_agent.py`
-
-## Benchmark 与评测
-
-QitOS 统一链路：
-
-`数据样本 -> adapter -> Task -> Engine -> evaluate -> metric report`
-
-内置适配：
-- `qitos.benchmark.gaia`
-- `qitos.benchmark.tau_bench`
-- `qitos.benchmark.cybench`
-
-评测体系：
-- `qitos.evaluate` 负责单任务结果判定
-- `qitos.metric` 负责基准级指标汇总
-- `qitos.kit` 提供 rule-based / DSL-based / model-based evaluator 与常用 metrics
-
-## qita 可观测性
-
-- `qita board`：运行总览与统计
-- `qita view`：结构化轨迹查看
-- `qita replay`：执行过程回放
-- `qita export`：导出 JSON / HTML 工件
-
-## 项目结构
-
-- `qitos/core/`：接口与核心契约
-- `qitos/engine/`：执行内核
-- `qitos/kit/`：可复用模块（工具、解析、规划、记忆、评测）
-- `qitos/benchmark/`：benchmark 适配层
-- `qitos/qita/`：轨迹工具链
-
-## 文档
-
-- 主文档: [https://qitor.github.io/qitos/](https://qitor.github.io/qitos/)
-- API 参考: [https://qitor.github.io/qitos/reference/api_generated/](https://qitor.github.io/qitos/reference/api_generated/)
-- 中文文档: [https://qitor.github.io/qitos/zh/](https://qitor.github.io/qitos/zh/)
+欢迎贡献。开发环境、文档工作流和 PR 约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## License
 

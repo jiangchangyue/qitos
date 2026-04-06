@@ -319,4 +319,58 @@ class HTMLExtractText(BaseTool):
         return data.strip(), title
 
 
-__all__ = ["HTTPRequest", "HTTPGet", "HTTPPost", "HTMLExtractText"]
+class WebFetch(BaseTool):
+    """Fetch a web page and optionally return extracted readable text."""
+
+    def __init__(
+        self,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: int = 30,
+        max_retries: int = 2,
+    ):
+        self._http = HTTPGet(headers=headers, timeout=timeout, max_retries=max_retries)
+        self._extract = HTMLExtractText()
+        super().__init__(
+            ToolSpec(
+                name="web_fetch",
+                description="Fetch a web page and return structured text content",
+                parameters={
+                    "url": {"type": "string"},
+                    "extract_text": {"type": "boolean"},
+                    "keep_links": {"type": "boolean"},
+                    "max_chars": {"type": "integer"},
+                    "timeout": {"type": "integer"},
+                },
+                required=["url"],
+                permissions=ToolPermission(network=True),
+            )
+        )
+
+    def run(
+        self,
+        url: str,
+        extract_text: bool = True,
+        keep_links: bool = False,
+        max_chars: int = 20_000,
+        timeout: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        response = self._http.run(url=url, timeout=timeout)
+        if response.get("status") == "error":
+            return response
+        if not extract_text:
+            return response
+        content = str(response.get("content", ""))
+        extracted = self._extract.run(html=content, max_chars=max_chars, keep_links=keep_links)
+        return {
+            "status": extracted.get("status", "success"),
+            "url": response.get("url", url),
+            "status_code": response.get("status_code"),
+            "title": extracted.get("title", ""),
+            "content": extracted.get("content", ""),
+            "content_length": extracted.get("length", 0),
+            "truncated": str(extracted.get("content", "")).endswith("[truncated]"),
+            "raw_content_type": response.get("content_type", ""),
+        }
+
+
+__all__ = ["HTTPRequest", "HTTPGet", "HTTPPost", "HTMLExtractText", "WebFetch"]

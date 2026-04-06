@@ -16,7 +16,17 @@ from .prompts import (
     XML_DECISION_SYSTEM_PROMPT,
     render_prompt,
 )
-from .tool import EpubToolSet, EditorToolSet, HTMLExtractText, HTTPGet, ReadFile, RunCommand, WriteFile
+from .tool import (
+    CodingToolSet,
+    EpubToolSet,
+    EditorToolSet,
+    HTMLExtractText,
+    HTTPGet,
+    ReadFile,
+    RunCommand,
+    TaskToolSet,
+    WriteFile,
+)
 
 __all__ = [
     "critic",
@@ -41,12 +51,14 @@ __all__ = [
     "SWE_AGENT_SYSTEM_PROMPT",
     "render_prompt",
     "EditorToolSet",
+    "CodingToolSet",
     "RunCommand",
     "HTTPGet",
     "HTMLExtractText",
     "ReadFile",
     "WriteFile",
     "EpubToolSet",
+    "TaskToolSet",
     "MarkdownFileMemory",
     "WindowMemory",
     "WindowHistory",

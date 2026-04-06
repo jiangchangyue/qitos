@@ -1,33 +1,63 @@
 # Examples
 
-Examples are split into two layers.
+`examples/` is organized as a small canonical learning path for QitOS.
 
-## 1. Teaching examples
+The mental model we want users to internalize is:
 
-These are the files users should read first.
-They are intentionally short, self-contained, and runnable without CLI plumbing.
+```text
+StateSchema -> prepare -> Engine/Model decide -> tool/env -> reduce -> trace/qita
+```
 
-- `examples/quickstart/`
-- `examples/patterns/`
-- `examples/real/` single-task demos
+## Directory map
 
-All primary examples follow the same shape:
+- `examples/quickstart/`: the smallest runnable agent
+- `examples/patterns/`: one design axis per example (`react`, `planact`, `reflexion`, `tot`)
+- `examples/real/`: practical single-task agents that still follow the canonical authoring path
+- `examples/benchmarks/`: operational runners for GAIA, Tau-Bench, and CyBench
+
+## What stays consistent
+
+All teaching-first examples follow the same shape:
 
 - top-level constants for task / workspace / model defaults
-- direct model setup from environment variables
+- one explicit `StateSchema`
 - one `AgentModule`
+- direct model setup from environment variables
 - one `agent.run(...)`
 - terminal UI and trace on by default
 
-## 2. Benchmark runners
+Pattern examples change one design axis at a time.
+Real examples add capability on top of the same authoring path instead of inventing a different structure.
 
-Benchmark/eval runners are allowed to be more operational:
+## Recommended first run order
 
-- GAIA
-- Tau-Bench
-- CyBench
+```bash
+python examples/quickstart/minimal_agent.py
+python examples/patterns/react.py
+python examples/patterns/planact.py
+python examples/real/coding_agent.py
+```
 
-These files may keep benchmark loops, resume logic, JSONL export, and concurrency.
+Then continue with:
+
+```bash
+python examples/patterns/reflexion.py
+python examples/patterns/tot.py
+python examples/real/swe_agent.py
+python examples/real/computer_use_agent.py
+python examples/real/epub_reader_agent.py
+```
+
+## Benchmark runners
+
+Benchmark/eval runners live under `examples/benchmarks/`.
+They are intentionally more operational and may keep benchmark loops, resume logic, JSONL export, and concurrency.
+
+```bash
+python examples/benchmarks/gaia_eval.py --help
+python examples/benchmarks/tau_bench_eval.py --help
+python examples/benchmarks/cybench_eval.py --help
+```
 
 ## Required environment variables
 
@@ -44,25 +74,8 @@ Optional:
 export QITOS_MODEL="Qwen/Qwen3-8B"
 ```
 
-## Quickstart
-
-```bash
-python examples/quickstart/minimal_agent.py
-python examples/patterns/react.py
-python examples/patterns/planact.py
-python examples/patterns/reflexion.py
-```
-
-## Real agents
-
-```bash
-python examples/real/coding_agent.py
-python examples/real/swe_agent.py
-python examples/real/computer_use_agent.py
-python examples/real/epub_reader_agent.py
-```
-
-Notes:
+## Notes
 
 - `examples/real/epub_reader_agent.py` expects a local EPUB at `./playground/epub_reader_agent/book.epub`.
-- benchmark/eval runners remain under `examples/real/` because they are full workflows, not teaching-first demos.
+- `examples/real/skillhub_github_agent.py` is an advanced third-party skill example. Read it after the core canonical path.
+- benchmark runners may require dataset download or local benchmark assets before full runs.

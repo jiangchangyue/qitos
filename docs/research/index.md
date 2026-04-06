@@ -10,12 +10,12 @@ Use QitOS as a research kernel to:
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.9+
 - Basic familiarity with ReAct/PlanAct/ToT/Reflexion ideas
-- This repository installed in editable mode
+- QitOS installed from PyPI or this repository installed in editable mode
 
 ```bash
-pip install -e .
+pip install qitos
 ```
 
 ## Suggested reading order

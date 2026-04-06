@@ -2,65 +2,60 @@
 
 <div class="qitos-hero">
 
-QitOS is a research-first **agentic kernel** for modular and reproducible agent workflows.
+QitOS is a research-first **agent framework** for modular, reproducible LLM agent workflows.
 
-- One mainline: `AgentModule + Engine`
-- Explicit loop: `prepare -> decide -> act -> reduce -> check_stop`
-- Reproducible: hooks + trace as first-class contracts
+- Clean kernel: `AgentModule + Engine`
+- Canonical loop: `prepare -> decide -> act -> reduce -> check_stop`
+- Built-in observability: `qita` board, replay, export, and traces
 
 <div class="qitos-actions">
-  <a class="qitos-btn qitos-btn-glow" href="getting-started/">Start Building</a>
-  <a class="qitos-btn" href="research/kernel/">Learn the Kernel</a>
-  <a class="qitos-btn" href="builder/qita/">Inspect with qita</a>
+  <a class="qitos-btn qitos-btn-glow" href="start-here.md">Start Here</a>
+  <a class="qitos-btn" href="getting-started/build_agent_in_10_minutes.md">Build an Agent in 10 Minutes</a>
+  <a class="qitos-btn" href="tutorials/examples/index.md">Open Examples</a>
 </div>
 
 </div>
 
-<div class="qitos-section">
+## Choose Your Path
+
 <div class="qitos-grid">
   <div class="qitos-card">
-    <h3>Researchers</h3>
-    <p>Reproduce papers, design new methods, compare variants rigorously.</p>
-    <p><a href="research/kernel/">Start with Kernel</a></p>
+    <h3>I want to run a demo</h3>
+    <p>Install QitOS, run the minimal agent, and inspect the run with qita.</p>
+    <p><a href="getting-started/index.md">Go to Getting Started</a></p>
   </div>
   <div class="qitos-card">
-    <h3>Builders</h3>
-    <p>Get running fast, integrate tools/env, ship stable behavior.</p>
-    <p><a href="getting-started/">Start with Getting Started</a></p>
+    <h3>I want to build an agent</h3>
+    <p>Follow the canonical authoring path from state to <code>agent.run(...)</code>.</p>
+    <p><a href="getting-started/build_agent_in_10_minutes.md">Open 10-Minute Tutorial</a></p>
   </div>
   <div class="qitos-card">
-    <h3>Observability</h3>
-    <p>Inspect every run with qita board/view/replay/export.</p>
-    <p><a href="builder/qita/">Open qita Guide</a></p>
+    <h3>I want to study the kernel</h3>
+    <p>Understand the runtime contracts behind decisions, tools, state, and traces.</p>
+    <p><a href="research/kernel.md">Open Kernel Docs</a></p>
   </div>
   <div class="qitos-card">
-    <h3>Benchmark Ready</h3>
-    <p>GAIA is already adapted through qitos.benchmark -> Task.</p>
-    <p><a href="builder/benchmark_gaia/">Run GAIA with QitOS</a></p>
+    <h3>I want benchmarks</h3>
+    <p>Run GAIA and Tau-Bench on the same kernel used by practical agents.</p>
+    <p><a href="builder/benchmark_gaia.md">Open Benchmark Guides</a></p>
   </div>
 </div>
-</div>
 
-<div class="qitos-section">
-<h2>Run in 2 Minutes</h2>
+## Run In 2 Minutes
 
-```bash
-pip install -e .
-```
+From the repository root:
 
 ```bash
-export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
+pip install qitos
 export OPENAI_API_KEY="<your_key>"
-```
-
-```bash
-python examples/patterns/react.py --workspace ./playground
+python examples/quickstart/minimal_agent.py
+qita board --logdir runs
 ```
 
 <div class="qitos-actions">
-  <a class="qitos-btn qitos-btn-glow" href="builder/configuration/">Configure Model</a>
-  <a class="qitos-btn" href="tutorials/examples/">Read Walkthroughs</a>
-</div>
+  <a class="qitos-btn qitos-btn-glow" href="getting-started/first_run.md">First Run Guide</a>
+  <a class="qitos-btn" href="builder/configuration.md">Configure Model</a>
+  <a class="qitos-btn" href="builder/qita.md">Inspect with qita</a>
 </div>
 
 ## Product Snapshot
@@ -76,6 +71,13 @@ python examples/patterns/react.py --workspace ./playground
 ### qita trajectory view
 
 ![qita trajectory view](assets/qita_traj_snapshot.png)
+
+## What To Read Next
+
+- Need a fast orientation: [Start Here](start-here.md)
+- Need concrete scenarios: [Use Cases](use-cases.md)
+- Need framework guarantees: [Contracts & Guarantees](reference/contracts.md)
+- Need examples: [Example Walkthroughs](tutorials/examples/index.md)
 
 ## Source Index
 
