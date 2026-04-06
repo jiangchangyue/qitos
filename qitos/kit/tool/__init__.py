@@ -9,6 +9,7 @@ from .thinking import ThinkingToolSet, ThoughtData
 from .web import HTTPRequest, HTTPGet, HTTPPost, HTMLExtractText
 from .text_web_browser import WebSearch, VisitURL, PageDown, PageUp, FindInPage, FindNext, ArchiveSearch
 from .library import InMemoryToolLibrary, ToolArtifact, BaseToolLibrary
+from .skill_tools import SkillToolSet
 from .tools import math_tools, editor_tools
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "InMemoryToolLibrary",
     "ToolArtifact",
     "BaseToolLibrary",
+    "SkillToolSet",
     "math_tools",
     "editor_tools",
 ]

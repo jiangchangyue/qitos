@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, HistoryPolicy, RuntimeBudget, StateSchema, ToolRegistry, tool
+from qitos import Action, AgentModule, Decision, Engine, HistoryPolicy, StateSchema, ToolRegistry, tool
 from qitos.core.history import History, HistoryMessage
 from qitos.kit.memory import WindowMemory
 from qitos.kit.history import WindowHistory
 from qitos.kit.parser import ReActTextParser
 from qitos.core.memory import Memory, MemoryRecord
+from qitos.engine import RuntimeBudget
 
 
 @dataclass
@@ -54,7 +55,46 @@ def test_engine_happy_path():
 
 def test_agent_run_shortcut():
     agent = DemoAgent()
-    assert agent.run("compute") == "42"
+    assert agent.run("compute", trace=False, render=False) == "42"
+
+
+def test_agent_run_enables_trace_and_render_by_default(tmp_path):
+    workspace = tmp_path / "workspace"
+    logdir = tmp_path / "runs"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    agent = DemoAgent()
+    result = agent.run(
+        "compute",
+        workspace=str(workspace),
+        trace_logdir=str(logdir),
+        return_state=True,
+    )
+
+    assert result.state.final_result == "42"
+    assert (workspace / "render_events.jsonl").exists()
+    run_dirs = [p for p in logdir.iterdir() if p.is_dir()]
+    assert run_dirs
+
+
+def test_agent_run_can_disable_default_trace_and_render(tmp_path):
+    workspace = tmp_path / "workspace"
+    logdir = tmp_path / "runs"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    agent = DemoAgent()
+    result = agent.run(
+        "compute",
+        workspace=str(workspace),
+        trace_logdir=str(logdir),
+        trace=False,
+        render=False,
+        return_state=True,
+    )
+
+    assert result.state.final_result == "42"
+    assert not (workspace / "render_events.jsonl").exists()
+    assert not logdir.exists() or not any(logdir.iterdir())
 
 
 def test_engine_injects_memory_context_into_env_view():

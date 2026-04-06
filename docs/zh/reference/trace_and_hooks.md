@@ -27,9 +27,22 @@ class PrintDecisions(EngineHook):
 
 你既可以直接传给 `Engine(...)`，也可以通过 `agent.run(..., hooks=[...])` 传入：
 
+更推荐的单次运行方式：
+
+```python
+result = my_agent.run(
+    task="做点什么",
+    workspace="./playground",
+    hooks=[PrintDecisions()],
+    return_state=True,
+)
+```
+
+当你要复用一套 runtime 配置时，再直接构造 `Engine(...)`：
+
 ```python
 from qitos import Engine
-from qitos.kit.env import HostEnv
+from qitos.kit import HostEnv
 
 engine = Engine(agent=my_agent, env=HostEnv(workspace_root="./playground"), hooks=[PrintDecisions()])
 result = engine.run("do something")

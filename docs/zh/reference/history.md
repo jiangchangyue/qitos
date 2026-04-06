@@ -38,11 +38,21 @@ Engine 会把当前轮 user/assistant 消息写入 history。
 
 ## HistoryPolicy
 
-通过 Engine 配置：
+在运行时调用上配置：
 
 - `roles`
 - `max_messages`
 - `step_window`
+
+典型 happy path：
+
+```python
+agent.run(
+    task="做点什么",
+    workspace="./playground",
+    history_policy=HistoryPolicy(max_messages=12),
+)
+```
 
 ## Source Index
 

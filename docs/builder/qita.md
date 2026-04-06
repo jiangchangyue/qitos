@@ -19,7 +19,7 @@ Use `qita` as your default run inspection tool: board, view, replay, and export.
 Run any example with trace enabled (default):
 
 ```bash
-python examples/patterns/react.py --workspace ./playground
+python examples/patterns/react.py
 ```
 
 This usually creates run artifacts under `./runs/<run_id>/` with:

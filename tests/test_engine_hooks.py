@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, RuntimeBudget, StateSchema, ToolRegistry
+from qitos import Action, AgentModule, Decision, Engine, StateSchema, ToolRegistry
+from qitos.engine import RuntimeBudget
 from qitos.engine.hooks import EngineHook
 from qitos.kit.critic import PassThroughCritic
 from qitos.kit.parser import ReActTextParser

@@ -2,34 +2,41 @@
 
 ## Goal
 
-Make examples runnable in under 5 minutes with explicit model configuration.
+Make QiTOS examples runnable in under 5 minutes with one mainstream setup path.
 
-## Supported input methods
+## Recommended setup
 
-QitOS examples (via `examples/common.py`) support:
+Primary examples now read model configuration directly from environment variables:
 
-1. CLI args
-2. Environment variables
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- `QITOS_API_KEY` as a fallback key name
+- `QITOS_MODEL` as an optional model name override
 
-Priority for API key is:
-
-1. `--api-key`
-2. `OPENAI_API_KEY`
-3. `QITOS_API_KEY`
-
-## Default model-related args
-
-- `--model-base-url` default: `https://api.siliconflow.cn/v1/`
-- `--model-name` default: `Qwen/Qwen3-8B`
-- `--temperature` default: `0.2`
-- `--max-tokens` default: `2048`
-
-## Fastest setup (recommended)
+Fastest setup:
 
 ```bash
 export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_api_key>"
+export QITOS_MODEL="Qwen/Qwen3-8B"
 ```
+
+Then run any teaching example directly:
+
+```bash
+python examples/patterns/react.py
+python examples/real/coding_agent.py
+```
+
+## Default example values
+
+If you only set the key and endpoint, the primary examples already default to:
+
+- model name: `Qwen/Qwen3-8B`
+- temperature: `0.2`
+- max tokens: `2048`
+
+That keeps the example files self-contained and easy to read.
 
 ## Keep your API key out of git
 
@@ -38,57 +45,36 @@ Do not hardcode keys in examples or commit them to Git.
 Recommended:
 
 - export them in your shell profile, or
-- use a local `.env` file and load it in your shell (do not commit `.env`)
+- load them from a local `.env` in your shell startup, without committing that file
 
-Then run with explicit model endpoint:
-
-```bash
-python examples/patterns/react.py \
-  --model-base-url "$OPENAI_BASE_URL" \
-  --model-name "Qwen/Qwen3-8B" \
-  --workspace ./playground
-```
-
-## Using CLI-only config (no env vars)
+## Quick verification
 
 ```bash
-python examples/patterns/react.py \
-  --model-base-url "https://api.siliconflow.cn/v1/" \
-  --api-key "<your_api_key>" \
-  --model-name "Qwen/Qwen3-8B" \
-  --workspace ./playground
+python examples/patterns/react.py
 ```
 
-## Verify your config quickly
+If configuration is correct, you should see:
 
-Run:
-
-```bash
-python examples/patterns/react.py --max-steps 1 --workspace ./playground
-```
-
-If config is correct, you should see:
-
-1. model call activity in render output
-2. no `Missing API key` exception
-3. trace artifacts in `runs/` (unless `--disable-trace`)
+1. terminal UI rendered automatically
+2. model/tool activity in the run
+3. a trace folder created under `runs/`
 
 ## Common errors
 
-1. `Missing API key...`
-- set `--api-key` or `OPENAI_API_KEY`/`QITOS_API_KEY`
+1. `Set OPENAI_API_KEY or QITOS_API_KEY before running this example.`
+- export one of those keys
 
 2. request 401/403
-- key invalid or endpoint does not accept this key
+- the key is invalid or rejected by the endpoint
 
-3. request 404/model not found
-- wrong `--model-name` for that provider
+3. request 404 / model not found
+- the provider does not serve the configured model name
 
 4. timeout
-- endpoint unavailable, network/proxy issue, or too strict timeout in provider
+- provider unavailable, network/proxy issue, or upstream latency
 
 ## Source Index
 
-- [examples/common.py](https://github.com/Qitor/qitos/blob/main/examples/common.py)
 - [examples/patterns/react.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/react.py)
+- [examples/real/coding_agent.py](https://github.com/Qitor/qitos/blob/main/examples/real/coding_agent.py)
 - [qitos/models/openai.py](https://github.com/Qitor/qitos/blob/main/qitos/models/openai.py)

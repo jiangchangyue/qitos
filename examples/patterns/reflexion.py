@@ -1,19 +1,24 @@
-"""Pattern: Reflexion (self-critique with citations, missing/superfluous checks, and revision)."""
+"""Pattern: Reflexion with grounded self-critique over retrieved evidence."""
 
 from __future__ import annotations
 
-import argparse
 import json
+import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
-from qitos import Action, AgentModule, Decision, EnvSpec, StateSchema, Task, TaskBudget, ToolRegistry
-from qitos.kit.env import HostEnv
-from qitos.kit.prompts import render_prompt
-from qitos.kit.tool import HTMLExtractText, HTTPGet
-from qitos.render import ClaudeStyleHook
+from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
+from qitos.kit import HTMLExtractText, HTTPGet
+from qitos.models import OpenAICompatibleModel
 
-from examples.common import add_common_args, build_model_from_args, make_trace_writer, setup_workspace
+TASK = "Summarize the article and revise the answer until the critique says it is grounded."
+WORKSPACE = Path("./playground/reflexion_pattern")
+TARGET_URL = "https://www.thepaper.cn/newsDetail_forward_32639776"
+MODEL_NAME = os.getenv("QITOS_MODEL", "Qwen/Qwen3-8B")
+MODEL_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.siliconflow.cn/v1/")
+MAX_STEPS = 12
+MAX_REFLECTIONS = 2
 
 REFLEXION_PROMPT = """You are a reflexion actor-critic.
 
@@ -29,19 +34,19 @@ Previous reflections:
 {reflections}
 
 Return valid JSON only:
-{
+{{
   "answer": "revised answer",
-  "citations": [{"source": "source_text", "quote": "exact supporting quote"}],
-  "critique": {
+  "citations": [{{"source": "source_text", "quote": "exact supporting quote"}}],
+  "critique": {{
     "missing": ["missing aspect 1", "..."],
     "superfluous": ["unnecessary claim 1", "..."],
     "grounding": ["claim X is/ is not grounded because ..."],
     "needs_revision": true_or_false
-  }
-}
+  }}
+}}
 
 Hard constraints:
-- Critique must be grounded in source text and must mention evidence quality.
+- Critique must be grounded in source text and discuss evidence quality.
 - Always provide at least 2 citations when possible.
 - Explicitly list both missing and superfluous aspects.
 - No markdown, no extra text, JSON only.
@@ -50,15 +55,15 @@ Hard constraints:
 
 @dataclass
 class ReflexionState(StateSchema):
-    target_url: str = ""
+    target_url: str = TARGET_URL
     page_html: str = ""
     page_text: str = ""
     draft_answer: str = ""
-    reflections: List[Dict[str, Any]] = field(default_factory=list)
-    max_reflections: int = 2
+    reflections: list[dict[str, Any]] = field(default_factory=list)
+    max_reflections: int = MAX_REFLECTIONS
 
 
-class ReflexionAgent(AgentModule[ReflexionState, Dict[str, Any], Action]):
+class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
     def __init__(self, llm: Any):
         registry = ToolRegistry()
         registry.register(HTTPGet())
@@ -68,20 +73,23 @@ class ReflexionAgent(AgentModule[ReflexionState, Dict[str, Any], Action]):
     def init_state(self, task: str, **kwargs: Any) -> ReflexionState:
         return ReflexionState(
             task=task,
-            max_steps=int(kwargs.get("max_steps", 12)),
-            target_url=str(kwargs.get("target_url", "")),
-            max_reflections=int(kwargs.get("max_reflections", 2)),
+            max_steps=int(kwargs.get("max_steps", MAX_STEPS)),
+            target_url=str(kwargs.get("target_url", TARGET_URL)),
+            max_reflections=int(kwargs.get("max_reflections", MAX_REFLECTIONS)),
         )
 
-    def decide(self, state: ReflexionState, observation: Dict[str, Any]) -> Optional[Decision[Action]]:
+    def decide(self, state: ReflexionState, observation: dict[str, Any]):
         if not state.page_html:
             return Decision.act([Action(name="http_get", args={"url": state.target_url})], rationale="fetch_source")
         if not state.page_text:
-            return Decision.act([Action(name="extract_web_text", args={"html": state.page_html, "max_chars": 12000})], rationale="extract_source_text")
+            return Decision.act(
+                [Action(name="extract_web_text", args={"html": state.page_html, "max_chars": 12000})],
+                rationale="extract_source_text",
+            )
 
         payload = self._reflect(state)
         if payload is None:
-            return Decision.final("Failed to produce valid reflexion JSON output")
+            return Decision.final("Failed to produce valid reflexion JSON output.")
 
         critique = payload.get("critique") if isinstance(payload.get("critique"), dict) else {}
         needs_revision = bool(critique.get("needs_revision", False))
@@ -96,32 +104,29 @@ class ReflexionAgent(AgentModule[ReflexionState, Dict[str, Any], Action]):
         citations = payload.get("citations") if isinstance(payload.get("citations"), list) else []
         return Decision.final(answer=f"{answer}\n\nCitations: {citations}")
 
-    def reduce(self, state: ReflexionState, observation: Dict[str, Any], decision: Decision[Action]) -> ReflexionState:
+    def reduce(self, state: ReflexionState, observation: dict[str, Any], decision: Decision[Action]) -> ReflexionState:
         action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
         if action_results:
             first = action_results[0]
             if isinstance(first, dict):
-                if "content" in first and decision.actions and decision.actions[0].name == "http_get":
+                if decision.actions and decision.actions[0].name == "http_get":
                     state.page_html = str(first.get("content", ""))
-                if "content" in first and decision.actions and decision.actions[0].name == "extract_web_text":
+                if decision.actions and decision.actions[0].name == "extract_web_text":
                     state.page_text = str(first.get("content", ""))
         return state
 
-    def _reflect(self, state: ReflexionState) -> Optional[Dict[str, Any]]:
+    def _reflect(self, state: ReflexionState) -> dict[str, Any] | None:
         raw = self.llm(
             [
                 {"role": "system", "content": "Return valid JSON only."},
                 {
                     "role": "user",
-                    "content": render_prompt(
-                        REFLEXION_PROMPT,
-                        {
-                            "task": state.task,
-                            "target_url": state.target_url,
-                            "text": state.page_text[:9000],
-                            "draft": state.draft_answer or "<empty>",
-                            "reflections": json.dumps(state.reflections[-2:], ensure_ascii=False),
-                        },
+                    "content": REFLEXION_PROMPT.format(
+                        task=state.task,
+                        target_url=state.target_url,
+                        text=state.page_text[:9000],
+                        draft=state.draft_answer or "<empty>",
+                        reflections=json.dumps(state.reflections[-2:], ensure_ascii=False),
                     ),
                 },
             ]
@@ -141,42 +146,34 @@ class ReflexionAgent(AgentModule[ReflexionState, Dict[str, Any], Action]):
             return None
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    add_common_args(ap)
-    ap.add_argument("--task", default="Summarize key content and provide grounded claims")
-    ap.add_argument("--target-url", default="https://www.thepaper.cn/newsDetail_forward_32639776")
-    ap.add_argument("--max-steps", type=int, default=12)
-    ap.add_argument("--max-reflections", type=int, default=2)
-    args = ap.parse_args()
-
-    root, temp_ctx = setup_workspace(args.workspace)
-    model = build_model_from_args(args)
-    agent = ReflexionAgent(llm=model)
-    trace_writer = make_trace_writer(args, "pattern_reflexion")
-    hooks = [] if args.disable_render else [ClaudeStyleHook(output_jsonl=str(root / "render_events.jsonl"), theme=args.theme)]
-
-    engine_kwargs = {"env": HostEnv(workspace_root=str(root))}
-    if trace_writer is not None:
-        engine_kwargs["trace_writer"] = trace_writer
-
-    result = agent.run(
-        task=Task(id="pattern_reflexion", objective=args.task, env_spec=EnvSpec(type="host", config={"workspace_root": str(root)}), budget=TaskBudget(max_steps=args.max_steps)),
-        return_state=True,
-        hooks=hooks,
-        target_url=args.target_url,
-        max_steps=args.max_steps,
-        max_reflections=args.max_reflections,
-        engine_kwargs=engine_kwargs,
+def build_model() -> OpenAICompatibleModel:
+    api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
+    if not api_key:
+        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+    return OpenAICompatibleModel(
+        model=MODEL_NAME,
+        api_key=api_key,
+        base_url=MODEL_BASE_URL,
+        temperature=0.2,
+        max_tokens=2048,
     )
-    print("workspace:", root)
+
+
+def main() -> None:
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    agent = ReflexionAgent(llm=build_model())
+    result = agent.run(
+        task=TASK,
+        workspace=str(WORKSPACE),
+        target_url=TARGET_URL,
+        max_steps=MAX_STEPS,
+        max_reflections=MAX_REFLECTIONS,
+        return_state=True,
+    )
+    print("workspace:", WORKSPACE)
     print("final_result:", result.state.final_result)
     print("reflections:", len(result.state.reflections))
     print("stop_reason:", result.state.stop_reason)
-    if trace_writer is not None:
-        print("trace_run_dir:", trace_writer.run_dir)
-    if temp_ctx is not None:
-        temp_ctx.cleanup()
 
 
 if __name__ == "__main__":

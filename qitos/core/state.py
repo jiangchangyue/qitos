@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, ClassVar, Dict, Optional, Tuple, Type, TypeVar
 
 from .errors import StopReason
 
@@ -51,15 +51,6 @@ class StateMigrationRegistry:
 
 
 @dataclass
-class PlanState:
-    """Structured plan state for planner-executor style agents."""
-
-    steps: List[str] = field(default_factory=list)
-    cursor: int = 0
-    status: str = "idle"  # idle | executing | completed
-
-
-@dataclass
 class StateSchema:
     """Canonical typed state base for AgentModule."""
 
@@ -70,9 +61,7 @@ class StateSchema:
     final_result: Optional[str] = None
     stop_reason: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    memory: Dict[str, Any] = field(default_factory=dict)
     metrics: Dict[str, Any] = field(default_factory=dict)
-    plan: PlanState = field(default_factory=PlanState)
 
     # Subclasses can override this and set their own registry.
     migration_registry: ClassVar[StateMigrationRegistry] = StateMigrationRegistry()
@@ -91,10 +80,6 @@ class StateSchema:
             raise StateValidationError(f"Unknown state fields: {unknown_fields}")
 
         filtered = {k: v for k, v in payload.items() if k in known_fields}
-
-        # Handle nested plan dict input.
-        if "plan" in filtered and isinstance(filtered["plan"], dict):
-            filtered["plan"] = PlanState(**filtered["plan"])
 
         obj = cls(**filtered)
         obj.validate()
@@ -123,12 +108,6 @@ class StateSchema:
                 StopReason(str(self.stop_reason))
             except ValueError as exc:
                 raise StateValidationError(f"invalid stop_reason: {self.stop_reason}") from exc
-        if self.plan.cursor < 0:
-            raise StateValidationError("plan.cursor must be >= 0")
-        if self.plan.status not in {"idle", "executing", "completed"}:
-            raise StateValidationError("plan.status must be one of: idle/executing/completed")
-        if self.plan.cursor > len(self.plan.steps):
-            raise StateValidationError("plan.cursor cannot exceed number of plan steps")
 
     def set_stop(self, reason: StopReason | str, final_result: Optional[str] = None) -> None:
         if isinstance(reason, StopReason):
@@ -140,17 +119,4 @@ class StateSchema:
 
     def advance_step(self) -> None:
         self.current_step += 1
-        self.validate()
-
-    def mark_plan_executing(self, steps: List[str]) -> None:
-        self.plan.steps = steps
-        self.plan.cursor = 0
-        self.plan.status = "executing" if steps else "idle"
-        self.validate()
-
-    def mark_plan_step_done(self) -> None:
-        if self.plan.cursor < len(self.plan.steps):
-            self.plan.cursor += 1
-        if self.plan.cursor >= len(self.plan.steps) and self.plan.steps:
-            self.plan.status = "completed"
         self.validate()

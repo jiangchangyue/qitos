@@ -1,71 +1,68 @@
 # Examples
 
-Examples are organized by learning depth.
+Examples are split into two layers.
 
-## Structure
+## 1. Teaching examples
+
+These are the files users should read first.
+They are intentionally short, self-contained, and runnable without CLI plumbing.
 
 - `examples/quickstart/`
-  - minimal runnable agent in ~50 lines.
 - `examples/patterns/`
-  - focused algorithm patterns: ReAct / Plan-Act / ToT / Reflexion.
-- `examples/real/`
-  - practical end-to-end agents: coding / SWE / computer-use / EPUB.
+- `examples/real/` single-task demos
 
-## API Key (local only)
+All primary examples follow the same shape:
+
+- top-level constants for task / workspace / model defaults
+- direct model setup from environment variables
+- one `AgentModule`
+- one `agent.run(...)`
+- terminal UI and trace on by default
+
+## 2. Benchmark runners
+
+Benchmark/eval runners are allowed to be more operational:
+
+- GAIA
+- Tau-Bench
+- CyBench
+
+These files may keep benchmark loops, resume logic, JSONL export, and concurrency.
+
+## Required environment variables
 
 Never commit API keys.
 
 ```bash
+export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="your_api_key"
-# or
-export QITOS_API_KEY="your_api_key"
+```
+
+Optional:
+
+```bash
+export QITOS_MODEL="Qwen/Qwen3-8B"
 ```
 
 ## Quickstart
 
 ```bash
 python examples/quickstart/minimal_agent.py
+python examples/patterns/react.py
+python examples/patterns/planact.py
+python examples/patterns/reflexion.py
 ```
 
-## Patterns
+## Real agents
 
 ```bash
-python examples/patterns/react.py --workspace /tmp/qitos_react
-python examples/patterns/planact.py --workspace /tmp/qitos_planact
-python examples/patterns/tot.py --workspace /tmp/qitos_tot
-python examples/patterns/reflexion.py --workspace /tmp/qitos_reflexion
+python examples/real/coding_agent.py
+python examples/real/swe_agent.py
+python examples/real/computer_use_agent.py
+python examples/real/epub_reader_agent.py
 ```
 
-Notes for Reflexion pattern:
-- The actor must critique each draft with explicit `missing` and `superfluous` lists.
-- The critique must be grounded in external data with explicit citations.
-- The agent revises until critique says no further revision is needed (or max reflections reached).
+Notes:
 
-## Real Agents
-
-```bash
-python examples/real/coding_agent.py --workspace /tmp/qitos_coding
-python examples/real/swe_agent.py --workspace /tmp/qitos_swe
-python examples/real/computer_use_agent.py --workspace /tmp/qitos_computer
-python examples/real/epub_reader_agent.py --workspace /tmp/qitos_epub
-python examples/real/open_deep_research_gaia_agent.py --workspace /tmp/qitos_gaia --gaia-from-local
-python examples/real/open_deep_research_gaia_agent.py --workspace /tmp/qitos_gaia --gaia-from-local --run-all --concurrency 4 --limit 50 --output-jsonl /tmp/qitos_gaia/gaia_results.jsonl
-python examples/real/tau_bench_eval.py --workspace /tmp/qitos_tau --tau-env retail --tau-split test --task-index 0
-python examples/real/cybench_eval.py --workspace /tmp/qitos_cybench --cybench-root ./references/cybench --task-index 0
-python examples/real/cybench_eval.py --workspace /tmp/qitos_cybench --cybench-root ./references/cybench --run-all --max-workers 2 --resume
-```
-
-## Common CLI flags
-
-All pattern/real examples support:
-- `--workspace`
-- `--model-base-url`
-- `--api-key`
-- `--model-name`
-- `--temperature`
-- `--max-tokens`
-- `--theme`
-- `--trace-logdir`
-- `--trace-prefix`
-- `--disable-trace`
-- `--disable-render`
+- `examples/real/epub_reader_agent.py` expects a local EPUB at `./playground/epub_reader_agent/book.epub`.
+- benchmark/eval runners remain under `examples/real/` because they are full workflows, not teaching-first demos.

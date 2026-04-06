@@ -52,10 +52,16 @@ What the example does:
 
 ### Engine wiring: attach a `Search` implementation
 
-The example passes:
+The example uses the high-level run path:
 
 ```python
-engine_kwargs = {"search": DynamicTreeSearch(top_k=2), ...}
+agent.run(
+    task=...,
+    workspace=...,
+    search=DynamicTreeSearch(top_k=2),
+    trace=...,
+    render=...,
+)
 ```
 
 Design principle:

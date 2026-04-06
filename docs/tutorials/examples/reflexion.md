@@ -86,7 +86,7 @@ What the example does:
 2. Add stop criteria:
    - stop if critique says `needs_revision=false` twice in a row
 3. Externalize critic to Engine:
-   - use `Engine(critics=[...])` to decouple reflection from actor policy
+   - use `agent.run(..., critics=[...])` to decouple reflection from actor policy
 
 ## Source Index
 

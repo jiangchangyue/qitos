@@ -8,7 +8,7 @@ from .errors import (
     RuntimeErrorInfo,
     QitosRuntimeError,
 )
-from .state import StateSchema, PlanState, StateMigrationRegistry, StateValidationError, StateMigrationError
+from .state import StateSchema, StateMigrationRegistry, StateValidationError, StateMigrationError
 from .memory import Memory, MemoryRecord
 from .history import History, HistoryMessage, HistoryPolicy
 from .env import Env, EnvSpec, EnvObservation, EnvStepResult, FileSystemCapability, CommandCapability
@@ -37,7 +37,6 @@ __all__ = [
     "RuntimeErrorInfo",
     "QitosRuntimeError",
     "StateSchema",
-    "PlanState",
     "StateMigrationRegistry",
     "StateValidationError",
     "StateMigrationError",

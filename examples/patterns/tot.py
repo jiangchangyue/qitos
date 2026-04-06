@@ -1,28 +1,36 @@
-"""Pattern: Tree-of-Thought (multiple candidate actions + search-based selection)."""
+"""Pattern: Tree-of-Thought with branch search over EPUB evidence."""
 
 from __future__ import annotations
 
-import argparse
 import json
+import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
-from qitos import Action, AgentModule, Decision, EnvSpec, StateSchema, Task, TaskBudget, ToolRegistry
-from qitos.kit.env import HostEnv
-from qitos.kit.planning import DynamicTreeSearch
-from qitos.kit.prompts import render_prompt
-from qitos.kit.tool import EpubToolSet
-from qitos.render import ClaudeStyleHook
+from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
+from qitos.kit import DynamicTreeSearch, EpubToolSet, format_action
+from qitos.models import OpenAICompatibleModel
 
-from examples.common import add_common_args, build_model_from_args, make_trace_writer, setup_workspace
+TASK = "Read the EPUB and answer the question with concise supporting evidence."
+WORKSPACE = Path("./playground/tot_pattern")
+EPUB_PATH = WORKSPACE / "book.epub"
+QUESTION = "What is the main argument of chapter 1?"
+MODEL_NAME = os.getenv("QITOS_MODEL", "Qwen/Qwen3-8B")
+MODEL_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.siliconflow.cn/v1/")
+MAX_STEPS = 12
 
-THOUGHT_PROMPT = """Question: {question}\nEPUB path: {epub_path}\nEvidence:\n{evidence}\n
+THOUGHT_PROMPT = """Question: {question}
+EPUB path: {epub_path}
+Evidence:
+{evidence}
+
 Return JSON:
-{
-  "thoughts": [{"idea": "...", "score": 0.0, "action": {"name": "epub.list_chapters|epub.search|epub.read_chapter", "args": {...}}}],
+{{
+  "thoughts": [{{"idea": "...", "score": 0.0, "action": {{"name": "epub.list_chapters|epub.search|epub.read_chapter", "args": {{...}}}}}}],
   "can_answer": true_or_false,
   "answer": "optional"
-}
+}}
 """
 
 
@@ -30,10 +38,11 @@ Return JSON:
 class ToTState(StateSchema):
     epub_path: str = "book.epub"
     question: str = ""
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    scratchpad: list[str] = field(default_factory=list)
 
 
-class ToTAgent(AgentModule[ToTState, Dict[str, Any], Action]):
+class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
         registry.register_toolset(EpubToolSet(workspace_root=workspace_root), namespace="epub")
@@ -42,30 +51,39 @@ class ToTAgent(AgentModule[ToTState, Dict[str, Any], Action]):
     def init_state(self, task: str, **kwargs: Any) -> ToTState:
         return ToTState(
             task=task,
-            max_steps=int(kwargs.get("max_steps", 12)),
-            epub_path=str(kwargs.get("epub_path", "book.epub")),
-            question=str(kwargs.get("question", "")),
+            max_steps=int(kwargs.get("max_steps", MAX_STEPS)),
+            epub_path=str(kwargs.get("epub_path", EPUB_PATH.name)),
+            question=str(kwargs.get("question", QUESTION)),
         )
 
-    def decide(self, state: ToTState, observation: Dict[str, Any]) -> Optional[Decision[Action]]:
+    def decide(self, state: ToTState, observation: dict[str, Any]):
         if state.current_step == 0:
             return Decision.act([Action(name="epub.list_chapters", args={"path": state.epub_path})], rationale="bootstrap_catalog")
 
-        raw = self.llm([
-            {"role": "system", "content": "Return valid JSON only."},
-            {
-                "role": "user",
-                "content": render_prompt(THOUGHT_PROMPT, {"question": state.question, "epub_path": state.epub_path, "evidence": self._evidence_block(state)}),
-            },
-        ])
+        raw = self.llm(
+            [
+                {"role": "system", "content": "Return valid JSON only."},
+                {
+                    "role": "user",
+                    "content": THOUGHT_PROMPT.format(
+                        question=state.question,
+                        epub_path=state.epub_path,
+                        evidence=self._evidence_block(state),
+                    ),
+                },
+            ]
+        )
         parsed = self._parse_json(str(raw))
         if not parsed:
-            return Decision.act([Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})], rationale="fallback_search")
+            return Decision.act(
+                [Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})],
+                rationale="fallback_search",
+            )
 
         if bool(parsed.get("can_answer")) and str(parsed.get("answer", "")).strip() and len(state.evidence) >= 2:
             return Decision.final(answer=str(parsed["answer"]))
 
-        candidates: List[Decision[Action]] = []
+        candidates: list[Decision[Action]] = []
         for item in parsed.get("thoughts", []):
             if not isinstance(item, dict):
                 continue
@@ -76,25 +94,39 @@ class ToTAgent(AgentModule[ToTState, Dict[str, Any], Action]):
                 continue
             args.setdefault("path", state.epub_path)
             score = float(item.get("score", 0.5))
-            candidates.append(Decision.act([Action(name=name, args=args)], rationale=str(item.get("idea", "candidate")), meta={"score": score}))
+            candidates.append(
+                Decision.act(
+                    [Action(name=name, args=args)],
+                    rationale=str(item.get("idea", "candidate")),
+                    meta={"score": score},
+                )
+            )
 
         if not candidates:
-            return Decision.act([Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})], rationale="fallback_search")
+            return Decision.act(
+                [Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})],
+                rationale="fallback_search",
+            )
         return Decision.branch(candidates=candidates, rationale="tot_branch")
 
-    def reduce(self, state: ToTState, observation: Dict[str, Any], decision: Decision[Action]) -> ToTState:
+    def reduce(self, state: ToTState, observation: dict[str, Any], decision: Decision[Action]) -> ToTState:
         action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
-        if not action_results:
-            return state
-        result = action_results[0]
-        if isinstance(result, dict):
-            if isinstance(result.get("hits"), list):
-                for h in result["hits"][:3]:
-                    if isinstance(h, dict):
-                        state.evidence.append(str(h.get("snippet", "")))
-            if isinstance(result.get("content"), str):
-                state.evidence.append(result["content"][:320])
+        if decision.rationale:
+            state.scratchpad.append(f"Thought: {decision.rationale}")
+        if decision.actions:
+            state.scratchpad.append(f"Action: {format_action(decision.actions[0])}")
+        if action_results:
+            result = action_results[0]
+            state.scratchpad.append(f"Observation: {result}")
+            if isinstance(result, dict):
+                if isinstance(result.get("hits"), list):
+                    for hit in result["hits"][:3]:
+                        if isinstance(hit, dict):
+                            state.evidence.append(str(hit.get("snippet", "")))
+                if isinstance(result.get("content"), str):
+                    state.evidence.append(result["content"][:320])
         state.evidence = state.evidence[-20:]
+        state.scratchpad = state.scratchpad[-30:]
         return state
 
     def _evidence_block(self, state: ToTState) -> str:
@@ -102,7 +134,7 @@ class ToTAgent(AgentModule[ToTState, Dict[str, Any], Action]):
             return "- none"
         return "\n".join(f"- {item}" for item in state.evidence[-8:])
 
-    def _parse_json(self, raw: str) -> Optional[Dict[str, Any]]:
+    def _parse_json(self, raw: str) -> dict[str, Any] | None:
         text = raw.strip()
         if not text:
             return None
@@ -119,41 +151,39 @@ class ToTAgent(AgentModule[ToTState, Dict[str, Any], Action]):
         return None
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    add_common_args(ap)
-    ap.add_argument("--task", default="Read EPUB and answer question")
-    ap.add_argument("--epub-path", default="book.epub")
-    ap.add_argument("--question", default="What is the main argument of chapter 1?")
-    ap.add_argument("--max-steps", type=int, default=12)
-    args = ap.parse_args()
-
-    root, temp_ctx = setup_workspace(args.workspace)
-    model = build_model_from_args(args)
-    agent = ToTAgent(llm=model, workspace_root=str(root))
-    trace_writer = make_trace_writer(args, "pattern_tot")
-    hooks = [] if args.disable_render else [ClaudeStyleHook(output_jsonl=str(root / "render_events.jsonl"), theme=args.theme)]
-
-    engine_kwargs = {"search": DynamicTreeSearch(top_k=2), "env": HostEnv(workspace_root=str(root))}
-    if trace_writer is not None:
-        engine_kwargs["trace_writer"] = trace_writer
-
-    result = agent.run(
-        task=Task(id="pattern_tot", objective=args.task, env_spec=EnvSpec(type="host", config={"workspace_root": str(root)}), budget=TaskBudget(max_steps=args.max_steps)),
-        return_state=True,
-        hooks=hooks,
-        epub_path=args.epub_path,
-        question=args.question,
-        max_steps=args.max_steps,
-        engine_kwargs=engine_kwargs,
+def build_model() -> OpenAICompatibleModel:
+    api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
+    if not api_key:
+        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+    return OpenAICompatibleModel(
+        model=MODEL_NAME,
+        api_key=api_key,
+        base_url=MODEL_BASE_URL,
+        temperature=0.2,
+        max_tokens=2048,
     )
-    print("workspace:", root)
+
+
+def main() -> None:
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    if not EPUB_PATH.exists():
+        raise FileNotFoundError(
+            f"Expected an EPUB at {EPUB_PATH}. Place a sample book there before running this example."
+        )
+
+    agent = ToTAgent(llm=build_model(), workspace_root=str(WORKSPACE))
+    result = agent.run(
+        task=TASK,
+        workspace=str(WORKSPACE),
+        epub_path=EPUB_PATH.name,
+        question=QUESTION,
+        max_steps=MAX_STEPS,
+        search=DynamicTreeSearch(top_k=2),
+        return_state=True,
+    )
+    print("workspace:", WORKSPACE)
     print("final_result:", result.state.final_result)
     print("stop_reason:", result.state.stop_reason)
-    if trace_writer is not None:
-        print("trace_run_dir:", trace_writer.run_dir)
-    if temp_ctx is not None:
-        temp_ctx.cleanup()
 
 
 if __name__ == "__main__":

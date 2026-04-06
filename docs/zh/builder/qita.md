@@ -19,7 +19,7 @@
 先跑一个示例（默认会写 trace）：
 
 ```bash
-python examples/patterns/react.py --workspace ./playground
+python examples/patterns/react.py
 ```
 
 通常会在 `./runs/<run_id>/` 下看到：

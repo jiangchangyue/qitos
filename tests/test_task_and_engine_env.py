@@ -9,10 +9,7 @@ from qitos import (
     Decision,
     Engine,
     Env,
-    EnvObservation,
     EnvSpec,
-    EnvStepResult,
-    RuntimeBudget,
     StateSchema,
     StopReason,
     Task,
@@ -21,6 +18,8 @@ from qitos import (
     ToolRegistry,
     tool,
 )
+from qitos.core.env import EnvObservation, EnvStepResult
+from qitos.engine import RuntimeBudget
 from qitos.kit.parser import ReActTextParser
 
 
@@ -118,7 +117,7 @@ def test_task_budget_overrides_engine_budget():
 def test_agent_run_accepts_task_object():
     agent = _DemoAgent()
     task = Task(id="t_run", objective="run noop", budget=TaskBudget(max_steps=1))
-    output = agent.run(task)
+    output = agent.run(task, trace=False, render=False)
     assert output is None
 
 

@@ -26,9 +26,9 @@
 ## Milestone 4：接入 Env 与 Memory/History
 
 1. 优先用 `HostEnv`
-2. 通过 `Engine(history_policy=...)` 控制 history 窗口
+2. 通过 `agent.run(..., history_policy=...)` 控制 history 窗口
 3. 在 `prepare(state)` 中显式读取 memory
-3. 检查 trace 里 memory/env payload 是否完整
+4. 检查 trace 里 memory/env payload 是否完整
 
 ## Milestone 5：上线前加固
 
@@ -39,11 +39,9 @@
 ## 实战命令（可直接复制）
 
 ```bash
-python examples/real/coding_agent.py \
-  --model-base-url "https://api.siliconflow.cn/v1/" \
-  --api-key "<your_api_key>" \
-  --model-name "Qwen/Qwen3-8B" \
-  --workspace ./playground
+export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
+export OPENAI_API_KEY="<your_api_key>"
+python examples/real/coding_agent.py
 ```
 
 ## Source Index

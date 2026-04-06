@@ -7,10 +7,15 @@
 
 - [Classes](#classes)
 - [Functions](#functions)
+- [Class: `NumberedPlanBuilder`](#class-numberedplanbuilder)
 - [Class: `PlanCursor`](#class-plancursor)
 - [Function: `parse_numbered_plan`](#function-parse-numbered-plan)
 
 ## Classes
+
+<a id="class-numberedplanbuilder"></a>
+???+ note "Class: `NumberedPlanBuilder(self, system_prompt: 'str' = 'Return a numbered plan only.')`"
+    Small reusable helper for LLM-based numbered plan generation.
 
 <a id="class-plancursor"></a>
 ???+ note "Class: `PlanCursor(self, plan_field: 'str' = 'plan', cursor_field: 'str' = 'plan_cursor')`"

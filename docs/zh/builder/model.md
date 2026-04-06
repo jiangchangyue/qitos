@@ -10,7 +10,7 @@
 
 1. Engine 调 `agent.prepare(state)`
 2. Engine 拼接 system prompt
-3. Engine 注入 memory messages
+3. Engine 注入 history messages
 4. Engine 调 `agent.llm(messages)`
 5. parser 把模型输出转成 `Decision`
 
@@ -18,7 +18,7 @@
 
 ```python
 from qitos import AgentModule
-from qitos.kit.parser import ReActTextParser
+from qitos.kit import ReActTextParser
 
 class MyAgent(AgentModule):
     def __init__(self, llm):
@@ -28,7 +28,7 @@ class MyAgent(AgentModule):
         return "你是严谨的代码智能体。"
 
     def prepare(self, state):
-        return f"任务: {state.task}\n观察: {observation}"
+        return f"任务: {state.task}\n步数: {state.current_step}/{state.max_steps}"
 
     def decide(self, state, observation):
         return None

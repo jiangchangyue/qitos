@@ -164,9 +164,6 @@ def _run_objective(
 ) -> Dict[str, Any]:
     agent = CyBenchReactAgent(llm=model, workspace_root=str(workspace))
     trace_writer = make_trace_writer(args, task_id)
-    engine_kwargs: Dict[str, Any] = {"env": env}
-    if trace_writer is not None:
-        engine_kwargs["trace_writer"] = trace_writer
 
     task_obj = Task(
         id=task_id,
@@ -180,7 +177,8 @@ def _run_objective(
         max_steps=int(args.max_steps),
         objective=objective,
         workspace=str(workspace),
-        engine_kwargs=engine_kwargs,
+        env=env,
+        trace=trace_writer,
     )
     return {
         "result": result,

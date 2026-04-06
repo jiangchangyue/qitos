@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def parse_numbered_plan(text: str) -> List[str]:
@@ -17,6 +17,21 @@ def parse_numbered_plan(text: str) -> List[str]:
         if m:
             items.append(m.group(2).strip())
     return items
+
+
+class NumberedPlanBuilder:
+    """Small reusable helper for LLM-based numbered plan generation."""
+
+    def __init__(self, system_prompt: str = "Return a numbered plan only."):
+        self.system_prompt = system_prompt
+
+    def build(self, llm: Any, prompt: str, extra_messages: Optional[List[Dict[str, str]]] = None) -> List[str]:
+        messages: List[Dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+        if extra_messages:
+            messages.extend(extra_messages)
+        messages.append({"role": "user", "content": prompt})
+        raw = llm(messages)
+        return parse_numbered_plan(str(raw))
 
 
 class PlanCursor:
@@ -47,4 +62,4 @@ class PlanCursor:
         return cursor >= len(plan)
 
 
-__all__ = ["parse_numbered_plan", "PlanCursor"]
+__all__ = ["parse_numbered_plan", "NumberedPlanBuilder", "PlanCursor"]

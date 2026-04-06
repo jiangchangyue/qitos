@@ -10,7 +10,7 @@
 
 It intentionally mixes two decision mechanisms:
 
-- a deterministic “planner” (`_plan`) that calls LLM directly
+- a deterministic “planner” (`_plan`) that calls a reusable `NumberedPlanBuilder`
 - Engine-driven ReAct execution (`decide -> None`) once a plan step exists
 
 ## Core idea
@@ -77,9 +77,14 @@ Design principle:
 
 What the example does:
 
-- uses a strict “numbered plan only” system instruction
-- parses with `parse_numbered_plan(...)`
+- uses `PLAN_DRAFT_PROMPT` as a strict numbered-plan contract
+- delegates numbered-list parsing to `NumberedPlanBuilder`
 - records the plan into `scratchpad` for traceability
+
+This matters because prompt and parser stay paired:
+
+- plan draft prompt -> numbered list parser/builder
+- execution prompt -> `ReActTextParser`
 
 ### `reduce`: advance cursor only on successful step
 
@@ -100,11 +105,11 @@ What the example does:
 2. Dynamic replanning:
    - set cursor to end when verification fails, then `_plan` again
 3. Search-based plan selection:
-   - emit `Decision.branch(candidates=[...])` and attach `Engine(search=...)`
+   - emit `Decision.branch(candidates=[...])` and attach `agent.run(..., search=...)`
 
 ## Source Index
 
 - [examples/patterns/planact.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/planact.py)
 - [qitos/core/state.py](https://github.com/Qitor/qitos/blob/main/qitos/core/state.py)
-- [qitos/kit/planning/plan_parser.py](https://github.com/Qitor/qitos/blob/main/qitos/kit/planning/plan_parser.py)
+- [qitos/kit/planning/plan.py](https://github.com/Qitor/qitos/blob/main/qitos/kit/planning/plan.py)
 - [qitos/kit/parser/react_parser.py](https://github.com/Qitor/qitos/blob/main/qitos/kit/parser/react_parser.py)

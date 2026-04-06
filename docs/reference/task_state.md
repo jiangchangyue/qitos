@@ -22,7 +22,7 @@ task = Task(
 )
 ```
 
-Use plain string tasks (`Engine.run("...")`) when you are prototyping.
+Use plain string tasks (`agent.run("...")`) when you are prototyping.
 Use `Task(...)` when you need reproducibility, metadata, and consistent evaluation.
 
 ## StateSchema
@@ -33,15 +33,15 @@ It already includes kernel-stable fields used by Engine and tooling:
 
 - `task`, `current_step`, `max_steps`
 - `final_result`, `stop_reason`
-- `memory` (optional structured memory view)
+- `metadata` (stable run metadata you want to keep in state)
 - `metrics` (place to accumulate eval stats)
-- `plan` (structured `PlanState` for plan/execute style agents)
 
 Principles:
 
 1. put all experiment-relevant fields in state
 2. keep state bounded (truncate logs)
 3. never rely on local variables for critical facts
+4. add planning or memory-specific fields only in your own subclass or via `qitos.kit.*` helpers
 
 ### Minimal StateSchema subclass
 

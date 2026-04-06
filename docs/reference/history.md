@@ -38,11 +38,21 @@ Typical history stream:
 
 ## HistoryPolicy
 
-Configure from Engine:
+Configure on the runtime call:
 
 - `roles`
 - `max_messages`
 - `step_window`
+
+Typical happy path:
+
+```python
+agent.run(
+    task="do something",
+    workspace="./playground",
+    history_policy=HistoryPolicy(max_messages=12),
+)
+```
 
 ## Source Index
 

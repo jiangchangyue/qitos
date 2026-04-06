@@ -22,7 +22,7 @@ task = Task(
 )
 ```
 
-当你在快速试错时，可以直接用字符串任务（`Engine.run(\"...\")`）。
+当你在快速试错时，可以直接用字符串任务（`agent.run(\"...\")`）。
 当你要做可复现实验、做横向对比、做评测时，建议用 `Task(...)`。
 
 ## StateSchema
@@ -33,15 +33,15 @@ task = Task(
 
 - `task`, `current_step`, `max_steps`
 - `final_result`, `stop_reason`
-- `memory`（可选：结构化记忆视图）
+- `metadata`（你希望稳定挂在 state 上的运行元数据）
 - `metrics`（用来积累评测指标）
-- `plan`（结构化 `PlanState`，用于 plan/execute 风格 agent）
 
 原则：
 
 1. 所有实验相关字段都要进入 state
 2. 状态必须有界（截断日志）
 3. 不要把关键事实放在局部变量
+4. 规划、记忆等特定字段请放到你自己的 state 子类里，或使用 `qitos.kit.*` 中的辅助模块
 
 ### 最小 StateSchema 子类
 

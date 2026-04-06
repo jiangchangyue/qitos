@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import qitos
-from qitos import Action, AgentModule, Decision, Engine, RuntimeBudget, StateSchema, StopReason
+from qitos import Action, AgentModule, Decision, Engine, StateSchema, StopReason
 from qitos.core.memory import Memory, MemoryRecord
+from qitos.engine import RuntimeBudget
 
 
 @dataclass

@@ -73,6 +73,8 @@ This reducer:
    - stop only when `report.md` exists and has > N chars
 3. Add memory:
    - set memory on `AgentModule` (`super().__init__(..., memory=...)`)
+4. Keep runtime wiring on the happy path:
+   - use `agent.run(..., workspace=..., trace=..., render=...)`
 
 ## Source Index
 

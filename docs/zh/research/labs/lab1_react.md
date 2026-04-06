@@ -61,8 +61,7 @@ class ReactState(StateSchema):
 
 ```python
 from qitos import Action, AgentModule, ToolRegistry
-from qitos.kit.tool import EditorToolSet, RunCommand
-from qitos.kit.parser import ReActTextParser
+from qitos.kit import EditorToolSet, ReActTextParser, RunCommand
 
 class ReactAgent(AgentModule[ReactState, dict, Action]):
     def __init__(self, llm, workspace_root: str):
@@ -76,7 +75,7 @@ class ReactAgent(AgentModule[ReactState, dict, Action]):
 
 ```python
 from qitos import Decision
-from qitos.kit.planning import format_action
+from qitos.kit import format_action
 
 SYSTEM_PROMPT = """You are a concise ReAct agent.
 Rules:
@@ -129,11 +128,14 @@ class ReactAgent(AgentModule[ReactState, dict, Action]):
 ### D1. 运行代码
 
 ```python
-from qitos import Engine
-from qitos.kit.env import HostEnv
-
-engine = Engine(agent=agent, env=HostEnv(workspace_root="./playground"))
-result = engine.run(task, max_steps=8)
+result = agent.run(
+    task=task,
+    workspace="./playground",
+    max_steps=8,
+    trace=True,
+    render=True,
+    return_state=True,
+)
 print(result.state.final_result, result.state.stop_reason)
 ```
 

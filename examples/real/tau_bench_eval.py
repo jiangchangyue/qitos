@@ -260,21 +260,20 @@ def _run_one_task(args: argparse.Namespace, adapter: TauBenchAdapter, idx: int, 
     agent = TauBenchAgent(llm=model, tau_env=tau_env)
 
     trace_writer = make_trace_writer(args, f"tau_{args.tau_env}_{idx:05d}_trial{trial}")
-    hooks = [] if args.disable_render else [ClaudeStyleHook(output_jsonl=str(root / "render_events.jsonl"), theme=args.theme)]
-
-    engine_kwargs: Dict[str, Any] = {}
-    if trace_writer is not None:
-        engine_kwargs["trace_writer"] = trace_writer
+    render = None if args.disable_render else ClaudeStyleHook(
+        output_jsonl=str(root / "render_events.jsonl"),
+        theme=args.theme,
+    )
 
     error_msg = None
     try:
         result = agent.run(
             task=task,
             return_state=True,
-            hooks=hooks,
             max_steps=int(args.max_steps),
             task_index=idx,
-            engine_kwargs=engine_kwargs,
+            trace=trace_writer,
+            render=render,
         )
         eval_out = _evaluate_one(task=task, result=result, include_model_judge=bool(args.enable_model_judge), llm=model)
         reward = float(result.state.metadata.get("tau_reward", 0.0))

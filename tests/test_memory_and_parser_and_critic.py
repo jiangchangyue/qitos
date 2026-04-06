@@ -1,4 +1,4 @@
-from qitos import MemoryRecord
+from qitos.core.memory import MemoryRecord
 from qitos.kit.critic import PassThroughCritic
 from qitos.kit.memory import SummaryMemory, VectorMemory, WindowMemory
 from qitos.kit.parser import (

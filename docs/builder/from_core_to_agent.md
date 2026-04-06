@@ -26,9 +26,9 @@ Build a practical agent by inheriting core contracts, with clear implementation 
 ## Milestone 4: add env + memory/history
 
 1. choose Env backend (`HostEnv` first)
-2. set `Engine(history_policy=...)` for bounded model history
+2. set `agent.run(..., history_policy=...)` for bounded model history
 3. keep memory retrieval inside `prepare(state)`
-3. verify trace includes memory and env payload
+4. verify trace includes memory and env payload
 
 ## Milestone 5: harden runtime
 
@@ -39,11 +39,9 @@ Build a practical agent by inheriting core contracts, with clear implementation 
 ## Minimal production-ready run command
 
 ```bash
-python examples/real/coding_agent.py \
-  --model-base-url "https://api.siliconflow.cn/v1/" \
-  --api-key "<your_api_key>" \
-  --model-name "Qwen/Qwen3-8B" \
-  --workspace ./playground
+export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
+export OPENAI_API_KEY="<your_api_key>"
+python examples/real/coding_agent.py
 ```
 
 ## Source Index

@@ -86,7 +86,7 @@ Run a pattern-based agent:
 ```bash
 export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_api_key>"
-python examples/patterns/react.py --workspace ./playground
+python examples/patterns/react.py
 ```
 
 Inspect trajectories:
@@ -94,6 +94,13 @@ Inspect trajectories:
 ```bash
 qita board --logdir runs
 ```
+
+Primary examples are now intentionally self-contained:
+
+- top-level constants for task, workspace, and model defaults
+- `from qitos.kit import ...` for common practical components
+- direct `agent.run(...)`
+- terminal UI and trace enabled by default
 
 ## AgentModule + Engine Mindset
 
@@ -110,11 +117,8 @@ This separation gives you a clean place to innovate on agent intelligence withou
 from dataclasses import dataclass, field
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, EnvSpec, HistoryPolicy, StateSchema, Task, TaskBudget, ToolRegistry
-from qitos.kit.env import HostEnv
-from qitos.kit.memory import MarkdownFileMemory
-from qitos.kit.parser import ReActTextParser
-from qitos.kit.tool import EditorToolSet, RunCommand
+from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
+from qitos.kit import EditorToolSet, MarkdownFileMemory, ReActTextParser, RunCommand
 
 SWE_REACT_SYSTEM_PROMPT = """
 You are a senior software engineer agent that delivers requirement-complete, PR-ready patches.
@@ -189,19 +193,21 @@ class MinimalSWEAgent(AgentModule[SWEState, dict[str, Any], Action]):
 
 # llm = ...
 # agent = MinimalSWEAgent(llm=llm, workspace_root="./playground")
-# task = Task(
-#     id="swe_minimal",
-#     objective="Implement the requirement and make checks pass.",
-#     env_spec=EnvSpec(type="host", config={"workspace_root": "./playground"}),
-#     budget=TaskBudget(max_steps=12),
+# result = agent.run(
+#     task="Implement the requirement and make checks pass.",
+#     workspace="./playground",
+#     max_steps=12,
+#     return_state=True,
 # )
-# result = Engine(
-#     agent=agent,
-#     env=HostEnv(workspace_root="./playground"),
-#     history_policy=HistoryPolicy(max_messages=20),
-# ).run(task)
-# print(result.state.final_result, result.state.stop_reason)
+# print(result.state.final_result)
+# print(result.state.stop_reason)
 ```
+
+`agent.run(...)` is the blessed path. By default it gives you:
+
+- terminal render
+- trace artifacts in `runs/`
+- workspace-local render event logs when `workspace=...` is provided
 
 ## Prompt-Parser Contract (Critical)
 

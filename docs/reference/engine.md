@@ -34,8 +34,18 @@ When `decide` returns `None`, Engine does:
 
 - `env`
 - `history_policy`
+- `search`
+- `critics`
 - `hooks`
 - `trace_writer`
+
+For most users, the preferred entry point is still:
+
+```python
+agent.run(task, workspace="./playground", max_steps=8)
+```
+
+Use `Engine(...)` directly when you need to preconfigure runtime pieces once and reuse them across many runs.
 
 ## EngineResult
 
@@ -50,9 +60,12 @@ When `decide` returns `None`, Engine does:
 ## Minimal usage
 
 ```python
-from qitos import Engine
-
-result = Engine(agent=my_agent, env=my_env).run(task)
+result = my_agent.run(
+    task="do something",
+    workspace="./playground",
+    max_steps=8,
+    return_state=True,
+)
 print(result.state.final_result, result.state.stop_reason)
 ```
 

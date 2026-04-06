@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .plan import PlanState
+
 
 def set_str(state: Any, key: str, value: str) -> Any:
     setattr(state, key, value)
@@ -19,4 +21,4 @@ def append_str(state: Any, key: str, value: str, max_items: int = 50) -> Any:
     return state
 
 
-__all__ = ["set_str", "append_str"]
+__all__ = ["PlanState", "set_str", "append_str"]

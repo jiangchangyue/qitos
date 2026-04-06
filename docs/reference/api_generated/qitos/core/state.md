@@ -7,17 +7,12 @@
 
 - [Classes](#classes)
 - [Functions](#functions)
-- [Class: `PlanState`](#class-planstate)
 - [Class: `StateMigrationError`](#class-statemigrationerror)
 - [Class: `StateMigrationRegistry`](#class-statemigrationregistry)
 - [Class: `StateSchema`](#class-stateschema)
 - [Class: `StateValidationError`](#class-statevalidationerror)
 
 ## Classes
-
-<a id="class-planstate"></a>
-???+ note "Class: `PlanState(self, steps: 'List[str]' = <factory>, cursor: 'int' = 0, status: 'str' = 'idle') -> None`"
-    Structured plan state for planner-executor style agents.
 
 <a id="class-statemigrationerror"></a>
 ???+ note "Class: `StateMigrationError(self, /, *args, **kwargs)`"
@@ -28,7 +23,7 @@
     Simple in-process migration graph for state schema versions.
 
 <a id="class-stateschema"></a>
-???+ note "Class: `StateSchema(self, schema_version: 'int' = 1, task: 'str' = '', current_step: 'int' = 0, max_steps: 'int' = 10, final_result: 'Optional[str]' = None, stop_reason: 'Optional[str]' = None, metadata: 'Dict[str, Any]' = <factory>, memory: 'Dict[str, Any]' = <factory>, metrics: 'Dict[str, Any]' = <factory>, plan: 'PlanState' = <factory>) -> None`"
+???+ note "Class: `StateSchema(self, schema_version: 'int' = 1, task: 'str' = '', current_step: 'int' = 0, max_steps: 'int' = 10, final_result: 'Optional[str]' = None, stop_reason: 'Optional[str]' = None, metadata: 'Dict[str, Any]' = <factory>, metrics: 'Dict[str, Any]' = <factory>) -> None`"
     Canonical typed state base for AgentModule.
 
 <a id="class-statevalidationerror"></a>

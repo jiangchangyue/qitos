@@ -93,15 +93,15 @@ Design principle:
 
 - “done” should be a function of tool evidence, not model confidence.
 
-## Engine wiring (why it matters)
+## Runtime wiring (why it matters)
 
-This example passes into `Engine(...)`:
+This example keeps the happy path on `agent.run(...)`:
 
 - `super().__init__(..., memory=MarkdownFileMemory(path=".../memory.md"))`
 - `critics=[ReActSelfReflectionCritic(max_retries=2)]`
-- `env=HostEnv(workspace_root=...)`
 - `history_policy=HistoryPolicy(max_messages=12)`
-- `trace_writer=...` (optional)
+- `workspace=...` so `HostEnv` can be auto-created
+- `trace=...` / `render=...` (optional)
 
 That’s the core “builder stack” in QitOS:
 

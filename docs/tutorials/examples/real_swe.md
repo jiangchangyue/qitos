@@ -87,12 +87,13 @@ Advancement rules:
 - on verification `returncode == 0` => set `final_result` and finish
 - on failed verification => trigger replanning next step
 
-## Engine wiring (what makes it “SWE-like”)
+## Runtime wiring (what makes it “SWE-like”)
 
-The example uses:
+The example keeps authoring on `agent.run(...)`, while still using richer runtime modules:
 
 - `RepoEnv(...)` so file/process ops are scoped to a repo workspace
-- `DynamicTreeSearch(...)` (optional) to select branch candidates
+- `search=DynamicTreeSearch(...)` to select branch candidates
+- structured `Task(...)` because SWE tasks benefit from explicit resources and success criteria
 
 ## Source Index
 

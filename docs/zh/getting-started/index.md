@@ -26,6 +26,11 @@
     <p>board/view/replay/export 一套闭环。</p>
     <p><a href="../builder/qita/">打开 qita 使用指南</a></p>
   </div>
+  <div class="qitos-card">
+    <h3>5）10 分钟搭一个 Agent</h3>
+    <p>按推荐主线，从 state 一步走到 <code>agent.run(...)</code>。</p>
+    <p><a href="build_agent_in_10_minutes/">打开 10 分钟教程</a></p>
+  </div>
 </div>
 
 ## 如果你是研究者

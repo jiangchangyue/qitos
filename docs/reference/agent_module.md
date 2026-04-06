@@ -2,9 +2,10 @@
 
 ## Role
 
-`AgentModule` defines policy semantics. `Engine` owns orchestration.
+`AgentModule` defines agent semantics.
+`Engine` owns execution, orchestration, trace, and hooks.
 
-You implement how state is initialized, how model input is prepared, how decisions are made, and how state is reduced.
+For most users, `AgentModule` is the main object to author.
 
 ## Required methods
 
@@ -20,17 +21,60 @@ You implement how state is initialized, how model input is prepared, how decisio
 
 ## Decision semantics
 
-- Return `Decision`: fully custom policy path.
-- Return `None`: Engine model path (`prepare` -> messages -> llm -> parser -> `Decision`).
+- return a `Decision`: fully custom policy path
+- return `None`: default Engine model path
 
-## Memory semantics
+Default Engine model path:
 
-Memory is on the agent (`self.memory`).
-History is on the agent (`self.history`).
+```text
+prepare -> history assembly -> llm(messages) -> parser -> Decision
+```
 
-- You can pass memory when constructing the agent (`super().__init__(..., memory=...)`).
-- In `prepare`, you can retrieve memory via `self.memory.retrieve(...)`.
-- Engine uses `self.history.retrieve(...)` with engine-side `HistoryPolicy` when `decide` returns `None`.
+## Preferred run path
+
+For normal single-run workflows, instantiate the agent and call `agent.run(...)`.
+
+```python
+result = agent.run(
+    task="fix the bug",
+    workspace="./playground",
+    max_steps=8,
+    return_state=True,
+)
+```
+
+By default, `agent.run(...)` now enables:
+
+- terminal rendering
+- trace writing into `runs/`
+
+Use `trace=False` or `render=False` only when you explicitly want to turn them off.
+
+Use `Engine(...)` directly only when you want a reusable advanced runtime configuration.
+
+## Memory and History semantics
+
+Memory and history are different on purpose.
+
+- `self.memory`: task-level retrieval store used by your agent inside `prepare`
+- `self.history`: message history used by Engine to assemble model input when `decide(...)` returns `None`
+
+Typical usage:
+
+- put long-term or selective retrieval logic in memory
+- let Engine manage message history with `HistoryPolicy`
+
+## Prompt-parser contract
+
+Prompt format and parser must agree.
+
+Examples:
+
+- ReAct prompt -> `ReActTextParser`
+- XML decision prompt -> `XmlDecisionParser`
+- JSON decision prompt -> `JsonDecisionParser`
+
+This is a hard runtime contract.
 
 ## Minimal skeleton
 
@@ -39,7 +83,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry, tool
-from qitos.kit.parser import ReActTextParser
+from qitos.kit import ReActTextParser
 
 @dataclass
 class S(StateSchema):
@@ -59,7 +103,7 @@ class A(AgentModule[S, dict[str, Any], Action]):
         return S(task=task, max_steps=6)
 
     def build_system_prompt(self, state: S) -> str | None:
-        return "Use ReAct. Return Action(...) or Final Answer: ..."
+        return "Use ReAct and return one action or Final Answer."
 
     def prepare(self, state: S) -> str:
         return f"Task: {state.task}\nRecent: {state.scratchpad[-6:]}"

@@ -2,17 +2,18 @@
 
 ## Goal
 
-Get two runs working end-to-end:
+Get two end-to-end runs working:
 
-1. a minimal run (no model call) to validate the kernel wiring
-2. an LLM-backed ReAct run to validate model + parser + tools + trace
+1. a minimal run without an LLM, just to validate the kernel loop
+2. an LLM-backed ReAct run, to validate model + parser + tools + trace
 
-## 0) (One-time) configure model for LLM examples
+## 0) Configure the model once
 
-QitOS examples read:
+Primary QiTOS examples read:
 
-- `OPENAI_BASE_URL` (provider endpoint)
-- `OPENAI_API_KEY` (or `QITOS_API_KEY`)
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- `QITOS_API_KEY` as a fallback
 
 Fastest setup:
 
@@ -21,9 +22,7 @@ export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_api_key>"
 ```
 
-If you prefer CLI-only config, see: [Configuration & API Keys](../builder/configuration.md).
-
-## 1) Run the minimal agent (no LLM)
+## 1) Run the minimal agent
 
 ```bash
 python examples/quickstart/minimal_agent.py
@@ -31,38 +30,45 @@ python examples/quickstart/minimal_agent.py
 
 What to check:
 
-1. The program completes with a final result.
-2. The run has a clear stop reason.
-3. If traces are enabled, you can find a run folder under `runs/`.
+1. the script completes with a final result
+2. the stop reason is explicit
+3. a trace run appears under `runs/`
 
-## 2) Run an LLM-backed agent (ReAct)
-
-This run exercises the default model path:
-
-- `AgentModule.decide(...) -> None`
-- Engine builds messages (system + memory + prepared user text)
-- Engine calls `llm(messages)`
-- Parser turns text into `Decision(Action(...))`
-- Engine executes the tool call and reduces into state
+## 2) Run an LLM-backed agent
 
 ```bash
-python examples/patterns/react.py --workspace ./playground
+python examples/patterns/react.py
 ```
+
+This exercises the default Engine path:
+
+- `decide(...) -> None`
+- Engine assembles `system + history + prepared user input`
+- Engine calls `llm(messages)`
+- parser turns model text into `Decision`
+- Engine executes the action and reduces back into state
 
 What to check:
 
-1. You can see model output in the terminal render (unless `--disable-render`).
-2. Tools are actually called (you should see action results in scratchpad/trace).
-3. A run folder exists under `runs/` and contains `manifest.json`, `events.jsonl`, `steps.jsonl`.
+1. terminal render appears automatically
+2. tool calls and observations are visible in the run
+3. `runs/` contains the trace artifacts
+
+## Why this matters
+
+The same happy path scales from teaching demos to real agents:
+
+- author the policy in `AgentModule`
+- run through `agent.run(...)`
+- get trace + terminal UI by default
 
 ## Next
 
-- If model calls fail: [Configuration & API Keys](../builder/configuration.md)
-- Inspect your run with qita: [qita Guide](../builder/qita.md)
+- Model setup details: [Configuration & API Keys](../builder/configuration.md)
+- Inspect runs with qita: [qita Guide](../builder/qita.md)
 
 ## Source Index
 
 - [examples/quickstart/minimal_agent.py](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py)
-- [qitos/core/agent_module.py](https://github.com/Qitor/qitos/blob/main/qitos/core/agent_module.py)
-- [qitos/engine/engine.py](https://github.com/Qitor/qitos/blob/main/qitos/engine/engine.py)
 - [examples/patterns/react.py](https://github.com/Qitor/qitos/blob/main/examples/patterns/react.py)
+- [qitos/core/agent_module.py](https://github.com/Qitor/qitos/blob/main/qitos/core/agent_module.py)

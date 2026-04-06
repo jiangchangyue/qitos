@@ -10,13 +10,13 @@
 - [Class: `StateValidationGate`](#class-statevalidationgate)
 - [Class: `StateValidatorChain`](#class-statevalidatorchain)
 - [Function: `validate_final_consistency`](#function-validate-final-consistency)
-- [Function: `validate_plan_cursor`](#function-validate-plan-cursor)
+- [Function: `validate_optional_plan_fields`](#function-validate-optional-plan-fields)
 - [Function: `validate_step_bounds`](#function-validate-step-bounds)
 
 ## Classes
 
 <a id="class-statevalidationgate"></a>
-???+ note "Class: `StateValidationGate(self, validators: 'Iterable[Validator]' = [<function validate_step_bounds at 0x102debe20>, <function validate_plan_cursor at 0x102e104a0>, <function validate_final_consistency at 0x102e10540>])`"
+???+ note "Class: `StateValidationGate(self, validators: 'Iterable[Validator]' = [<function validate_step_bounds at 0x1116bf740>, <function validate_optional_plan_fields at 0x1116bfd80>, <function validate_final_consistency at 0x1116bfe20>])`"
     Run validation checks before and after each engine phase.
 
 <a id="class-statevalidatorchain"></a>
@@ -29,8 +29,8 @@
 ???+ note "Function: `validate_final_consistency(state: 'StateSchema') -> 'None'`"
     _No summary available._
 
-<a id="function-validate-plan-cursor"></a>
-???+ note "Function: `validate_plan_cursor(state: 'StateSchema') -> 'None'`"
+<a id="function-validate-optional-plan-fields"></a>
+???+ note "Function: `validate_optional_plan_fields(state: 'StateSchema') -> 'None'`"
     _No summary available._
 
 <a id="function-validate-step-bounds"></a>

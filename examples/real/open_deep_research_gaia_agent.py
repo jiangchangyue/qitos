@@ -251,23 +251,21 @@ def _run_one_record(
     model = build_model_from_args(args)
     agent = OpenDeepResearchGaiaAgent(llm=model, workspace_root=str(task_workspace))
     trace_writer = make_trace_writer(args, f"gaia_odr_{_normalize_filename(task.id)}")
-    hooks = [] if args.disable_render else [
-        ClaudeStyleHook(output_jsonl=str(task_workspace / "render_events.jsonl"), theme=args.theme)
-    ]
-
-    engine_kwargs: dict[str, Any] = {"env": TextWebEnv(workspace_root=str(task_workspace))}
-    if trace_writer is not None:
-        engine_kwargs["trace_writer"] = trace_writer
+    render = None if args.disable_render else ClaudeStyleHook(
+        output_jsonl=str(task_workspace / "render_events.jsonl"),
+        theme=args.theme,
+    )
 
     error_msg = None
     try:
         result = agent.run(
             task=task,
             return_state=True,
-            hooks=hooks,
             max_steps=args.max_steps,
             task_payload=task.inputs,
-            engine_kwargs=engine_kwargs,
+            env=TextWebEnv(workspace_root=str(task_workspace)),
+            trace=trace_writer,
+            render=render,
         )
         final_result = result.state.final_result
         stop_reason = result.state.stop_reason

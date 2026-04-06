@@ -1,6 +1,7 @@
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, RuntimeBudget, StateSchema, ToolRegistry, tool
+from qitos import Action, AgentModule, Decision, Engine, StateSchema, ToolRegistry, tool
+from qitos.engine import RuntimeBudget
 from qitos.kit.tool import EditorToolSet
 
 

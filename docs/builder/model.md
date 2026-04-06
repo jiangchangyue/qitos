@@ -10,7 +10,7 @@ When `AgentModule.decide(...)` returns `None`:
 
 1. Engine calls `agent.prepare(state)`.
 2. Engine adds system prompt from `build_system_prompt`.
-3. Engine retrieves memory messages.
+3. Engine retrieves history messages.
 4. Engine calls `agent.llm(messages)`.
 5. Parser maps model output to `Decision`.
 
@@ -18,7 +18,7 @@ When `AgentModule.decide(...)` returns `None`:
 
 ```python
 from qitos import AgentModule
-from qitos.kit.parser import ReActTextParser
+from qitos.kit import ReActTextParser
 
 class MyAgent(AgentModule):
     def __init__(self, llm):
@@ -28,7 +28,7 @@ class MyAgent(AgentModule):
         return "You are a precise coding assistant."
 
     def prepare(self, state):
-        return f"Task: {state.task}\nObservation: {observation}"
+        return f"Task: {state.task}\nStep: {state.current_step}/{state.max_steps}"
 
     def decide(self, state, observation):
         return None

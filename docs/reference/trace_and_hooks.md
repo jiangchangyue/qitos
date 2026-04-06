@@ -27,9 +27,22 @@ class PrintDecisions(EngineHook):
 
 You can attach hooks either via `Engine(...)` or via `agent.run(..., hooks=[...])`:
 
+Preferred single-run path:
+
+```python
+result = my_agent.run(
+    task="do something",
+    workspace="./playground",
+    hooks=[PrintDecisions()],
+    return_state=True,
+)
+```
+
+Reusable runtime path:
+
 ```python
 from qitos import Engine
-from qitos.kit.env import HostEnv
+from qitos.kit import HostEnv
 
 engine = Engine(agent=my_agent, env=HostEnv(workspace_root="./playground"), hooks=[PrintDecisions()])
 result = engine.run("do something")

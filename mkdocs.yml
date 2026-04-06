@@ -73,6 +73,7 @@ nav:
           - Installation: getting-started/installation.md
           - Configuration & API Keys: builder/configuration.md
           - First Run (Minimal + LLM): getting-started/first_run.md
+          - Build an Agent in 10 Minutes: getting-started/build_agent_in_10_minutes.md
           - Inspect Runs with qita: builder/qita.md
       - Concepts:
           - Kernel (AgentModule + Engine): research/kernel.md
@@ -123,6 +124,7 @@ nav:
           - 安装: zh/getting-started/installation.md
           - 配置与 API Key: zh/builder/configuration.md
           - 第一次运行: zh/getting-started/first_run.md
+          - 10 分钟搭一个 Agent: zh/getting-started/build_agent_in_10_minutes.md
           - 使用 qita 查看运行: zh/builder/qita.md
       - 核心概念:
           - 内核（AgentModule + Engine）: zh/research/kernel.md

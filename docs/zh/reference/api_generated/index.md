@@ -5,6 +5,7 @@
 ## 分组跳转
 
 - [qitos.benchmark](#group-qitos-benchmark)
+- [qitos.cli](#group-qitos-cli)
 - [qitos.core](#group-qitos-core)
 - [qitos.debug](#group-qitos-debug)
 - [qitos.engine](#group-qitos-engine)
@@ -84,6 +85,11 @@
 - [`qitos.benchmark.tau_bench.port.types`](qitos/benchmark/tau_bench/port/types.md)
 - [`qitos.benchmark.tau_bench.runtime`](qitos/benchmark/tau_bench/runtime.md)
 
+<a id="group-qitos-cli"></a>
+### `qitos.cli`
+
+- [`qitos.cli`](qitos/cli.md)
+
 <a id="group-qitos-core"></a>
 ### `qitos.core`
 
@@ -112,6 +118,11 @@
 ### `qitos.engine`
 
 - [`qitos.engine`](qitos/engine.md)
+- [`qitos.engine._action_runtime`](qitos/engine/_action_runtime.md)
+- [`qitos.engine._control_runtime`](qitos/engine/_control_runtime.md)
+- [`qitos.engine._env_runtime`](qitos/engine/_env_runtime.md)
+- [`qitos.engine._model_runtime`](qitos/engine/_model_runtime.md)
+- [`qitos.engine._trace_runtime`](qitos/engine/_trace_runtime.md)
 - [`qitos.engine.action_executor`](qitos/engine/action_executor.md)
 - [`qitos.engine.branching`](qitos/engine/branching.md)
 - [`qitos.engine.critic`](qitos/engine/critic.md)
@@ -173,7 +184,17 @@
 - [`qitos.kit.planning.state_ops`](qitos/kit/planning/state_ops.md)
 - [`qitos.kit.prompts`](qitos/kit/prompts.md)
 - [`qitos.kit.prompts.template`](qitos/kit/prompts/template.md)
+- [`qitos.kit.skill`](qitos/kit/skill.md)
+- [`qitos.kit.skill.cli`](qitos/kit/skill/cli.md)
+- [`qitos.kit.skill.injector`](qitos/kit/skill/injector.md)
+- [`qitos.kit.skill.integration`](qitos/kit/skill/integration.md)
+- [`qitos.kit.skill.loader`](qitos/kit/skill/loader.md)
+- [`qitos.kit.skill.manager`](qitos/kit/skill/manager.md)
+- [`qitos.kit.skill.manifest`](qitos/kit/skill/manifest.md)
+- [`qitos.kit.skill.provider`](qitos/kit/skill/provider.md)
+- [`qitos.kit.skill.registry`](qitos/kit/skill/registry.md)
 - [`qitos.kit.state`](qitos/kit/state.md)
+- [`qitos.kit.state.plan`](qitos/kit/state/plan.md)
 - [`qitos.kit.tool`](qitos/kit/tool.md)
 - [`qitos.kit.tool.cybench`](qitos/kit/tool/cybench.md)
 - [`qitos.kit.tool.editor`](qitos/kit/tool/editor.md)
@@ -183,6 +204,7 @@
 - [`qitos.kit.tool.library.base`](qitos/kit/tool/library/base.md)
 - [`qitos.kit.tool.library.store`](qitos/kit/tool/library/store.md)
 - [`qitos.kit.tool.shell`](qitos/kit/tool/shell.md)
+- [`qitos.kit.tool.skill_tools`](qitos/kit/tool/skill_tools.md)
 - [`qitos.kit.tool.text_web_browser`](qitos/kit/tool/text_web_browser.md)
 - [`qitos.kit.tool.thinking`](qitos/kit/tool/thinking.md)
 - [`qitos.kit.tool.tools`](qitos/kit/tool/tools.md)

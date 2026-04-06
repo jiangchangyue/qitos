@@ -13,6 +13,7 @@ It uses:
 - `EpubToolSet` (chapter listing/search/reading)
 - `Decision.branch(...)` for candidate actions
 - optional `DynamicTreeSearch` for selection
+- `agent.run(..., search=DynamicTreeSearch(...))` as the preferred runtime hook-up
 
 ## Core design choices
 

@@ -19,9 +19,14 @@ def validate_step_bounds(state: StateSchema) -> None:
         )
 
 
-def validate_plan_cursor(state: StateSchema) -> None:
-    if state.plan.cursor > len(state.plan.steps):
-        raise StateValidationError("plan cursor exceeds available plan steps")
+def validate_optional_plan_fields(state: StateSchema) -> None:
+    plan_steps = getattr(state, "plan_steps", None)
+    cursor = getattr(state, "cursor", None)
+    if isinstance(plan_steps, list) and cursor is not None:
+        if int(cursor) < 0:
+            raise StateValidationError("cursor must be >= 0 when plan_steps is present")
+        if int(cursor) > len(plan_steps):
+            raise StateValidationError("cursor exceeds available plan steps")
 
 
 def validate_final_consistency(state: StateSchema) -> None:
@@ -36,7 +41,7 @@ def validate_final_consistency(state: StateSchema) -> None:
 
 DEFAULT_STATE_VALIDATORS: List[Validator] = [
     validate_step_bounds,
-    validate_plan_cursor,
+    validate_optional_plan_fields,
     validate_final_consistency,
 ]
 
@@ -70,6 +75,6 @@ __all__ = [
     "StateValidatorChain",
     "StateValidationGate",
     "validate_step_bounds",
-    "validate_plan_cursor",
+    "validate_optional_plan_fields",
     "validate_final_consistency",
 ]

@@ -26,6 +26,11 @@ Get from zero to a runnable agent with inspectable traces.
     <p>Use board/view/replay/export to debug runs.</p>
     <p><a href="../builder/qita/">Open qita Guide</a></p>
   </div>
+  <div class="qitos-card">
+    <h3>5) Build in 10 Minutes</h3>
+    <p>Follow the blessed authoring path from state to <code>agent.run(...)</code>.</p>
+    <p><a href="build_agent_in_10_minutes/">Open 10-Min Guide</a></p>
+  </div>
 </div>
 
 ## If you are a researcher

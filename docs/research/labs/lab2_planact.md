@@ -67,7 +67,7 @@ def build_plan(llm, task: str) -> list[str]:
 
 ```python
 from qitos import Action, AgentModule, Decision, ToolRegistry
-from qitos.kit.parser import ReActTextParser
+from qitos.kit import ReActTextParser
 
 class PlanActAgent(AgentModule[PlanActState, dict, Action]):
     def __init__(self, llm, tool_registry: ToolRegistry):

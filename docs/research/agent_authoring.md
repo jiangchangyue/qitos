@@ -16,6 +16,19 @@ Build a new agent by implementing only policy code, while keeping runtime behavi
 3. `decide(state, observation)`
 4. `should_stop(state)`
 
+## Recommended authoring path
+
+For most new agents, use this path:
+
+1. define a small `StateSchema` subclass
+2. define prompt + parser together
+3. implement `prepare`
+4. let `decide` return `None`
+5. implement `reduce`
+6. run with `agent.run(...)`
+
+This keeps policy code in the agent and runtime configuration in the call site, without forcing you to manually wire `Engine(...)`.
+
 ## Template
 
 ```python
@@ -53,6 +66,22 @@ class MyAgent(AgentModule[MyState, dict[str, Any], Action]):
 - Let `reduce` be state transition only.
 - Put all I/O in tools/env, not in `reduce`.
 - Keep stop logic explicit (`final`, `should_stop`, criteria).
+- Treat prompt format and parser as one contract.
+- Use `history_policy=...` on `agent.run(...)` to control model-facing history.
+- Keep memory retrieval explicit inside `prepare`, via `self.memory`.
+
+## Happy-path run
+
+```python
+result = agent.run(
+    task="solve the task",
+    workspace="./playground",
+    max_steps=8,
+    trace=True,
+    render=True,
+    return_state=True,
+)
+```
 
 ## Source Index
 

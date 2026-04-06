@@ -46,6 +46,7 @@ setup(
         "beautifulsoup4>=4.12.3",
         "lxml>=5.2.0",
         "rich>=13.7.0",
+        "pyyaml>=6.0",
     ],
     extras_require={
         "models": ["openai>=1.0.0"],
@@ -78,6 +79,7 @@ setup(
     zip_safe=False,
     entry_points={
         "console_scripts": [
+            "qit=qitos.cli:main",
             "qita=qitos.qita.cli:main",
         ]
     },

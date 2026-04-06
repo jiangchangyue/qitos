@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
-from qitos import Action, AgentModule, Decision, Engine, RuntimeBudget, StateSchema, ToolRegistry
+from qitos import Action, AgentModule, Decision, Engine, StateSchema, ToolRegistry
+from qitos.engine import RuntimeBudget
 from qitos.kit.env import HostEnv
 from qitos.kit.tool import WriteFile
 

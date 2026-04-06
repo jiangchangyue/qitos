@@ -86,7 +86,7 @@ python examples/quickstart/minimal_agent.py
 ```bash
 export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
 export OPENAI_API_KEY="<your_api_key>"
-python examples/patterns/react.py --workspace ./playground
+python examples/patterns/react.py
 ```
 
 查看轨迹与统计：
@@ -94,6 +94,13 @@ python examples/patterns/react.py --workspace ./playground
 ```bash
 qita board --logdir runs
 ```
+
+现在主示例都刻意保持为自包含脚本：
+
+- 顶部常量直接定义 task、workspace 与模型默认值
+- 常用组件统一从 `qitos.kit` 平铺导入
+- 直接调用 `agent.run(...)`
+- 终端 UI 与 trace 默认开启
 
 ## AgentModule + Engine 思维方式
 
@@ -110,11 +117,8 @@ QitOS 将职责拆分得非常清晰：
 from dataclasses import dataclass, field
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, EnvSpec, HistoryPolicy, StateSchema, Task, TaskBudget, ToolRegistry
-from qitos.kit.env import HostEnv
-from qitos.kit.memory import MarkdownFileMemory
-from qitos.kit.parser import ReActTextParser
-from qitos.kit.tool import EditorToolSet, RunCommand
+from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
+from qitos.kit import EditorToolSet, MarkdownFileMemory, ReActTextParser, RunCommand
 
 SWE_REACT_SYSTEM_PROMPT = """
 你是资深软件工程师 Agent，目标是产出可直接提交 PR 的、满足需求的补丁。
@@ -188,19 +192,21 @@ class MinimalSWEAgent(AgentModule[SWEState, dict[str, Any], Action]):
 
 # llm = ...
 # agent = MinimalSWEAgent(llm=llm, workspace_root="./playground")
-# task = Task(
-#     id="swe_minimal",
-#     objective="实现需求并让检查通过。",
-#     env_spec=EnvSpec(type="host", config={"workspace_root": "./playground"}),
-#     budget=TaskBudget(max_steps=12),
+# result = agent.run(
+#     task="实现需求并让检查通过。",
+#     workspace="./playground",
+#     max_steps=12,
+#     return_state=True,
 # )
-# result = Engine(
-#     agent=agent,
-#     env=HostEnv(workspace_root="./playground"),
-#     history_policy=HistoryPolicy(max_messages=20),
-# ).run(task)
-# print(result.state.final_result, result.state.stop_reason)
+# print(result.state.final_result)
+# print(result.state.stop_reason)
 ```
+
+`agent.run(...)` 是推荐主线。默认就会提供：
+
+- 终端 render
+- 写入 `runs/` 的 trace 工件
+- 当传入 `workspace=...` 时自动写入本地 render event 日志
 
 ## 提示词-解析器契约（关键）
 
