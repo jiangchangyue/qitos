@@ -32,7 +32,9 @@ class ReActAgent(AgentModule[ReActState, Dict[str, Any], Action]):
         registry.register(add)
         registry.register(multiply)
 
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> ReActState:
         return ReActState(task=task, max_steps=int(kwargs.get("max_steps", 8)))
@@ -45,15 +47,24 @@ class ReActAgent(AgentModule[ReActState, Dict[str, Any], Action]):
             "memory": env_view.get("memory", {}),
         }
 
-    def decide(self, state: ReActState, observation: Dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: ReActState, observation: Dict[str, Any]
+    ) -> Decision[Action]:
         return None
 
     def build_system_prompt(self, state: ReActState) -> str | None:
-        tool_schema = self.tool_registry.get_tool_descriptions() if self.tool_registry is not None else ""
+        tool_schema = (
+            self.tool_registry.get_tool_descriptions()
+            if self.tool_registry is not None
+            else ""
+        )
         return render_prompt(REACT_SYSTEM_PROMPT, {"tool_schema": tool_schema})
 
     def prepare(self, state: ReActState, observation: Dict[str, Any]) -> str:
-        lines = [f"Task: {observation.get('task', '')}", f"Step: {observation.get('step', 0)}"]
+        lines = [
+            f"Task: {observation.get('task', '')}",
+            f"Step: {observation.get('step', 0)}",
+        ]
         scratchpad = observation.get("scratchpad") or []
         if scratchpad:
             lines.append("Scratchpad:")
@@ -74,10 +85,19 @@ class ReActAgent(AgentModule[ReActState, Dict[str, Any], Action]):
         action_results: List[Any],
     ) -> ReActState:
         if decision.rationale:
-            append_log(state, "scratchpad", f"Thought: {decision.rationale}", max_items=16)
+            append_log(
+                state, "scratchpad", f"Thought: {decision.rationale}", max_items=16
+            )
         if decision.actions:
             for action in decision.actions:
-                append_log(state, "scratchpad", f"Action: {format_action(action)}", max_items=16)
+                append_log(
+                    state,
+                    "scratchpad",
+                    f"Action: {format_action(action)}",
+                    max_items=16,
+                )
         if action_results:
-            append_log(state, "scratchpad", f"Observation: {action_results[0]}", max_items=16)
+            append_log(
+                state, "scratchpad", f"Observation: {action_results[0]}", max_items=16
+            )
         return state

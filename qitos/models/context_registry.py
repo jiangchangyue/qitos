@@ -104,7 +104,9 @@ def _normalize(model_name: Optional[str]) -> str:
     return str(model_name or "").strip().lower()
 
 
-def infer_context_window(model_name: Optional[str], *, fallback: Optional[int] = None) -> Optional[int]:
+def infer_context_window(
+    model_name: Optional[str], *, fallback: Optional[int] = None
+) -> Optional[int]:
     """
     Infer a conservative context window from a model identifier.
 

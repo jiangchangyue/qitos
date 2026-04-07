@@ -12,7 +12,9 @@ class SelfReflectionCritic(Critic):
     def __init__(self, max_retries: int = 2):
         self.max_retries = max_retries
 
-    def evaluate(self, state: Any, decision: Decision[Any], results: list[Any]) -> Dict[str, Any]:
+    def evaluate(
+        self, state: Any, decision: Decision[Any], results: list[Any]
+    ) -> Dict[str, Any]:
         metadata = getattr(state, "metadata", {}) or {}
         retries = int(metadata.get("reflection_retries", 0))
 

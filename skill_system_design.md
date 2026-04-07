@@ -18,7 +18,7 @@
 flowchart LR
     A[用户提出复杂任务] --> B[智能体Agent解析任务]
     B --> C{推理与规划<br>需要哪些技能？}
-    
+
     subgraph S [Skill 技能库]
         direction LR
         S1[翻译Skill]
@@ -56,7 +56,7 @@ class BaseSkill:
         self.config = config or {}
         self.name = self.__class__.__name__
         self.description = "请在此技能类中实现description方法" # 用于智能体理解技能用途
-    
+
     def execute(self, **kwargs) -> dict:
         """
         执行技能的核心方法
@@ -64,7 +64,7 @@ class BaseSkill:
         :return: 包含执行结果和元数据的字典
         """
         raise NotImplementedError("子类必须实现execute方法")
-    
+
     def get_schema(self) -> dict:
         """
         返回技能的输入参数模式（JSON Schema），
@@ -78,7 +78,7 @@ class TranslationSkill(BaseSkill):
         super().__init__(config)
         self.description = "将文本从一种语言翻译成另一种语言"
         self.api_key = self.config.get("api_key") # 从配置中获取API密钥
-    
+
     def get_schema(self) -> dict:
         return {
             "type": "object",
@@ -89,7 +89,7 @@ class TranslationSkill(BaseSkill):
             },
             "required": ["text", "target_language"]
         }
-    
+
     def execute(self, text: str, target_language: str, source_language: str = None) -> dict:
         # 这里调用翻译API（如Google Translate, DeepL等）
         # 伪代码：
@@ -164,7 +164,7 @@ flowchart LR
     A -- 3. 下载Skill包 --> C[本地Skill缓存]
     C -- 4. 动态加载Skill --> D[SkillRegistry]
     D -- 5. 实例化并执行 --> E[Agent使用Skill]
-    
+
     style A fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
     style B fill:#bbdefb,stroke:#2196f3,color:#0d47a1
     style C fill:#90caf9,stroke:#2196f3,color:#ffffff
@@ -184,31 +184,31 @@ from tempfile import TemporaryDirectory
 class SkillHubClient:
     def __init__(self, hub_url: str):
         self.hub_url = hub_url
-    
+
     def search_skills(self, query: str) -> list:
         """在Skillhub中搜索技能"""
         response = requests.get(f"{self.hub_url}/api/skills", params={"q": query})
         response.raise_for_status()
         return response.json() # 返回技能元数据列表
-    
+
     def install_skill(self, skill_name: str, version: str = "latest") -> str:
         """从Skillhub安装技能到本地"""
         # 1. 获取技能下载URL
         response = requests.get(f"{self.hub_url}/api/skills/{skill_name}/download", params={"version": version})
         response.raise_for_status()
         download_url = response.json()["download_url"]
-        
+
         # 2. 下载技能包（通常是.wheel文件或.zip）
         skill_package = requests.get(download_url)
         skill_package.raise_for_status()
-        
+
         # 3. 安装到临时目录或指定目录
         with TemporaryDirectory() as tmp_dir:
             package_path = Path(tmp_dir) / f"{skill_name}.whl" # 假设是wheel包
             package_path.write_bytes(skill_package.content)
             # 使用pip安装到当前Python环境或指定路径
             subprocess.check_call([sys.executable, "-m", "pip", "install", str(package_path), "--target", "./skills"])
-        
+
         # 4. 动态加载新安装的技能模块
         module = importlib.import_module(f"skills.{skill_name}")
         # 技能类通过装饰器自动注册到SkillRegistry
@@ -279,7 +279,7 @@ class MyAgent:
     def __init__(self, skill_manager: SkillManager):
         self.skill_manager = skill_manager
         self.memory = []
-    
+
     def process(self, user_input: str) -> str:
         """处理用户输入的核心流程"""
         # 1. 理解用户意图（这里简化处理，实际应使用LLM进行意图识别和参数提取）
@@ -301,10 +301,10 @@ class MyAgent:
 if __name__ == "__main__":
     skill_manager = SkillManager(skillhub_url="https://api.skillhub.example.com")
     agent = MyAgent(skill_manager)
-    
+
     # 用户请求安装技能
     print(agent.process("install translation skill")) # 输出安装结果
-    
+
     # 用户请求使用技能
     print(agent.process("translate 'Hello World' to Chinese")) # 输出翻译结果
 ```
@@ -429,7 +429,7 @@ curl -fsSL https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/install/ins
 ```mermaid
 flowchart LR
     A[用户请求安装/使用Skill] --> B[Agent框架解析意图]
-    
+
     subgraph C [Skillhub集成核心模块]
         direction LR
         C1[命令执行器<br>执行shell命令]
@@ -442,14 +442,14 @@ flowchart LR
     C1 -- 执行安装脚本 --> D[系统环境]
     D -- 安装成功 --> C2
     C2 -- 感知到skillhub --> C3
-    
+
     B -- 需要安装特定Skill? --> C3
     C3 -- skillhub install <skill_name> --> D
     D -- 安装Skill到本地 --> E[本地技能缓存]
-    
+
     B -- 需要使用Skill? --> C4
     C4 -- 从E加载技能 --> F[Agent执行引擎]
-    
+
     F -- 调用Skill --> G[完成用户任务]
     G --> H[返回结果给用户]
 ```
@@ -529,13 +529,13 @@ class EnvironmentDetector:
 class SkillHubManager:
     def __init__(self):
         self.executor = CommandExecutor()
-    
+
     def search_skills(self, query: str) -> list[dict]:
         """搜索技能"""
         success, output = self.executor.execute(f"skillhub search {query}")
         if not success:
             return []
-        
+
         # 解析输出（实际实现需要根据skillhub search的输出格式来编写解析逻辑）
         # 这里假设输出是每行一个技能，格式为: "skill_name (version) - description"
         skills = []
@@ -553,25 +553,25 @@ class SkillHubManager:
                         'description': description
                     })
         return skills
-    
+
     def install_skill(self, skill_name: str, version: str = "latest") -> tuple[bool, str]:
         """安装技能到当前工作区"""
         command = f"skillhub install {skill_name}"
         if version != "latest":
             command += f"@{version}"
-        
+
         success, output = self.executor.execute(command)
         return success, output
-    
+
     def list_installed_skills(self) -> list[str]:
         """列出已安装的技能"""
         success, output = self.executor.execute("skillhub list")
         if not success:
             return []
-        
+
         # 解析输出，假设每行是一个技能名称
         return [line.strip() for line in output.split('\n') if line.strip()]
-    
+
     def uninstall_skill(self, skill_name: str) -> tuple[bool, str]:
         """卸载技能"""
         success, output = self.executor.execute(f"skillhub uninstall {skill_name}")
@@ -601,10 +601,10 @@ class SkillLoader:
             skill_path = Path.cwd() / ".skills" / skill_name
             if not skill_path.exists():
                 skill_path = Path.cwd() / "node_modules" / ".skills" / skill_name
-        
+
         if not skill_path.exists():
             return None
-        
+
         try:
             # 查找技能模块的主文件（通常是__init__.py或skill_name.py）
             module_file = None
@@ -612,10 +612,10 @@ class SkillLoader:
                 if (skill_path / file).exists():
                     module_file = str(skill_path / file)
                     break
-            
+
             if not module_file:
                 return None
-            
+
             # 动态加载模块
             spec = importlib.util.spec_from_file_location(skill_name, module_file)
             if spec and spec.loader:
@@ -626,7 +626,7 @@ class SkillLoader:
         except Exception as e:
             print(f"Failed to load skill {skill_name}: {e}")
             return None
-        
+
         return None
 ```
 
@@ -640,7 +640,7 @@ class AgentSkillManager:
         self.hub_manager = SkillHubManager()
         self.loader = SkillLoader()
         self.loaded_skills = {}  # 缓存已加载的技能模块
-    
+
     def ensure_skillhub_installed(self) -> bool:
         """确保Skillhub已安装，如果未安装则尝试安装"""
         if not EnvironmentDetector.is_skillhub_installed():
@@ -653,18 +653,18 @@ class AgentSkillManager:
                 print(f"Skillhub安装失败: {output}")
                 return False
         return True
-    
+
     def search_and_install_skill(self, query: str) -> tuple[bool, str]:
         """搜索并安装技能"""
         skills = self.hub_manager.search_skills(query)
         if not skills:
             return False, f"未找到匹配的技能: {query}"
-        
+
         # 简化处理：选择第一个搜索结果
         skill = skills[0]
         print(f"找到技能: {skill['name']} (版本: {skill['version']})")
         print(f"描述: {skill['description']}")
-        
+
         success, output = self.hub_manager.install_skill(skill['name'], skill['version'])
         if success:
             print(f"技能 {skill['name']} 安装成功!")
@@ -677,7 +677,7 @@ class AgentSkillManager:
                 return True, f"技能 {skill['name']} 安装成功，但加载失败。"
         else:
             return False, f"技能安装失败: {output}"
-    
+
     def get_skill(self, skill_name: str):
         """获取已加载的技能模块"""
         if skill_name not in self.loaded_skills:
@@ -688,16 +688,16 @@ class AgentSkillManager:
             else:
                 return None
         return self.loaded_skills[skill_name]
-    
+
     def execute_skill(self, skill_name: str, method_name: str, *args, **kwargs):
         """执行技能的指定方法"""
         skill = self.get_skill(skill_name)
         if not skill:
             return None, f"技能 {skill_name} 未加载"
-        
+
         if not hasattr(skill, method_name):
             return None, f"技能 {skill_name} 没有方法 {method_name}"
-        
+
         method = getattr(skill, method_name)
         try:
             result = method(*args, **kwargs)
@@ -715,18 +715,18 @@ class MyAgent:
     def __init__(self):
         self.skill_manager = AgentSkillManager()
         self.initialize_skills()
-    
+
     def initialize_skills(self):
         """初始化技能系统"""
         if not self.skill_manager.ensure_skillhub_installed():
             print("请重启Agent以完成Skillhub安装。")
             return
-        
+
         # 可以预加载一些常用技能
         common_skills = ["summarize", "search", "translate"]  # 示例
         for skill in common_skills:
             self.skill_manager.get_skill(skill)
-    
+
     def process_user_request(self, request: str):
         """处理用户请求"""
         # 1. 意图识别（简化版）
@@ -735,7 +735,7 @@ class MyAgent:
             skill_query = request.replace("安装", "").replace("技能", "").strip()
             success, message = self.skill_manager.search_and_install_skill(skill_query)
             return message
-        
+
         elif "使用" in request:
             # 解析要使用的技能和方法（简化处理）
             parts = request.replace("使用", "").strip().split()
@@ -747,7 +747,7 @@ class MyAgent:
                     return f"执行结果: {result}"
                 else:
                     return result
-        
+
         return "我暂时无法理解您的请求，请尝试说'安装XXX技能'或'使用XXX技能YYY'。"
 
 # 使用示例
@@ -774,7 +774,7 @@ import docker
 class DockerSkillRunner:
     def __init__(self):
         self.client = docker.from_env()
-    
+
     def run_skill_in_container(self, skill_name: str, method_name: str, *args, **kwargs):
         # 1. 构建或获取技能的Docker镜像
         image_name = f"skillhub/{skill_name}:latest"
@@ -783,7 +783,7 @@ class DockerSkillRunner:
         except docker.errors.ImageNotFound:
             # 从Skillhub拉取或构建镜像
             pass
-        
+
         # 2. 运行容器并执行命令
         command = f"python -c 'import {skill_name}; skill = {skill_name}.{skill_name}(); print(skill.{method_name}(*{args}, **{kwargs}))'"
         container = self.client.containers.run(
@@ -809,7 +809,7 @@ class LocalSkillDiscovery:
             path = Path(skill_dir)
             if not path.exists():
                 continue
-            
+
             for skill_path in path.iterdir():
                 if skill_path.is_dir():
                     skill_name = skill_path.name

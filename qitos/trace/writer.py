@@ -55,7 +55,9 @@ class TraceWriter:
             f.write(json.dumps(payload, ensure_ascii=False))
             f.write("\n")
 
-    def _write_manifest(self, status: str, summary: Optional[Dict[str, Any]] = None) -> None:
+    def _write_manifest(
+        self, status: str, summary: Optional[Dict[str, Any]] = None
+    ) -> None:
         merged_summary: Dict[str, Any] = {
             "stop_reason": None,
             "final_result": None,
@@ -87,11 +89,15 @@ class TraceWriter:
         events = []
         if os.path.exists(self.events_path):
             with open(self.events_path, "r", encoding="utf-8") as f:
-                events = [json.loads(line) for line in f.read().splitlines() if line.strip()]
+                events = [
+                    json.loads(line) for line in f.read().splitlines() if line.strip()
+                ]
         steps = []
         if os.path.exists(self.steps_path):
             with open(self.steps_path, "r", encoding="utf-8") as f:
-                steps = [json.loads(line) for line in f.read().splitlines() if line.strip()]
+                steps = [
+                    json.loads(line) for line in f.read().splitlines() if line.strip()
+                ]
 
         validator.validate_manifest(manifest)
         validator.validate_events(events)
@@ -118,7 +124,11 @@ def runtime_step_to_trace(step: Any) -> TraceStep:
     decision = getattr(step, "decision", None)
     decision_payload: Any
     if decision is not None and hasattr(decision, "__dict__"):
-        decision_payload = asdict(decision) if hasattr(decision, "__dataclass_fields__") else dict(decision.__dict__)
+        decision_payload = (
+            asdict(decision)
+            if hasattr(decision, "__dataclass_fields__")
+            else dict(decision.__dict__)
+        )
     else:
         decision_payload = decision
 
@@ -126,12 +136,22 @@ def runtime_step_to_trace(step: Any) -> TraceStep:
         step_id=int(getattr(step, "step_id", 0)),
         observation=_normalize(getattr(step, "observation", None)),
         decision=_normalize(decision_payload),
+        model_response=_normalize(dict(getattr(step, "model_response", {}) or {})),
         actions=_normalize(list(getattr(step, "actions", []) or [])),
         action_results=_normalize(list(getattr(step, "action_results", []) or [])),
         tool_invocations=_normalize(list(getattr(step, "tool_invocations", []) or [])),
         critic_outputs=_normalize(list(getattr(step, "critic_outputs", []) or [])),
         state_diff=_normalize(dict(getattr(step, "state_diff", {}) or {})),
         context=_normalize(dict(getattr(step, "context", {}) or {})),
+        protocol_id=getattr(step, "protocol_id", None),
+        parser_selected=getattr(step, "parser_selected", None),
+        parser_fallback_used=bool(getattr(step, "parser_fallback_used", False)),
+        parser_attempts=_normalize(list(getattr(step, "parser_attempts", []) or [])),
+        parser_diagnostics=_normalize(
+            dict(getattr(step, "parser_diagnostics", {}) or {})
+        ),
+        parser_contract=getattr(step, "parser_contract", None),
+        parser_salvage_applied=bool(getattr(step, "parser_salvage_applied", False)),
     )
 
 

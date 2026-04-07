@@ -24,15 +24,21 @@ class ToolRegistry:
         self._toolsets: List[Any] = []
         self._setup_done: bool = False
 
-    def register(self, item: Any, name: Optional[str] = None, meta: Optional[ToolMeta] = None) -> "ToolRegistry":
+    def register(
+        self, item: Any, name: Optional[str] = None, meta: Optional[ToolMeta] = None
+    ) -> "ToolRegistry":
         tool_obj = self._to_tool(item, meta=meta)
-        resolved_name = name or getattr(item, "name", None) or getattr(item, "_name", None)
+        resolved_name = (
+            name or getattr(item, "name", None) or getattr(item, "_name", None)
+        )
         if resolved_name:
             tool_obj.spec.name = str(resolved_name)
         self._register_tool_object(tool_obj, origin=ToolOrigin(source="function"))
         return self
 
-    def register_toolset(self, toolset: Any, namespace: Optional[str] = None) -> "ToolRegistry":
+    def register_toolset(
+        self, toolset: Any, namespace: Optional[str] = None
+    ) -> "ToolRegistry":
         if not hasattr(toolset, "tools"):
             raise TypeError("register_toolset() expects an object with tools()")
 
@@ -50,7 +56,11 @@ class ToolRegistry:
             tool_obj.spec.name = full_name
             self._register_tool_object(
                 tool_obj,
-                origin=ToolOrigin(source="toolset", toolset_name=toolset_name, toolset_version=toolset_version),
+                origin=ToolOrigin(
+                    source="toolset",
+                    toolset_name=toolset_name,
+                    toolset_version=toolset_version,
+                ),
             )
 
         return self
@@ -87,7 +97,9 @@ class ToolRegistry:
     def list_toolsets(self) -> List[str]:
         names: List[str] = []
         for toolset in self._toolsets:
-            names.append(str(getattr(toolset, "name", toolset.__class__.__name__.lower())))
+            names.append(
+                str(getattr(toolset, "name", toolset.__class__.__name__.lower()))
+            )
         return names
 
     def describe_tool(self, name: str) -> Dict[str, Any]:
@@ -114,7 +126,9 @@ class ToolRegistry:
             },
         }
 
-    def call(self, name: str, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+    def call(
+        self, name: str, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Any:
         tool = self.get(name)
         if tool is None:
             raise ValueError(f"Tool '{name}' not found")
@@ -136,7 +150,16 @@ class ToolRegistry:
                 toolset.teardown(payload)
         self._setup_done = False
 
-    def get_tool_descriptions(self) -> str:
+    def get_tool_descriptions(self, protocol: Any = None, renderer: Any = None) -> str:
+        if renderer is not None:
+            return str(renderer(self))
+        if protocol is not None:
+            try:
+                from qitos.protocols import render_protocol_tool_schema
+
+                return render_protocol_tool_schema(self, protocol)
+            except Exception:
+                pass
         lines: List[str] = []
         for name in self.list_tools():
             tool = self._tools[name]
@@ -154,6 +177,9 @@ class ToolRegistry:
                 lines.append(f"  - {param} ({t})")
             lines.append("")
         return "\n".join(lines)
+
+    def render_tool_schema(self, protocol: Any = None, renderer: Any = None) -> str:
+        return self.get_tool_descriptions(protocol=protocol, renderer=renderer)
 
     def get_all_specs(self) -> List[Dict[str, Any]]:
         specs = []
@@ -189,7 +215,9 @@ class ToolRegistry:
                     "capabilities": {
                         "read_only": bool(tool.spec.read_only),
                         "concurrency_safe": bool(tool.spec.concurrency_safe),
-                        "requires_user_interaction": bool(tool.spec.requires_user_interaction),
+                        "requires_user_interaction": bool(
+                            tool.spec.requires_user_interaction
+                        ),
                         "supports_background": bool(tool.spec.supports_background),
                         "result_max_chars": tool.spec.result_max_chars,
                         "produces_artifact": bool(tool.spec.produces_artifact),

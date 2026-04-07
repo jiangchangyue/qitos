@@ -25,7 +25,11 @@ class WindowMemory(Memory):
         roles = query.get("roles")
         step_min = query.get("step_min")
 
-        items = self._records[-self.window_size :] if self.window_size > 0 else list(self._records)
+        items = (
+            self._records[-self.window_size :]
+            if self.window_size > 0
+            else list(self._records)
+        )
         if roles:
             role_set = set(roles)
             items = [r for r in items if r.role in role_set]
@@ -35,7 +39,9 @@ class WindowMemory(Memory):
 
     def summarize(self, max_items: int = 5) -> str:
         items = self.retrieve()[-max_items:]
-        return "\n".join(f"[{r.step_id}] {r.role}: {str(r.content)[:120]}" for r in items)
+        return "\n".join(
+            f"[{r.step_id}] {r.role}: {str(r.content)[:120]}" for r in items
+        )
 
     def evict(self) -> int:
         if self.window_size <= 0 or len(self._records) <= self.window_size:

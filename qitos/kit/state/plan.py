@@ -21,4 +21,3 @@ class PlanState:
             raise ValueError("PlanState.cursor cannot exceed number of steps")
         if self.status not in {"idle", "executing", "completed"}:
             raise ValueError("PlanState.status must be idle/executing/completed")
-

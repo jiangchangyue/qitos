@@ -162,7 +162,7 @@
 - `qitos/benchmark/tau_bench/port/envs/retail/tasks.py`
 - `qitos/benchmark/tau_bench/port/envs/airline/tasks.py`
 
-这些文件极大抬高了仓库 LOC、lint 噪音和阅读成本，但并不等于“框架复杂度”。  
+这些文件极大抬高了仓库 LOC、lint 噪音和阅读成本，但并不等于“框架复杂度”。
 建议后续迁移成数据文件、构建产物，或拆为可选 benchmark 包。
 
 4. `qita` 和 render 层出现单文件膨胀
@@ -214,7 +214,7 @@
 - `qitos/trace/writer.py`
 - `qitos/render/cli_render.py`
 
-这说明项目的**类型设计还没有跟上架构演进**。  
+这说明项目的**类型设计还没有跟上架构演进**。
 对一个智能体框架来说，这会直接影响：
 
 - 重构速度
@@ -276,7 +276,7 @@
 
 - `SkillRegistry` 只作为字符串注解出现，但静态分析认为名字未定义
 
-这类问题本身不大，但它暴露出一个更重要的事实：  
+这类问题本身不大，但它暴露出一个更重要的事实：
 **skill 子系统目前像是“已经进入公共表面”，但内部契约和类型边界还没有完全收口。**
 
 #### P1：异常吞掉过多，削弱可观测性
@@ -325,7 +325,7 @@
 - `qitos/kit/tool/recon_toolset.py`
 - `qitos/kit/tool/vuln_scan_toolset.py`
 
-从“能不能做”角度看，这些能力不一定有问题；  
+从“能不能做”角度看，这些能力不一定有问题；
 但从开源框架维护角度看，它们会放大：
 
 - 包的认知复杂度
@@ -454,7 +454,7 @@
 
 3. 现代化打包配置
 
-当前 `pyproject.toml` 只有 build-system，项目实际配置主要还在 `setup.py`。  
+当前 `pyproject.toml` 只有 build-system，项目实际配置主要还在 `setup.py`。
 建议逐步迁移到 `pyproject.toml` 的标准声明式配置，并统一：
 
 - 依赖

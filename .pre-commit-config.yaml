@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        exclude: ^(docs/reference/api_generated/|docs/zh/reference/api_generated/|site/|runs/|dist/|build/)
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        pass_filenames: false
+        args: ["qitos/core", "qitos/engine", "qitos/models", "qitos/trace"]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(docs/reference/api_generated/|docs/zh/reference/api_generated/|site/|runs/)
+      - id: end-of-file-fixer
+        exclude: ^(docs/reference/api_generated/|docs/zh/reference/api_generated/|site/|runs/)
+      - id: check-merge-conflict
+      - id: check-yaml
+        exclude: ^mkdocs\.yml$

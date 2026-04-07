@@ -2,7 +2,12 @@
 
 from qitos.core.history import History, HistoryMessage
 
-from .compact_history import CompactConfig, CompactHistory, MessageGrouper, compact_history
+from .compact_history import (
+    CompactConfig,
+    CompactHistory,
+    MessageGrouper,
+    compact_history,
+)
 from .token_budget_history import TokenBudgetSummaryHistory
 from .window_history import WindowHistory
 

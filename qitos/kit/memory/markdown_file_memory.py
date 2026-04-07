@@ -31,7 +31,11 @@ class MarkdownFileMemory(Memory):
         observation: object = None,
     ) -> List[MemoryRecord]:
         query = query or {}
-        roles = set(query.get("roles", [])) if isinstance(query.get("roles"), list) else None
+        roles = (
+            set(query.get("roles", []))
+            if isinstance(query.get("roles"), list)
+            else None
+        )
         step_min = query.get("step_min")
         max_items = int(query.get("max_items", 50))
 
@@ -45,7 +49,9 @@ class MarkdownFileMemory(Memory):
 
     def summarize(self, max_items: int = 5) -> str:
         items = self._records[-max_items:]
-        return "\n".join(f"[{r.step_id}] {r.role}: {str(r.content)[:120]}" for r in items)
+        return "\n".join(
+            f"[{r.step_id}] {r.role}: {str(r.content)[:120]}" for r in items
+        )
 
     def evict(self) -> int:
         if self.max_in_memory <= 0 or len(self._records) <= self.max_in_memory:

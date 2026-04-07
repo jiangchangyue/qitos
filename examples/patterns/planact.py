@@ -9,12 +9,11 @@ from typing import Any
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
 from qitos.kit import (
-    EditorToolSet,
+    CodingToolSet,
     NumberedPlanBuilder,
     PLAN_DRAFT_PROMPT,
     PLAN_EXEC_SYSTEM_PROMPT,
     ReActTextParser,
-    RunCommand,
     format_action,
     render_prompt,
 )
@@ -40,13 +39,25 @@ class PlanActState(StateSchema):
 class PlanActAgent(AgentModule[PlanActState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
         self.plan_builder = NumberedPlanBuilder()
 
     def init_state(self, task: str, **kwargs: Any) -> PlanActState:
-        return PlanActState(task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS)))
+        return PlanActState(
+            task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS))
+        )
 
     def build_system_prompt(self, state: PlanActState) -> str | None:
         return render_prompt(
@@ -81,8 +92,17 @@ class PlanActAgent(AgentModule[PlanActState, dict[str, Any], Action]):
             return Decision.wait("plan_ready")
         return None
 
-    def reduce(self, state: PlanActState, observation: dict[str, Any], decision: Decision[Action]) -> PlanActState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: PlanActState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> PlanActState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -126,7 +146,9 @@ class PlanActAgent(AgentModule[PlanActState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

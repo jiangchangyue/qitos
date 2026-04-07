@@ -45,11 +45,18 @@ class AnthropicModel(Model):
             context_window=context_window,
         )
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.base_url = (base_url or os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")).rstrip("/")
-        self.api_version = api_version or os.getenv("ANTHROPIC_API_VERSION", "2023-06-01")
+        resolved_base_url = base_url or os.getenv(
+            "ANTHROPIC_BASE_URL", "https://api.anthropic.com"
+        )
+        self.base_url = str(resolved_base_url).rstrip("/")
+        self.api_version = api_version or os.getenv(
+            "ANTHROPIC_API_VERSION", "2023-06-01"
+        )
         self.timeout = timeout
         if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set. Please set it or pass api_key.")
+            raise ValueError(
+                "ANTHROPIC_API_KEY not set. Please set it or pass api_key."
+            )
 
     def _call_api(self, messages: List[Dict[str, str]]) -> str:
         headers = {
@@ -97,7 +104,9 @@ class AnthropicModel(Model):
                     parts.append(content)
         return "\n\n".join(parts).strip()
 
-    def _anthropic_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    def _anthropic_messages(
+        self, messages: List[Dict[str, str]]
+    ) -> List[Dict[str, Any]]:
         converted: List[Dict[str, Any]] = []
         for msg in messages:
             role = str(msg.get("role", ""))
@@ -135,7 +144,9 @@ class AnthropicModel(Model):
             return "\n".join(tool_parts)
         return "\n".join(text_parts).strip()
 
-    def _usage_from_response(self, response: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _usage_from_response(
+        self, response: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         usage = response.get("usage")
         if not isinstance(usage, dict):
             return None

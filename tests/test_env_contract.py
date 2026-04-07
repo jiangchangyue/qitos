@@ -10,16 +10,22 @@ class _DummyEnv(Env):
 
     def reset(self, task=None, workspace=None, **kwargs):
         self.counter = 0
-        return EnvObservation(data={"event": "reset", "task": task, "workspace": workspace})
+        return EnvObservation(
+            data={"event": "reset", "task": task, "workspace": workspace}
+        )
 
     def observe(self, state=None):
-        return EnvObservation(data={"event": "observe", "counter": self.counter, "state": state})
+        return EnvObservation(
+            data={"event": "observe", "counter": self.counter, "state": state}
+        )
 
     def step(self, action, state=None):
         self.counter += 1
         done = self.counter >= 2
         return EnvStepResult(
-            observation=EnvObservation(data={"event": "step", "action": action, "counter": self.counter}),
+            observation=EnvObservation(
+                data={"event": "step", "action": action, "counter": self.counter}
+            ),
             done=done,
             reward=float(self.counter),
             info={"state": state},

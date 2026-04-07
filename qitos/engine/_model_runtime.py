@@ -6,8 +6,16 @@ from typing import Any, Dict, Generic, List, TypeVar
 
 from ..core.decision import Decision
 from ..core.errors import ErrorCategory, ParseExecutionError, RuntimeErrorInfo
+from ..core.model_response import ModelResponse
+from ..protocols import get_protocol, resolve_protocol_chain
 from ..core.state import StateSchema
 from ._context_runtime import ContextOverflowError
+from .parser import (
+    build_parser_diagnostics,
+    normalize_parser_diagnostics,
+    parser_contract,
+    parser_name,
+)
 from .states import RuntimePhase, StepRecord
 
 
@@ -20,7 +28,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
     def __init__(self, engine: Any):
         self.engine = engine
 
-    def run_decide(self, state: StateT, observation: ObservationT, record: StepRecord) -> Decision[ActionT]:
+    def run_decide(
+        self, state: StateT, observation: ObservationT, record: StepRecord
+    ) -> Decision[ActionT]:
         engine = self.engine
         engine._dispatch_hook(
             "on_before_decide",
@@ -32,14 +42,30 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 record=record,
             ),
         )
-        engine._emit(record.step_id, RuntimePhase.DECIDE, payload={"stage": "state_ready", "observation": observation})
+        engine._emit(
+            record.step_id,
+            RuntimePhase.DECIDE,
+            payload={"stage": "state_ready", "observation": observation},
+        )
         engine._memory_append("state", state.to_dict(), record.step_id)
         engine._emit(record.step_id, RuntimePhase.DECIDE, payload={"stage": "start"})
         raw_decision = engine.agent.decide(state, observation)
+        model_response: ModelResponse | None = None
         if raw_decision is None:
-            raw_decision = self._run_llm_decide(state=state, observation=observation, record=record)
+            model_response = self._run_llm_decide(
+                state=state, observation=observation, record=record
+            )
+            interpreted = self._interpret_model_response(
+                state=state,
+                observation=observation,
+                response=model_response,
+                record=record,
+            )
+            raw_decision = interpreted if interpreted is not None else model_response
 
-        decision = self.normalize_decision(raw_decision, step=record.step_id)
+        decision = self.normalize_decision(
+            raw_decision, step=record.step_id, record=record
+        )
         if decision.mode == "branch":
             decision = self.select_branch(state, observation, decision)
 
@@ -70,25 +96,39 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 state=state,
                 observation=observation,
                 decision=decision,
+                model_response=(
+                    dict(record.model_response) if record.model_response else None
+                ),
                 record=record,
+                payload=(
+                    {"model_response": dict(record.model_response)}
+                    if record.model_response
+                    else {}
+                ),
             ),
         )
         return decision
 
-    def _run_llm_decide(self, state: StateT, observation: ObservationT, record: StepRecord) -> Any:
+    def _run_llm_decide(
+        self, state: StateT, observation: ObservationT, record: StepRecord
+    ) -> ModelResponse:
         engine = self.engine
         if engine.agent.llm is None:
             raise ValueError("No llm configured and Agent.decide returned None")
+        protocol = engine.resolve_protocol()
         setattr(engine.agent, "_runtime_observation", observation)
         setattr(engine.agent, "_runtime_step_id", record.step_id)
+        setattr(engine.agent, "_runtime_protocol", protocol)
         try:
+            system_prompt = engine.agent.build_system_prompt(state)
             prepared = engine.agent.prepare(state)
         finally:
             if hasattr(engine.agent, "_runtime_observation"):
                 delattr(engine.agent, "_runtime_observation")
             if hasattr(engine.agent, "_runtime_step_id"):
                 delattr(engine.agent, "_runtime_step_id")
-        system_prompt = engine.agent.build_system_prompt(state)
+            if hasattr(engine.agent, "_runtime_protocol"):
+                delattr(engine.agent, "_runtime_protocol")
         context_runtime = engine._context_runtime
         pre_context = context_runtime.build_pre_request(
             llm=engine.agent.llm,
@@ -100,7 +140,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             system = system_prompt.strip()
             messages.append({"role": "system", "content": system})
             if system != engine._last_system_prompt:
-                engine._history_append("system", system, record.step_id, metadata={"source": "engine"})
+                engine._history_append(
+                    "system", system, record.step_id, metadata={"source": "engine"}
+                )
                 engine._last_system_prompt = system
         history: List[Dict[str, str]] = []
         query = engine.history_policy.build_query(
@@ -110,9 +152,13 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         )
         if isinstance(query, dict):
             query.setdefault("pending_content", str(prepared))
-            query.setdefault("model_name", getattr(getattr(engine.agent, "llm", None), "model", None))
+            query.setdefault(
+                "model_name", getattr(getattr(engine.agent, "llm", None), "model", None)
+            )
             query.setdefault("step_id", record.step_id)
-            query.setdefault("warning_ratio", float(engine.context_config.warning_ratio))
+            query.setdefault(
+                "warning_ratio", float(engine.context_config.warning_ratio)
+            )
             history_budget = context_runtime.history_budget(pre_context)
             if history_budget is not None:
                 current_max = query.get("max_tokens")
@@ -125,14 +171,20 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                         query["max_tokens"] = history_budget
         try:
             history_impl = engine._history()
-            retrieved = history_impl.retrieve(state=state, observation=observation, query=query)
+            retrieved = history_impl.retrieve(
+                state=state, observation=observation, query=query
+            )
             history = engine._normalize_history_messages(retrieved)
             compact_events = []
-            consume_runtime_events = getattr(history_impl, "consume_runtime_events", None)
+            consume_runtime_events = getattr(
+                history_impl, "consume_runtime_events", None
+            )
             if callable(consume_runtime_events):
                 compact_events = list(consume_runtime_events() or [])
             history_metadata = []
-            get_last_message_metadata = getattr(history_impl, "get_last_message_metadata", None)
+            get_last_message_metadata = getattr(
+                history_impl, "get_last_message_metadata", None
+            )
             if callable(get_last_message_metadata):
                 history_metadata = list(get_last_message_metadata() or [])
         except Exception:
@@ -145,7 +197,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             history_messages=history,
             compact_events=compact_events,
         )
-        normalized_compact_events = context_runtime.normalize_history_events(compact_events, pre_context)
+        normalized_compact_events = context_runtime.normalize_history_events(
+            compact_events, pre_context
+        )
         if not normalized_compact_events:
             warning_event = context_runtime.maybe_note_warning(pre_context)
             if warning_event is not None:
@@ -153,7 +207,11 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         for compact_event in normalized_compact_events:
             engine._emit(record.step_id, RuntimePhase.DECIDE, payload=compact_event)
         if context_runtime.should_overflow(pre_context):
-            engine._emit(record.step_id, RuntimePhase.DECIDE, payload=context_runtime.overflow_event(pre_context))
+            engine._emit(
+                record.step_id,
+                RuntimePhase.DECIDE,
+                payload=context_runtime.overflow_event(pre_context),
+            )
             raise ContextOverflowError(
                 f"context overflow: input_tokens={pre_context.input_tokens_total} budget={pre_context.available_input_budget}"
             )
@@ -175,24 +233,37 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 "state_stats": self._state_stats(observation, record.context),
             },
         )
-        engine._history_append("user", str(prepared), record.step_id, metadata={"source": "engine"})
+        engine._history_append(
+            "user", str(prepared), record.step_id, metadata={"source": "engine"}
+        )
         raw_decision = engine.agent.llm(messages)
+        response = self._normalize_model_response(raw_decision)
         post_context = context_runtime.finalize_output(
             llm=engine.agent.llm,
             telemetry=pre_context,
-            raw_output=str(raw_decision),
+            raw_output=response.text,
         )
         record.context = context_runtime.telemetry_dict(post_context)
+        record.model_response = response.to_summary_dict()
         engine._last_context_telemetry = dict(record.context)
         engine._emit(
             record.step_id,
             RuntimePhase.DECIDE,
-            payload={"stage": "model_output", "raw_output": str(raw_decision), "context": dict(record.context)},
+            payload={
+                "stage": "model_output",
+                "raw_output": response.text,
+                "model_response": dict(record.model_response),
+                "context": dict(record.context),
+            },
         )
-        engine._history_append("assistant", str(raw_decision), record.step_id, metadata={"source": "engine"})
-        return raw_decision
+        engine._history_append(
+            "assistant", response.text, record.step_id, metadata={"source": "engine"}
+        )
+        return response
 
-    def _state_stats(self, observation: ObservationT, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _state_stats(
+        self, observation: ObservationT, context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         stats: Dict[str, Any] = {}
         if isinstance(observation, dict):
             scratchpad = observation.get("scratchpad")
@@ -206,7 +277,13 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             workspace_files = observation.get("workspace_files")
             if isinstance(workspace_files, list):
                 stats["workspace_files"] = len(workspace_files)
-        for key in ("input_tokens_total", "history_tokens", "output_tokens", "occupancy_ratio", "context_window"):
+        for key in (
+            "input_tokens_total",
+            "history_tokens",
+            "output_tokens",
+            "occupancy_ratio",
+            "context_window",
+        ):
             if key in context:
                 stats[key] = context.get(key)
         return stats
@@ -219,7 +296,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
     ) -> Decision[ActionT]:
         engine = self.engine
         if engine.search is not None:
-            candidates = engine.search.expand(state, observation, branch_decision) or list(branch_decision.candidates)
+            candidates = engine.search.expand(
+                state, observation, branch_decision
+            ) or list(branch_decision.candidates)
             scores = engine.search.score(state, observation, candidates)
             candidates = engine.search.prune(candidates, scores)
             if not candidates:
@@ -233,26 +312,517 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             if callable(mark_selected):
                 mark_selected(state, selected)
         else:
-            selected = engine.branch_selector.select(branch_decision.candidates, state, observation)
+            selected = engine.branch_selector.select(
+                branch_decision.candidates, state, observation
+            )
         selected.validate()
         return selected
 
-    def normalize_decision(self, raw_decision: Any, step: int) -> Decision[ActionT]:
+    def normalize_decision(
+        self, raw_decision: Any, step: int, record: StepRecord | None = None
+    ) -> Decision[ActionT]:
         if isinstance(raw_decision, Decision):
             return raw_decision
 
-        parser = self.engine.parser or getattr(self.engine.agent, "model_parser", None)
-        if parser is not None:
+        response = raw_decision if isinstance(raw_decision, ModelResponse) else None
+        parser_input = response.text if response is not None else raw_decision
+        parse_outcome = self._parse_with_protocol_chain(
+            parser_input=parser_input,
+            step=step,
+            record=record,
+        )
+        if parse_outcome is not None:
+            return parse_outcome
+
+        raise ValueError(
+            "Agent.decide must return Decision when no parser is configured"
+        )
+
+    def _parse_with_protocol_chain(
+        self,
+        *,
+        parser_input: Any,
+        step: int,
+        record: StepRecord | None,
+    ) -> Decision[ActionT] | None:
+        parser_attempts: List[Dict[str, Any]] = []
+        last_exception: Exception | None = None
+        last_diagnostics: Dict[str, Any] | None = None
+        candidates = self._candidate_parsers()
+        for candidate in candidates:
+            parser = candidate["parser"]
+            protocol = candidate.get("protocol")
+            fallback_used = bool(candidate.get("fallback_used"))
             try:
-                return parser.parse(raw_decision, context={"step": step})
+                decision = parser.parse(
+                    parser_input,
+                    context={"step": step, "protocol": getattr(protocol, "id", None)},
+                )
+                normalized = normalize_parser_diagnostics(
+                    getattr(decision, "meta", None),
+                    parser=parser,
+                    raw_output=parser_input,
+                    step_id=step,
+                )
+                if normalized is not None:
+                    normalized = dict(normalized)
+                    normalized.setdefault("protocol", getattr(protocol, "id", None))
+                    normalized.setdefault("selected_parser", parser_name(parser))
+                    normalized.setdefault("fallback_used", fallback_used)
+                    normalized.setdefault("parser_attempts", list(parser_attempts))
+                parser_attempts.append(
+                    {
+                        "parser": parser_name(parser),
+                        "contract": parser_contract(parser),
+                        "protocol": getattr(protocol, "id", None),
+                        "result": "success"
+                        if normalized is None
+                        or normalized.get("severity") != "error"
+                        else "error",
+                        "fallback_used": fallback_used,
+                    }
+                )
+                if (
+                    normalized is not None
+                    and normalized.get("severity") == "error"
+                    and candidate.get("allow_fallback", True)
+                ):
+                    last_diagnostics = dict(normalized)
+                    continue
+                self._record_parser_observability(
+                    step=step,
+                    raw_output=parser_input,
+                    decision=decision,
+                    record=record,
+                    parser=parser,
+                    diagnostics=normalized,
+                    protocol=protocol,
+                    parser_attempts=parser_attempts,
+                    fallback_used=fallback_used,
+                )
+                return decision
             except Exception as exc:
+                last_exception = exc
+                parser_attempts.append(
+                    {
+                        "parser": parser_name(parser),
+                        "contract": parser_contract(parser),
+                        "protocol": getattr(protocol, "id", None),
+                        "result": "exception",
+                        "fallback_used": fallback_used,
+                    }
+                )
+                last_diagnostics = build_parser_diagnostics(
+                    parser=parser,
+                    severity="error",
+                    code="unexpected_parser_exception",
+                    summary="Parser raised an unexpected exception.",
+                    raw_output=parser_input,
+                    details=str(exc),
+                    repair_instruction="The parser failed internally before producing structured repair feedback.",
+                    expected_shape="See the configured parser contract for the expected output format.",
+                    step_id=step,
+                )
+                last_diagnostics["protocol"] = getattr(protocol, "id", None)
+                last_diagnostics["selected_parser"] = parser_name(parser)
+                last_diagnostics["fallback_used"] = fallback_used
+                last_diagnostics["parser_attempts"] = list(parser_attempts)
+                continue
+        if last_diagnostics is not None:
+            selected_parser = parser_name(candidates[-1]["parser"]) if candidates else "unknown_parser"
+            last_diagnostics.setdefault("selected_parser", selected_parser)
+            last_diagnostics.setdefault("fallback_used", any(item.get("fallback_used") for item in parser_attempts))
+            last_diagnostics.setdefault("parser_attempts", parser_attempts)
+            self._record_parser_observability(
+                step=step,
+                raw_output=parser_input,
+                decision=None,
+                record=record,
+                parser=candidates[-1]["parser"] if candidates else "unknown_parser",
+                diagnostics=last_diagnostics,
+                protocol=candidates[-1].get("protocol") if candidates else None,
+                parser_attempts=parser_attempts,
+                fallback_used=any(item.get("fallback_used") for item in parser_attempts),
+            )
+            if last_exception is not None:
                 info = RuntimeErrorInfo(
                     category=ErrorCategory.PARSE,
-                    message=str(exc),
+                    message=str(last_exception),
                     phase="decide",
                     step_id=step,
                     recoverable=True,
+                    details={"parser_diagnostics": last_diagnostics},
                 )
-                raise ParseExecutionError(info) from exc
+                raise ParseExecutionError(info) from last_exception
+            return Decision.wait(
+                rationale=str(last_diagnostics.get("summary") or "Parser error."),
+                meta={
+                    "parser_error": True,
+                    "parser_feedback": str(
+                        last_diagnostics.get("repair_instruction")
+                        or last_diagnostics.get("summary")
+                        or ""
+                    ),
+                    "parser_diagnostics": last_diagnostics,
+                },
+            )
+        return None
 
-        raise ValueError("Agent.decide must return Decision when no parser is configured")
+    def _candidate_parsers(self) -> List[Dict[str, Any]]:
+        engine = self.engine
+        if engine.parser is not None:
+            return [
+                {
+                    "parser": engine.parser,
+                    "protocol": get_protocol(engine.protocol),
+                    "fallback_used": False,
+                    "allow_fallback": False,
+                }
+            ]
+        protocol = engine.resolve_protocol()
+        candidates: List[Dict[str, Any]] = []
+        agent_parser = getattr(engine.agent, "model_parser", None)
+        if agent_parser is not None:
+            candidates.append(
+                {
+                    "parser": agent_parser,
+                    "protocol": protocol,
+                    "fallback_used": False,
+                    "allow_fallback": True,
+                }
+            )
+        for index, item in enumerate(resolve_protocol_chain(protocol)):
+            try:
+                parser = item.parser_factory()
+            except Exception:
+                continue
+            if agent_parser is not None and parser.__class__ is agent_parser.__class__:
+                continue
+            candidates.append(
+                {
+                    "parser": parser,
+                    "protocol": item,
+                    "fallback_used": bool(agent_parser) or index > 0,
+                    "allow_fallback": True,
+                }
+            )
+        return candidates
+
+    def _interpret_model_response(
+        self,
+        *,
+        state: StateT,
+        observation: ObservationT,
+        response: ModelResponse,
+        record: StepRecord,
+    ) -> Decision[ActionT] | None:
+        interpret = getattr(self.engine.agent, "interpret_model_response", None)
+        if not callable(interpret):
+            return None
+        decision = interpret(state, observation, response)
+        if decision is None:
+            return None
+        if not isinstance(decision, Decision):
+            raise ValueError(
+                "Agent.interpret_model_response must return Decision or None"
+            )
+        self.engine._emit(
+            record.step_id,
+            RuntimePhase.DECIDE,
+            payload={
+                "stage": "model_response_interpreted",
+                "mode": decision.mode,
+                "model_response": dict(record.model_response),
+            },
+        )
+        return decision
+
+    def _record_parser_observability(
+        self,
+        *,
+        step: int,
+        raw_output: Any,
+        decision: Decision[ActionT] | None,
+        record: StepRecord | None,
+        parser: Any,
+        diagnostics: Dict[str, Any] | None = None,
+        protocol: Any = None,
+        parser_attempts: List[Dict[str, Any]] | None = None,
+        fallback_used: bool = False,
+    ) -> None:
+        engine = self.engine
+        contract = parser_contract(parser)
+        normalized = diagnostics or normalize_parser_diagnostics(
+            getattr(decision, "meta", None),
+            parser=parser,
+            raw_output=raw_output,
+            step_id=step,
+        )
+        protocol_id = getattr(protocol, "id", None) if protocol is not None else None
+        attempts = list(parser_attempts or [])
+        if normalized is not None:
+            normalized.setdefault("protocol", protocol_id)
+            normalized.setdefault("selected_parser", parser_name(parser))
+            normalized.setdefault("fallback_used", bool(fallback_used))
+            normalized.setdefault("parser_attempts", attempts)
+        if (
+            decision is not None
+            and isinstance(decision.meta, dict)
+            and normalized is not None
+        ):
+            decision.meta["parser_diagnostics"] = normalized
+            if normalized.get("severity") == "error":
+                decision.meta.setdefault("parser_error", True)
+                decision.meta.setdefault(
+                    "parser_feedback",
+                    normalized.get("repair_instruction")
+                    or normalized.get("summary")
+                    or "",
+                )
+            else:
+                decision.meta.setdefault(
+                    "parser_warning",
+                    normalized.get("salvage_summary")
+                    or normalized.get("summary")
+                    or "",
+                )
+        parsed_mode = getattr(decision, "mode", None) if decision is not None else None
+        result_payload = {
+            "stage": "parser_result",
+            "parser": parser_name(parser),
+            "contract": contract,
+            "protocol": protocol_id,
+            "selected_parser": parser_name(parser),
+            "parsed_mode": parsed_mode,
+            "has_diagnostics": normalized is not None,
+            "salvage_applied": bool((normalized or {}).get("salvage_applied")),
+            "severity": (normalized or {}).get("severity"),
+            "fallback_used": bool(fallback_used),
+            "parser_attempts": attempts,
+        }
+        engine._emit(step, RuntimePhase.DECIDE, payload=result_payload)
+        if normalized is not None:
+            engine._emit(
+                step,
+                RuntimePhase.DECIDE,
+                payload={"stage": "parser_diagnostics", "diagnostics": normalized},
+            )
+            engine._trace_runtime.record_parser_diagnostics(normalized)
+        if record is not None:
+            record.protocol_id = protocol_id
+            record.parser_selected = parser_name(parser)
+            record.parser_fallback_used = bool(fallback_used)
+            record.parser_attempts = attempts
+            record.parser_contract = contract
+            record.parser_diagnostics = dict(normalized or {})
+            record.parser_salvage_applied = bool(
+                (normalized or {}).get("salvage_applied")
+            )
+
+    def _normalize_model_response(self, raw_output: Any) -> ModelResponse:
+        if isinstance(raw_output, ModelResponse):
+            response = raw_output
+        else:
+            response = ModelResponse(
+                text=self._extract_response_text(raw_output),
+                raw=raw_output,
+                usage=self._extract_response_usage(raw_output),
+                finish_reason=self._extract_finish_reason(raw_output),
+                tool_calls=self._extract_tool_calls(raw_output),
+                model_name=self._extract_model_name(raw_output),
+                provider=self._extract_provider(raw_output),
+                metadata=self._extract_response_metadata(raw_output),
+            )
+        llm = getattr(self.engine.agent, "llm", None)
+        usage = response.usage
+        if usage is None and llm is not None and hasattr(llm, "extract_usage"):
+            try:
+                extracted = llm.extract_usage(raw_output)
+                if isinstance(extracted, dict):
+                    usage = extracted
+            except Exception:
+                usage = None
+        model_name = (
+            response.model_name
+            or getattr(llm, "model", None)
+            or getattr(llm, "model_name", None)
+        )
+        provider = (
+            response.provider
+            or getattr(llm, "provider", None)
+            or (llm.__class__.__name__ if llm is not None else None)
+        )
+        metadata = dict(response.metadata or {})
+        return ModelResponse(
+            text=str(response.text or ""),
+            raw=response.raw,
+            usage=dict(usage) if isinstance(usage, dict) else None,
+            finish_reason=response.finish_reason,
+            tool_calls=(
+                [dict(item) for item in (response.tool_calls or [])]
+                if isinstance(response.tool_calls, list)
+                else None
+            ),
+            model_name=str(model_name) if model_name is not None else None,
+            provider=str(provider) if provider is not None else None,
+            metadata=metadata,
+        )
+
+    def _extract_response_text(self, raw_output: Any) -> str:
+        if raw_output is None:
+            return ""
+        if isinstance(raw_output, str):
+            return raw_output
+        if isinstance(raw_output, dict):
+            for key in ("text", "content", "output_text"):
+                value = raw_output.get(key)
+                if isinstance(value, str):
+                    return value
+            choices = raw_output.get("choices")
+            if isinstance(choices, list) and choices:
+                return self._extract_response_text(choices[0])
+            message = raw_output.get("message")
+            if isinstance(message, dict):
+                return self._extract_response_text(message)
+            return str(raw_output)
+        choices = getattr(raw_output, "choices", None)
+        if isinstance(choices, list) and choices:
+            return self._extract_response_text(choices[0])
+        message = getattr(raw_output, "message", None)
+        if message is not None:
+            content = getattr(message, "content", None)
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                parts: List[str] = []
+                for item in content:
+                    if isinstance(item, str):
+                        parts.append(item)
+                    elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                        parts.append(str(item.get("text")))
+                    elif hasattr(item, "text") and isinstance(
+                        getattr(item, "text", None), str
+                    ):
+                        parts.append(str(getattr(item, "text")))
+                if parts:
+                    return "\n".join(parts)
+        for key in ("text", "content", "output_text"):
+            value = getattr(raw_output, key, None)
+            if isinstance(value, str):
+                return value
+        return str(raw_output)
+
+    def _extract_response_usage(self, raw_output: Any) -> Dict[str, Any] | None:
+        usage = (
+            raw_output.get("usage")
+            if isinstance(raw_output, dict)
+            else getattr(raw_output, "usage", None)
+        )
+        if isinstance(usage, dict):
+            return dict(usage)
+        if usage is None:
+            return None
+        prompt_tokens = getattr(usage, "prompt_tokens", None)
+        completion_tokens = getattr(usage, "completion_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        if prompt_tokens is None and completion_tokens is None and total_tokens is None:
+            return None
+        return {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }
+
+    def _extract_finish_reason(self, raw_output: Any) -> str | None:
+        if isinstance(raw_output, dict):
+            finish_reason = raw_output.get("finish_reason")
+            if finish_reason is not None:
+                return str(finish_reason)
+            choices = raw_output.get("choices")
+            if isinstance(choices, list) and choices:
+                return self._extract_finish_reason(choices[0])
+            return None
+        finish_reason = getattr(raw_output, "finish_reason", None)
+        if finish_reason is not None:
+            return str(finish_reason)
+        choices = getattr(raw_output, "choices", None)
+        if isinstance(choices, list) and choices:
+            return self._extract_finish_reason(choices[0])
+        return None
+
+    def _extract_tool_calls(self, raw_output: Any) -> List[Dict[str, Any]] | None:
+        if isinstance(raw_output, dict):
+            tool_calls = raw_output.get("tool_calls")
+            if isinstance(tool_calls, list):
+                return [self._normalize_tool_call(item) for item in tool_calls]
+            choices = raw_output.get("choices")
+            if isinstance(choices, list) and choices:
+                return self._extract_tool_calls(choices[0])
+            message = raw_output.get("message")
+            if isinstance(message, dict):
+                return self._extract_tool_calls(message)
+            return None
+        tool_calls = getattr(raw_output, "tool_calls", None)
+        if isinstance(tool_calls, list):
+            return [self._normalize_tool_call(item) for item in tool_calls]
+        message = getattr(raw_output, "message", None)
+        if message is not None:
+            inner = getattr(message, "tool_calls", None)
+            if isinstance(inner, list):
+                return [self._normalize_tool_call(item) for item in inner]
+        choices = getattr(raw_output, "choices", None)
+        if isinstance(choices, list) and choices:
+            return self._extract_tool_calls(choices[0])
+        return None
+
+    def _normalize_tool_call(self, tool_call: Any) -> Dict[str, Any]:
+        if isinstance(tool_call, dict):
+            payload = dict(tool_call)
+            function = payload.get("function")
+            if isinstance(function, dict):
+                payload["function"] = dict(function)
+            return payload
+        function = getattr(tool_call, "function", None)
+        normalized: Dict[str, Any] = {
+            "id": getattr(tool_call, "id", None),
+            "type": getattr(tool_call, "type", None),
+        }
+        if function is not None:
+            normalized["function"] = {
+                "name": getattr(function, "name", None),
+                "arguments": getattr(function, "arguments", None),
+            }
+        return normalized
+
+    def _extract_model_name(self, raw_output: Any) -> str | None:
+        if isinstance(raw_output, dict):
+            for key in ("model_name", "model"):
+                value = raw_output.get(key)
+                if value is not None:
+                    return str(value)
+            return None
+        for key in ("model_name", "model"):
+            value = getattr(raw_output, key, None)
+            if value is not None:
+                return str(value)
+        return None
+
+    def _extract_provider(self, raw_output: Any) -> str | None:
+        if isinstance(raw_output, dict):
+            value = raw_output.get("provider")
+            return str(value) if value is not None else None
+        value = getattr(raw_output, "provider", None)
+        return str(value) if value is not None else None
+
+    def _extract_response_metadata(self, raw_output: Any) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        if isinstance(raw_output, dict):
+            for key in ("id", "response_id", "created"):
+                if key in raw_output:
+                    metadata[key] = raw_output.get(key)
+            return metadata
+        for key in ("id", "response_id", "created"):
+            value = getattr(raw_output, key, None)
+            if value is not None:
+                metadata[key] = value
+        return metadata

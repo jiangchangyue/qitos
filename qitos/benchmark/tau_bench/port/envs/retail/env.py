@@ -20,11 +20,17 @@ class MockRetailDomainEnv(Env):
     ):
         match task_split:
             case "test":
-                from qitos.benchmark.tau_bench.port.envs.retail.tasks_test import TASKS_TEST as tasks
+                from qitos.benchmark.tau_bench.port.envs.retail.tasks_test import (
+                    TASKS_TEST as tasks,
+                )
             case "train":
-                from qitos.benchmark.tau_bench.port.envs.retail.tasks_train import TASKS_TRAIN as tasks
+                from qitos.benchmark.tau_bench.port.envs.retail.tasks_train import (
+                    TASKS_TRAIN as tasks,
+                )
             case "dev":
-                from qitos.benchmark.tau_bench.port.envs.retail.tasks_dev import TASKS_DEV as tasks
+                from qitos.benchmark.tau_bench.port.envs.retail.tasks_dev import (
+                    TASKS_DEV as tasks,
+                )
             case _:
                 raise ValueError(f"Unknown task split: {task_split}")
         super().__init__(

@@ -16,7 +16,9 @@ class _S(StateSchema):
 
 class _LLMAgent(AgentModule[_S, dict[str, Any], Action]):
     def __init__(self):
-        super().__init__(tool_registry=ToolRegistry(), llm=self._llm, model_parser=ReActTextParser())
+        super().__init__(
+            tool_registry=ToolRegistry(), llm=self._llm, model_parser=ReActTextParser()
+        )
 
     def _llm(self, messages):
         return "Final Answer: ok"
@@ -58,7 +60,11 @@ class _CaptureHook(EngineHook):
 
 def test_engine_hook_register_unregister():
     hook = _CaptureHook()
-    engine = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), critics=[PassThroughCritic()])
+    engine = Engine(
+        agent=_LLMAgent(),
+        budget=RuntimeBudget(max_steps=2),
+        critics=[PassThroughCritic()],
+    )
     engine.register_hook(hook)
     result = engine.run("x")
     assert result.state.final_result == "ok"
@@ -110,7 +116,9 @@ def test_phase_hooks_are_triggered():
         def on_after_check_stop(self, ctx, engine):
             marks.append("after_check_stop")
 
-    engine = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_PhaseHook()])
+    engine = Engine(
+        agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_PhaseHook()]
+    )
     result = engine.run("x")
     assert result.state.final_result == "ok"
     assert "before_decide" in marks
@@ -122,7 +130,12 @@ def test_phase_hooks_are_triggered():
 def test_render_stream_hook_outputs_structured_events(tmp_path):
     out = tmp_path / "render_events.jsonl"
     hook = RenderStreamHook(output_jsonl=str(out))
-    result = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), critics=[PassThroughCritic()], hooks=[hook]).run("x")
+    result = Engine(
+        agent=_LLMAgent(),
+        budget=RuntimeBudget(max_steps=2),
+        critics=[PassThroughCritic()],
+        hooks=[hook],
+    ).run("x")
     assert result.state.final_result == "ok"
     assert out.exists()
     assert len(hook.events) > 0
@@ -140,11 +153,25 @@ def test_hook_context_payload_has_canonical_fields():
         def on_after_decide(self, ctx, engine):
             seen_payloads.append(dict(ctx.payload))
 
-    engine = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_PayloadHook()])
+    engine = Engine(
+        agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_PayloadHook()]
+    )
     result = engine.run("x")
     assert result.state.final_result == "ok"
     assert seen_payloads
-    required = {"run_id", "step_id", "phase", "hook", "task", "stop_reason", "ts", "state_digest", "decision_digest", "action_digest", "error"}
+    required = {
+        "run_id",
+        "step_id",
+        "phase",
+        "hook",
+        "task",
+        "stop_reason",
+        "ts",
+        "state_digest",
+        "decision_digest",
+        "action_digest",
+        "error",
+    }
     for payload in seen_payloads:
         assert required.issubset(set(payload.keys()))
 
@@ -156,7 +183,9 @@ def test_runtime_event_payload_has_canonical_fields():
         def on_event(self, event, state, record, engine) -> None:
             captured.append(dict(event.payload))
 
-    engine = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_EventHook()])
+    engine = Engine(
+        agent=_LLMAgent(), budget=RuntimeBudget(max_steps=2), hooks=[_EventHook()]
+    )
     result = engine.run("x")
     assert result.state.final_result == "ok"
     assert captured

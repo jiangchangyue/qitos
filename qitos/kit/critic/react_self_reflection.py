@@ -14,7 +14,9 @@ class ReActSelfReflectionCritic(Critic):
     def __init__(self, max_retries: int = 2):
         self.max_retries = max_retries
 
-    def evaluate(self, state: Any, decision: Decision[Any], results: List[Any]) -> Dict[str, Any]:
+    def evaluate(
+        self, state: Any, decision: Decision[Any], results: List[Any]
+    ) -> Dict[str, Any]:
         metadata = getattr(state, "metadata", {}) or {}
         retries = int(metadata.get("reflection_retries", 0))
         reflections = metadata.get("self_reflections", [])
@@ -49,7 +51,9 @@ class ReActSelfReflectionCritic(Critic):
 
         return {"action": "continue", "reason": "react_reflection_pass", "score": 1.0}
 
-    def _build_error_reflection(self, decision: Decision[Any], error_item: Dict[str, Any]) -> str:
+    def _build_error_reflection(
+        self, decision: Decision[Any], error_item: Dict[str, Any]
+    ) -> str:
         action_desc = "no_action"
         if decision.actions:
             action_desc = str(decision.actions[0])

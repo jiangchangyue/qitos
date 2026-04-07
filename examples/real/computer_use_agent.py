@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
-from qitos.kit import HTMLExtractText, HTTPGet, JsonDecisionParser, ReadFile, RunCommand, WriteFile, format_action, render_prompt
+from qitos.kit import (
+    CodingToolSet,
+    HTMLExtractText,
+    HTTPGet,
+    JsonDecisionParser,
+    format_action,
+    render_prompt,
+)
 from qitos.models import OpenAICompatibleModel
 
 TASK = "Visit the target URL, summarize the key content, and write report.md."
@@ -77,10 +84,19 @@ class ComputerUseReActAgent(AgentModule[ComputerUseState, dict[str, Any], Action
         registry = ToolRegistry()
         registry.register(HTTPGet())
         registry.register(HTMLExtractText())
-        registry.register(RunCommand(cwd=workspace_root))
-        registry.register(WriteFile(root_dir=workspace_root))
-        registry.register(ReadFile(root_dir=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=JsonDecisionParser())
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=JsonDecisionParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> ComputerUseState:
         return ComputerUseState(
@@ -91,7 +107,9 @@ class ComputerUseReActAgent(AgentModule[ComputerUseState, dict[str, Any], Action
         )
 
     def build_system_prompt(self, state: ComputerUseState) -> str | None:
-        return render_prompt(SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()}
+        )
 
     def prepare(self, state: ComputerUseState) -> str:
         lines = [
@@ -105,8 +123,17 @@ class ComputerUseReActAgent(AgentModule[ComputerUseState, dict[str, Any], Action
             lines.extend(state.scratchpad[-8:])
         return "\n".join(lines)
 
-    def reduce(self, state: ComputerUseState, observation: dict[str, Any], decision: Decision[Action]) -> ComputerUseState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: ComputerUseState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> ComputerUseState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -121,7 +148,9 @@ class ComputerUseReActAgent(AgentModule[ComputerUseState, dict[str, Any], Action
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

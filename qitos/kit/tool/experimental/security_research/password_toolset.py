@@ -24,7 +24,9 @@ class PasswordToolSet:
     All operations must be performed within an authorized penetration testing engagement.
     """
 
-    def __init__(self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."):
+    def __init__(
+        self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."
+    ):
         """
         Initialize password attack toolset.
 
@@ -49,13 +51,25 @@ class PasswordToolSet:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
             )
-            return {"stdout": result.stdout, "stderr": result.stderr, "return_code": result.returncode}
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+            }
         except subprocess.TimeoutExpired:
             return {"stdout": "", "stderr": "Command timed out", "return_code": -1}
         except FileNotFoundError:
-            return {"stdout": "", "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.",
+                "return_code": -1,
+            }
         except Exception as e:
-            return {"stdout": "", "stderr": f"Error executing command: {str(e)}", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Error executing command: {str(e)}",
+                "return_code": -1,
+            }
 
     def _detect_hash_type(self, hash_str: str) -> Dict[str, Any]:
         """
@@ -69,122 +83,153 @@ class PasswordToolSet:
         """
         hash_str = hash_str.strip()
         length = len(hash_str)
-        result = {"hash": hash_str, "length": length, "detected_types": [], "confidence": "low"}
+        result = {
+            "hash": hash_str,
+            "length": length,
+            "detected_types": [],
+            "confidence": "low",
+        }
 
         # MD5: 32 hex chars
-        if re.match(r'^[a-fA-F0-9]{32}$', hash_str):
-            result["detected_types"].append({
-                "type": "MD5",
-                "john_format": "raw-md5",
-                "hashcat_mode": "0",
-                "confidence": "high",
-            })
+        if re.match(r"^[a-fA-F0-9]{32}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "MD5",
+                    "john_format": "raw-md5",
+                    "hashcat_mode": "0",
+                    "confidence": "high",
+                }
+            )
 
         # SHA-1: 40 hex chars
-        if re.match(r'^[a-fA-F0-9]{40}$', hash_str):
-            result["detected_types"].append({
-                "type": "SHA-1",
-                "john_format": "raw-sha1",
-                "hashcat_mode": "100",
-                "confidence": "high",
-            })
+        if re.match(r"^[a-fA-F0-9]{40}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "SHA-1",
+                    "john_format": "raw-sha1",
+                    "hashcat_mode": "100",
+                    "confidence": "high",
+                }
+            )
 
         # SHA-256: 64 hex chars
-        if re.match(r'^[a-fA-F0-9]{64}$', hash_str):
-            result["detected_types"].append({
-                "type": "SHA-256",
-                "john_format": "raw-sha256",
-                "hashcat_mode": "1400",
-                "confidence": "high",
-            })
+        if re.match(r"^[a-fA-F0-9]{64}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "SHA-256",
+                    "john_format": "raw-sha256",
+                    "hashcat_mode": "1400",
+                    "confidence": "high",
+                }
+            )
 
         # SHA-512: 128 hex chars (or crypt format)
-        if re.match(r'^[a-fA-F0-9]{128}$', hash_str):
-            result["detected_types"].append({
-                "type": "SHA-512",
-                "john_format": "raw-sha512",
-                "hashcat_mode": "1700",
-                "confidence": "high",
-            })
+        if re.match(r"^[a-fA-F0-9]{128}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "SHA-512",
+                    "john_format": "raw-sha512",
+                    "hashcat_mode": "1700",
+                    "confidence": "high",
+                }
+            )
 
         # NTLM: 32 hex chars (same length as MD5, but check format $NT$)
-        if re.match(r'^\$NT\$', hash_str) or (re.match(r'^[a-fA-F0-9]{32}$', hash_str) and length == 32):
-            result["detected_types"].append({
-                "type": "NTLM",
-                "john_format": "nt",
-                "hashcat_mode": "1000",
-                "confidence": "medium",
-            })
+        if re.match(r"^\$NT\$", hash_str) or (
+            re.match(r"^[a-fA-F0-9]{32}$", hash_str) and length == 32
+        ):
+            result["detected_types"].append(
+                {
+                    "type": "NTLM",
+                    "john_format": "nt",
+                    "hashcat_mode": "1000",
+                    "confidence": "medium",
+                }
+            )
 
         # bcrypt: starts with $2b$, $2a$, $2y$
-        if re.match(r'^\$2[aby]\$\d{2}\$', hash_str):
-            result["detected_types"].append({
-                "type": "bcrypt",
-                "john_format": "bcrypt",
-                "hashcat_mode": "3200",
-                "confidence": "high",
-            })
+        if re.match(r"^\$2[aby]\$\d{2}\$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "bcrypt",
+                    "john_format": "bcrypt",
+                    "hashcat_mode": "3200",
+                    "confidence": "high",
+                }
+            )
 
         # SHA-512 crypt: $6$...
         if hash_str.startswith("$6$"):
-            result["detected_types"].append({
-                "type": "sha512crypt",
-                "john_format": "sha512crypt",
-                "hashcat_mode": "1800",
-                "confidence": "high",
-            })
+            result["detected_types"].append(
+                {
+                    "type": "sha512crypt",
+                    "john_format": "sha512crypt",
+                    "hashcat_mode": "1800",
+                    "confidence": "high",
+                }
+            )
 
         # MD5 crypt: $1$...
         if hash_str.startswith("$1$"):
-            result["detected_types"].append({
-                "type": "md5crypt",
-                "john_format": "md5crypt",
-                "hashcat_mode": "500",
-                "confidence": "high",
-            })
+            result["detected_types"].append(
+                {
+                    "type": "md5crypt",
+                    "john_format": "md5crypt",
+                    "hashcat_mode": "500",
+                    "confidence": "high",
+                }
+            )
 
         # Blowfish crypt: $2a$ or $2y$ (already covered by bcrypt above)
 
         # WordPress hash: $P$B...
         if hash_str.startswith("$P$"):
-            result["detected_types"].append({
-                "type": "WordPress (phpass)",
-                "john_format": "phpass",
-                "hashcat_mode": "400",
-                "confidence": "high",
-            })
+            result["detected_types"].append(
+                {
+                    "type": "WordPress (phpass)",
+                    "john_format": "phpass",
+                    "hashcat_mode": "400",
+                    "confidence": "high",
+                }
+            )
 
         # MySQL: starts with * followed by 40 hex
-        if re.match(r'^\*[a-fA-F0-9]{40}$', hash_str):
-            result["detected_types"].append({
-                "type": "MySQL",
-                "john_format": "mysql",
-                "hashcat_mode": "300",
-                "confidence": "high",
-            })
+        if re.match(r"^\*[a-fA-F0-9]{40}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "MySQL",
+                    "john_format": "mysql",
+                    "hashcat_mode": "300",
+                    "confidence": "high",
+                }
+            )
 
         # SHA-512 crypt Linux: $6$salt$hash
-        if re.match(r'^\$6\$[^\$]+\$[a-zA-Z0-9./]{86}$', hash_str):
-            result["detected_types"].append({
-                "type": "sha512crypt (Linux /etc/shadow)",
-                "john_format": "sha512crypt",
-                "hashcat_mode": "1800",
-                "confidence": "high",
-            })
+        if re.match(r"^\$6\$[^\$]+\$[a-zA-Z0-9./]{86}$", hash_str):
+            result["detected_types"].append(
+                {
+                    "type": "sha512crypt (Linux /etc/shadow)",
+                    "john_format": "sha512crypt",
+                    "hashcat_mode": "1800",
+                    "confidence": "high",
+                }
+            )
 
         if result["detected_types"]:
             result["confidence"] = "high"
         else:
-            result["detected_types"].append({
-                "type": "Unknown",
-                "john_format": "",
-                "hashcat_mode": "",
-                "confidence": "low",
-            })
+            result["detected_types"].append(
+                {
+                    "type": "Unknown",
+                    "john_format": "",
+                    "hashcat_mode": "",
+                    "confidence": "low",
+                }
+            )
 
         return result
 
-    @tool(name='hash_identify')
+    @tool(name="hash_identify")
     def hash_identify(self, hash_str: str) -> Dict[str, Any]:
         """
         Identify the type of a hash string.
@@ -198,10 +243,15 @@ class PasswordToolSet:
         detection = self._detect_hash_type(hash_str)
 
         output = f"### 🔎 Hash Identification\n\n"
-        output += f"**Input Hash:** `{hash_str[:50]}{'...' if len(hash_str) > 50 else ''}`\n"
+        output += (
+            f"**Input Hash:** `{hash_str[:50]}{'...' if len(hash_str) > 50 else ''}`\n"
+        )
         output += f"**Length:** {detection['length']} characters\n\n"
 
-        if detection["detected_types"] and detection["detected_types"][0]["type"] != "Unknown":
+        if (
+            detection["detected_types"]
+            and detection["detected_types"][0]["type"] != "Unknown"
+        ):
             output += f"#### Detected Hash Type(s)\n\n"
             output += "| Hash Type | John Format | Hashcat Mode | Confidence |\n"
             output += "|-----------|-------------|--------------|------------|\n"
@@ -209,7 +259,9 @@ class PasswordToolSet:
                 output += f"| {dt['type']} | `{dt['john_format']}` | {dt['hashcat_mode']} | {dt['confidence']} |\n"
 
             best = detection["detected_types"][0]
-            output += f"\n**Best match:** {best['type']} (confidence: {best['confidence']})\n"
+            output += (
+                f"\n**Best match:** {best['type']} (confidence: {best['confidence']})\n"
+            )
         else:
             output += "⚠️ Could not identify the hash type. Try using `hash-identifier` or `name-that-hash` for more options.\n"
             output += "You may also need to specify the format manually when using John or Hashcat.\n"
@@ -220,9 +272,15 @@ class PasswordToolSet:
             "data": detection,
         }
 
-    @tool(name='john_crack')
-    def john_crack(self, hash_file: str, wordlist: str = "/usr/share/wordlists/rockyou.txt",
-                   format: str = "", rules: str = "", extra_args: str = "") -> Dict[str, Any]:
+    @tool(name="john_crack")
+    def john_crack(
+        self,
+        hash_file: str,
+        wordlist: str = "/usr/share/wordlists/rockyou.txt",
+        format: str = "",
+        rules: str = "",
+        extra_args: str = "",
+    ) -> Dict[str, Any]:
         """
         Crack password hashes using John the Ripper.
 
@@ -312,13 +370,20 @@ class PasswordToolSet:
                 "format": format,
                 "john_output": result["stdout"],
                 "show_output": stdout,
-            }
+            },
         }
 
-    @tool(name='hashcat_crack')
-    def hashcat_crack(self, hash_file: str, attack_mode: int = 0, hash_type: int = 0,
-                      wordlist: str = "", mask: str = "", rules_file: str = "",
-                      force: bool = True) -> Dict[str, Any]:
+    @tool(name="hashcat_crack")
+    def hashcat_crack(
+        self,
+        hash_file: str,
+        attack_mode: int = 0,
+        hash_type: int = 0,
+        wordlist: str = "",
+        mask: str = "",
+        rules_file: str = "",
+        force: bool = True,
+    ) -> Dict[str, Any]:
         """
         Crack password hashes using Hashcat.
 
@@ -344,14 +409,22 @@ class PasswordToolSet:
             return {"status": "error", "message": f"Hash file not found: {hash_file}"}
 
         if attack_mode in (0, 1, 6) and not wordlist:
-            return {"status": "error", "message": f"Wordlist required for attack mode {attack_mode}."}
+            return {
+                "status": "error",
+                "message": f"Wordlist required for attack mode {attack_mode}.",
+            }
         if attack_mode == 3 and not mask:
-            return {"status": "error", "message": "Mask pattern required for mask attack (mode 3)."}
+            return {
+                "status": "error",
+                "message": "Mask pattern required for mask attack (mode 3).",
+            }
 
         cmd = [
             "hashcat",
-            "-m", str(hash_type),
-            "-a", str(attack_mode),
+            "-m",
+            str(hash_type),
+            "-a",
+            str(attack_mode),
             hash_file,
         ]
 
@@ -395,14 +468,16 @@ class PasswordToolSet:
             output += "| Hash | Password |\n"
             output += "|------|----------|\n"
             for c in cracked:
-                short_hash = c["hash"][:30] + "..." if len(c["hash"]) > 30 else c["hash"]
+                short_hash = (
+                    c["hash"][:30] + "..." if len(c["hash"]) > 30 else c["hash"]
+                )
                 output += f"| `{short_hash}` | `{c['password']}` |\n"
         else:
             output += "#### ❌ No Passwords Cracked\n\n"
 
         # Extract performance info from stderr
         stderr = result.get("stderr", "")
-        speed_match = re.search(r'(\d+\.\d+\s*[GMKH]H/s)', stderr)
+        speed_match = re.search(r"(\d+\.\d+\s*[GMKH]H/s)", stderr)
         if speed_match:
             output += f"**Speed:** {speed_match.group(1)}\n"
 
@@ -422,14 +497,20 @@ class PasswordToolSet:
                 "cracked": cracked,
                 "cracked_count": len(cracked),
                 "hashcat_output": result["stderr"],
-            }
+            },
         }
 
-    @tool(name='hydra_bruteforce')
-    def hydra_bruteforce(self, target: str, service: str, username: str = "",
-                         wordlist: str = "/usr/share/wordlists/rockyou.txt",
-                         threads: int = 4, port: int = 0,
-                         extra_args: str = "") -> Dict[str, Any]:
+    @tool(name="hydra_bruteforce")
+    def hydra_bruteforce(
+        self,
+        target: str,
+        service: str,
+        username: str = "",
+        wordlist: str = "/usr/share/wordlists/rockyou.txt",
+        threads: int = 4,
+        port: int = 0,
+        extra_args: str = "",
+    ) -> Dict[str, Any]:
         """
         Brute-force login credentials using Hydra.
 
@@ -456,22 +537,43 @@ class PasswordToolSet:
         :return: Brute-force results with discovered credentials.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         if not os.path.isfile(wordlist):
             return {"status": "error", "message": f"Wordlist not found: {wordlist}"}
 
-        valid_services = ["ssh", "ftp", "http-post-form", "http-get-form", "mysql",
-                          "postgresql", "rdp", "smb", "smtp", "vnc", "telnet", "mssql"]
+        valid_services = [
+            "ssh",
+            "ftp",
+            "http-post-form",
+            "http-get-form",
+            "mysql",
+            "postgresql",
+            "rdp",
+            "smb",
+            "smtp",
+            "vnc",
+            "telnet",
+            "mssql",
+        ]
 
         if service not in valid_services:
-            return {"status": "error", "message": f"Invalid service '{service}'. Choose from: {', '.join(valid_services)}"}
+            return {
+                "status": "error",
+                "message": f"Invalid service '{service}'. Choose from: {', '.join(valid_services)}",
+            }
 
         cmd = [
             "hydra",
-            "-l", username,
-            "-P", wordlist,
-            "-t", str(threads),
+            "-l",
+            username,
+            "-P",
+            wordlist,
+            "-t",
+            str(threads),
             "-f",  # Stop on first valid pair
             "-v",  # Verbose
         ]
@@ -500,11 +602,11 @@ class PasswordToolSet:
         # Check for successful login
         combined = stdout + stderr
         success_pattern = r'\[({port or ""}+?port)\]\s*\[({service})\]\s*host:\s*({target}?)\s*\S*\s*login:\s*(\S+)\s*password:\s*(\S+)'
-        match = re.search(r'login:\s*(\S+)\s+password:\s*(\S+)', combined)
+        match = re.search(r"login:\s*(\S+)\s+password:\s*(\S+)", combined)
 
         if match or "1 valid password found" in combined.lower():
-            user_match = re.search(r'login:\s*(\S+)', combined)
-            pass_match = re.search(r'password:\s*(\S+)', combined)
+            user_match = re.search(r"login:\s*(\S+)", combined)
+            pass_match = re.search(r"password:\s*(\S+)", combined)
             found_user = user_match.group(1) if user_match else username
             found_pass = pass_match.group(1) if pass_match else "unknown"
 
@@ -528,13 +630,20 @@ class PasswordToolSet:
                 "username": username,
                 "hydra_output": combined,
                 "success": bool(match or "1 valid password found" in combined.lower()),
-            }
+            },
         }
 
-    @tool(name='wordlist_manage')
-    def wordlist_manage(self, action: str, input_file: str = "", output_file: str = "",
-                        min_length: int = 0, max_length: int = 0,
-                        charset: str = "", rules: str = "") -> Dict[str, Any]:
+    @tool(name="wordlist_manage")
+    def wordlist_manage(
+        self,
+        action: str,
+        input_file: str = "",
+        output_file: str = "",
+        min_length: int = 0,
+        max_length: int = 0,
+        charset: str = "",
+        rules: str = "",
+    ) -> Dict[str, Any]:
         """
         Manage and transform password wordlists.
 
@@ -561,9 +670,16 @@ class PasswordToolSet:
 
         valid_actions = ["filter", "unique", "sort", "combine", "stats", "generate"]
         if action not in valid_actions:
-            return {"status": "error", "message": f"Invalid action '{action}'. Choose from: {', '.join(valid_actions)}"}
+            return {
+                "status": "error",
+                "message": f"Invalid action '{action}'. Choose from: {', '.join(valid_actions)}",
+            }
 
-        if action != "generate" and action != "combine" and not os.path.isfile(input_file):
+        if (
+            action != "generate"
+            and action != "combine"
+            and not os.path.isfile(input_file)
+        ):
             return {"status": "error", "message": f"Input file not found: {input_file}"}
 
         if action == "stats":
@@ -601,14 +717,20 @@ class PasswordToolSet:
                     "max_length": max(lengths),
                     "avg_length": round(sum(lengths) / len(lengths), 1),
                     "charset": sorted(charset_chars),
-                }
+                },
             }
 
         if action == "unique":
             cmd = ["sort", input_file, "|", "uniq", ">", output_file]
-            result = self._run_command(["bash", "-c", f"sort '{input_file}' | uniq > '{output_file}'"], timeout=300)
+            result = self._run_command(
+                ["bash", "-c", f"sort '{input_file}' | uniq > '{output_file}'"],
+                timeout=300,
+            )
             if result["return_code"] != 0:
-                return {"status": "error", "message": f"Failed to process: {result['stderr']}"}
+                return {
+                    "status": "error",
+                    "message": f"Failed to process: {result['stderr']}",
+                }
 
             with open(output_file, "r", errors="ignore") as f:
                 count = sum(1 for _ in f)
@@ -618,17 +740,30 @@ class PasswordToolSet:
             output += f"**Output:** `{output_file}`\n"
             output += f"**Unique entries:** {count:,}\n"
 
-            return {"status": "success", "stdout": output, "data": {"output_file": output_file, "unique_count": count}}
+            return {
+                "status": "success",
+                "stdout": output,
+                "data": {"output_file": output_file, "unique_count": count},
+            }
 
         if action == "sort":
-            result = self._run_command(["sort", input_file, "-o", output_file], timeout=300)
+            result = self._run_command(
+                ["sort", input_file, "-o", output_file], timeout=300
+            )
             if result["return_code"] != 0:
-                return {"status": "error", "message": f"Failed to sort: {result['stderr']}"}
+                return {
+                    "status": "error",
+                    "message": f"Failed to sort: {result['stderr']}",
+                }
 
             output = f"### 📋 Wordlist Sorted\n\n"
             output += f"**Output:** `{output_file}`\n"
 
-            return {"status": "success", "stdout": output, "data": {"output_file": output_file}}
+            return {
+                "status": "success",
+                "stdout": output,
+                "data": {"output_file": output_file},
+            }
 
         if action == "filter":
             filter_cmd = f"cat '{input_file}'"
@@ -653,6 +788,10 @@ class PasswordToolSet:
             output += f"**Filters:** min_length={min_length}, max_length={max_length}, charset={charset}\n"
             output += f"**Output:** `{output_file}` ({count:,} entries)\n"
 
-            return {"status": "success", "stdout": output, "data": {"output_file": output_file, "filtered_count": count}}
+            return {
+                "status": "success",
+                "stdout": output,
+                "data": {"output_file": output_file, "filtered_count": count},
+            }
 
         return {"status": "error", "message": f"Action '{action}' not yet implemented."}

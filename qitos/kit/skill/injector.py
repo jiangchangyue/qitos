@@ -11,6 +11,7 @@ from .manifest import SkillManifest
 @dataclass
 class PromptContext:
     """Context for building prompts with skills."""
+
     task: str
     active_skills: List[SkillManifest] = field(default_factory=list)
     memory_snippets: List[str] = field(default_factory=list)
@@ -91,6 +92,7 @@ class SkillInjector:
     def _remove_section(self, content: str, section_header: str) -> str:
         """Remove a section from markdown content."""
         import re
+
         pattern = rf"{re.escape(section_header)}.*?\n(?=## |\Z)"
         return re.sub(pattern, "", content, flags=re.DOTALL).strip()
 
@@ -105,7 +107,9 @@ class SkillInjector:
         lines.append("")
         return "\n".join(lines)
 
-    def get_skill_for_file(self, filepath: str, skills: List[SkillManifest]) -> Optional[SkillManifest]:
+    def get_skill_for_file(
+        self, filepath: str, skills: List[SkillManifest]
+    ) -> Optional[SkillManifest]:
         """Get the most relevant skill for a file path."""
         filepath_lower = filepath.lower()
 
@@ -146,7 +150,9 @@ class AutoSkillSelector:
         """
         selected = []
         task_lower = task.lower()
-        for skill in self.registry.find_for_task(task_lower, filepath=filepath, active_only=False):
+        for skill in self.registry.find_for_task(
+            task_lower, filepath=filepath, active_only=False
+        ):
             if skill not in selected:
                 selected.append(skill)
         return selected[:5]
@@ -168,7 +174,9 @@ class SkillPromptBuilder:
             self._skills.append(skill)
         return self
 
-    def with_skills_for_task(self, task: str, filepath: Optional[str] = None) -> SkillPromptBuilder:
+    def with_skills_for_task(
+        self, task: str, filepath: Optional[str] = None
+    ) -> SkillPromptBuilder:
         """Auto-select skills for a task."""
         skills = self.selector.select(task, filepath)
         for skill in skills:

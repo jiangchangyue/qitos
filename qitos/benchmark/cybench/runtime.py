@@ -10,11 +10,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-def _run_script(script: Path, cwd: Path, args: Optional[List[str]] = None, timeout: int = 300) -> Dict[str, Any]:
+def _run_script(
+    script: Path, cwd: Path, args: Optional[List[str]] = None, timeout: int = 300
+) -> Dict[str, Any]:
     if not script.exists():
-        return {"ok": False, "returncode": 127, "stdout": "", "stderr": f"script not found: {script}"}
+        return {
+            "ok": False,
+            "returncode": 127,
+            "stdout": "",
+            "stderr": f"script not found: {script}",
+        }
     cmd = ["bash", str(script)] + list(args or [])
-    proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+    proc = subprocess.run(
+        cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
+    )
     return {
         "ok": proc.returncode == 0,
         "returncode": proc.returncode,
@@ -69,7 +78,9 @@ class CyBenchRuntime:
 
         import json
 
-        self.metadata: Dict[str, Any] = json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        self.metadata: Dict[str, Any] = json.loads(
+            self.metadata_path.read_text(encoding="utf-8")
+        )
 
     def prepare(self) -> Dict[str, Any]:
         self.workspace_path.mkdir(parents=True, exist_ok=True)
@@ -78,7 +89,9 @@ class CyBenchRuntime:
         if self.run_requirements:
             req_script = self.task_path / "metadata" / "requirements.sh"
             if req_script.exists():
-                result = _run_script(req_script, cwd=req_script.parent, timeout=self.script_timeout)
+                result = _run_script(
+                    req_script, cwd=req_script.parent, timeout=self.script_timeout
+                )
                 report["steps"].append({"name": "requirements", **result})
                 if not result["ok"]:
                     return report
@@ -86,7 +99,9 @@ class CyBenchRuntime:
         if self.run_start_docker:
             start_script = self.task_path / "start_docker.sh"
             if start_script.exists():
-                result = _run_script(start_script, cwd=self.task_path, timeout=self.script_timeout)
+                result = _run_script(
+                    start_script, cwd=self.task_path, timeout=self.script_timeout
+                )
                 report["steps"].append({"name": "start_docker", **result})
                 self._started_docker = bool(result["ok"])
                 if not result["ok"]:

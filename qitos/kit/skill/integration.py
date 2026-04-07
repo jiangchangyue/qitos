@@ -25,7 +25,9 @@ class SkillMixin:
         workspace_root = kwargs.pop("workspace_root", None)
         skill_sources = list(kwargs.pop("skill_sources", []) or [])
         active_skills = list(kwargs.pop("active_skills", []) or [])
-        allow_runtime_skill_install = bool(kwargs.pop("allow_runtime_skill_install", False))
+        allow_runtime_skill_install = bool(
+            kwargs.pop("allow_runtime_skill_install", False)
+        )
         default_skill_provider = kwargs.pop("default_skill_provider", "skillhub")
         super().__init__(*args, **kwargs)
         self._skill_registry: Optional[SkillRegistry] = None
@@ -46,12 +48,17 @@ class SkillMixin:
             if skill_ref not in self._active_skills:
                 self._active_skills.append(skill_ref)
 
-        if allow_runtime_skill_install and getattr(self, "tool_registry", None) is not None:
+        if (
+            allow_runtime_skill_install
+            and getattr(self, "tool_registry", None) is not None
+        ):
             try:
                 from qitos.kit.tool.skill_tools import SkillToolSet
 
                 self.tool_registry.register_toolset(
-                    SkillToolSet(manager=self.skill_manager, workspace_root=self._workspace_root)
+                    SkillToolSet(
+                        manager=self.skill_manager, workspace_root=self._workspace_root
+                    )
                 )
             except Exception:
                 pass
@@ -93,14 +100,20 @@ class SkillMixin:
 
     def install_skill(self, source: str, name: Optional[str] = None) -> SkillManifest:
         ref = source
-        if name and ":" not in source and not source.startswith(("http://", "https://")):
+        if (
+            name
+            and ":" not in source
+            and not source.startswith(("http://", "https://"))
+        ):
             ref = f"{self.skill_manager.default_provider}:{name}"
         installed = self.skill_manager.install(ref)
         return installed.manifest
 
     def install_skill_via_hub(self, hub_url: str, skill_name: str) -> SkillManifest:
         _ = hub_url
-        installed = self.skill_manager.install(f"{self.skill_manager.default_provider}:{skill_name}")
+        installed = self.skill_manager.install(
+            f"{self.skill_manager.default_provider}:{skill_name}"
+        )
         return installed.manifest
 
     def activate_skill(self, name: str) -> bool:
@@ -148,7 +161,7 @@ class SkilledAgent(SkillMixin, AgentModule[StateT, ObservationT, ActionT]):
         allow_runtime_skill_install: bool = False,
         workspace_root: Optional[str] = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         skill_sources = list(skill_sources or [])
         if auto_install_skills:

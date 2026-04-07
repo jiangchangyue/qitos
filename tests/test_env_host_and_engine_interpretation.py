@@ -5,9 +5,39 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from qitos import Action, AgentModule, Decision, Engine, StateSchema, ToolRegistry
+from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
 from qitos.engine import RuntimeBudget
 from qitos.kit.env import HostEnv
-from qitos.kit.tool import WriteFile
+
+
+class _OpsWriteFile(BaseTool):
+    def __init__(self):
+        super().__init__(
+            ToolSpec(
+                name="write_file",
+                description="Write a file through env file ops.",
+                parameters={
+                    "filename": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                required=["filename", "content"],
+                permissions=ToolPermission(filesystem_write=True),
+                required_ops=["file"],
+            )
+        )
+
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Dict[str, Any] | None = None
+    ) -> Dict[str, Any]:
+        ctx = runtime_context or {}
+        ops = dict(ctx.get("ops") or {})
+        file_ops = ops.get("file")
+        if file_ops is None:
+            return {"status": "error", "message": "Missing file ops"}
+        filename = str(args.get("filename", ""))
+        content = str(args.get("content", ""))
+        file_ops.write_text(filename, content)
+        return {"status": "success", "path": filename, "size": len(content)}
 
 
 def test_host_env_replace_lines_and_command(tmp_path: Path):
@@ -18,13 +48,20 @@ def test_host_env_replace_lines_and_command(tmp_path: Path):
     out = env.execute_action(
         Action(
             name="replace_lines",
-            args={"path": "m.py", "start_line": 2, "end_line": 2, "replacement": "    return a + b"},
+            args={
+                "path": "m.py",
+                "start_line": 2,
+                "end_line": 2,
+                "replacement": "    return a + b",
+            },
         )
     )
     assert isinstance(out, dict) and out.get("status") == "success"
     assert "return a + b" in target.read_text(encoding="utf-8")
 
-    run = env.execute_action(Action(name="run_command", args={"command": "python -c \"print(42)\""}))
+    run = env.execute_action(
+        Action(name="run_command", args={"command": 'python -c "print(42)"'})
+    )
     assert isinstance(run, dict)
     assert int(run.get("returncode", 1)) == 0
 
@@ -53,7 +90,9 @@ class _EnvOnlyAgent(AgentModule[_State, Dict[str, Any], Action]):
             )
         return Decision.final("done")
 
-    def reduce(self, state: _State, observation: Dict[str, Any], decision: Decision[Action]) -> _State:
+    def reduce(
+        self, state: _State, observation: Dict[str, Any], decision: Decision[Action]
+    ) -> _State:
         if decision.mode == "final":
             state.done = True
         return state
@@ -61,7 +100,7 @@ class _EnvOnlyAgent(AgentModule[_State, Dict[str, Any], Action]):
 
 def test_engine_executes_ops_aware_tool_with_env(tmp_path: Path):
     registry = ToolRegistry()
-    registry.register(WriteFile(root_dir=str(tmp_path)))
+    registry.register(_OpsWriteFile())
 
     class _EnvOpsAgent(_EnvOnlyAgent):
         def __init__(self):
@@ -78,14 +117,16 @@ def test_engine_executes_ops_aware_tool_with_env(tmp_path: Path):
 
 def test_engine_fails_when_required_ops_missing_env(tmp_path: Path):
     registry = ToolRegistry()
-    registry.register(WriteFile(root_dir=str(tmp_path)))
+    registry.register(_OpsWriteFile())
 
     class _NoEnvAgent(_EnvOnlyAgent):
         def __init__(self):
             super().__init__()
             self.tool_registry = registry
 
-    result = Engine(agent=_NoEnvAgent(), budget=RuntimeBudget(max_steps=2)).run("write file")
+    result = Engine(agent=_NoEnvAgent(), budget=RuntimeBudget(max_steps=2)).run(
+        "write file"
+    )
     assert result.state.stop_reason == "env_capability_mismatch"
     assert result.step_count == 0
     assert result.events

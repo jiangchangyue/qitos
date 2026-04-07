@@ -15,19 +15,27 @@ ObsT = TypeVar("ObsT")
 
 class Search(ABC, Generic[StateT, ObsT, ActionT]):
     @abstractmethod
-    def expand(self, state: StateT, obs: ObsT, seed_decision: Decision[ActionT]) -> List[Decision[ActionT]]:
+    def expand(
+        self, state: StateT, obs: ObsT, seed_decision: Decision[ActionT]
+    ) -> List[Decision[ActionT]]:
         """Expand a seed branch decision into concrete candidates."""
 
     @abstractmethod
-    def score(self, state: StateT, obs: ObsT, candidates: List[Decision[ActionT]]) -> List[float]:
+    def score(
+        self, state: StateT, obs: ObsT, candidates: List[Decision[ActionT]]
+    ) -> List[float]:
         """Score candidates for selection/pruning."""
 
     @abstractmethod
-    def select(self, candidates: List[Decision[ActionT]], scores: List[float]) -> Decision[ActionT]:
+    def select(
+        self, candidates: List[Decision[ActionT]], scores: List[float]
+    ) -> Decision[ActionT]:
         """Select one candidate for execution."""
 
     @abstractmethod
-    def prune(self, candidates: List[Decision[ActionT]], scores: List[float]) -> List[Decision[ActionT]]:
+    def prune(
+        self, candidates: List[Decision[ActionT]], scores: List[float]
+    ) -> List[Decision[ActionT]]:
         """Prune candidate set before selection."""
 
     @abstractmethod

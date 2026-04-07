@@ -23,10 +23,12 @@ from typing import Any, Dict, List
 from qitos import Action, Decision, StateSchema, ToolRegistry
 from qitos.kit.parser import ReActTextParser
 from qitos.kit.skill import SkilledAgent
-from qitos.kit.tool import EditorToolSet, RunCommand
+from qitos.kit.tool import CodingToolSet
 from qitos.models import OpenAIModel
 
-TASK = "Use the GitHub skill to explain how to inspect failed CI runs for a pull request."
+TASK = (
+    "Use the GitHub skill to explain how to inspect failed CI runs for a pull request."
+)
 WORKSPACE = "./playground/skillhub_github_agent"
 MODEL_NAME = os.getenv("QITOS_MODEL", "gpt-4o-mini")
 MODEL_BASE_URL = os.getenv("OPENAI_BASE_URL")
@@ -65,8 +67,16 @@ class GitHubSkillAgent(SkilledAgent[GitHubSkillState, Dict[str, Any], Action]):
         allow_runtime_skill_install: bool = True,
     ):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
 
         skill_sources = ["skillhub:github"] if bootstrap_github_skill else []
         active_skills = ["github"] if bootstrap_github_skill else []
@@ -82,7 +92,9 @@ class GitHubSkillAgent(SkilledAgent[GitHubSkillState, Dict[str, Any], Action]):
         )
 
     def init_state(self, task: str, **kwargs: Any) -> GitHubSkillState:
-        return GitHubSkillState(task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS)))
+        return GitHubSkillState(
+            task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS))
+        )
 
     def build_system_prompt(self, state: GitHubSkillState) -> str:
         return self.build_prompt_with_skills(
@@ -101,7 +113,9 @@ class GitHubSkillAgent(SkilledAgent[GitHubSkillState, Dict[str, Any], Action]):
             lines.extend(state.scratchpad[-5:])
         return "\n".join(lines)
 
-    def decide(self, state: GitHubSkillState, observation: Dict[str, Any]) -> Decision[Action] | None:
+    def decide(
+        self, state: GitHubSkillState, observation: Dict[str, Any]
+    ) -> Decision[Action] | None:
         _ = state
         _ = observation
         return None
@@ -114,14 +128,22 @@ class GitHubSkillAgent(SkilledAgent[GitHubSkillState, Dict[str, Any], Action]):
     ) -> GitHubSkillState:
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale[:120]}")
-        for result in observation.get("action_results", []) if isinstance(observation, dict) else []:
+        for result in (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        ):
             state.scratchpad.append(str(result)[:200])
         state.scratchpad = state.scratchpad[-20:]
         return state
 
 
 def build_model(args: argparse.Namespace) -> OpenAIModel:
-    api_key = args.api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("QITOS_API_KEY")
+    api_key = (
+        args.api_key
+        or os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("QITOS_API_KEY")
+    )
     if not api_key:
         raise RuntimeError("Set OPENAI_API_KEY or pass --api-key to run the example.")
     return OpenAIModel(

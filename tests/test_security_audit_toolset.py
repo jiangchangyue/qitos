@@ -44,10 +44,12 @@ if __name__ == "__main__":
         encoding="utf-8",
     )
     (root / "src" / "notes.py").write_text(
-        '# TODO: harden auth flow\n# nosec: temporary suppression for legacy code\n',
+        "# TODO: harden auth flow\n# nosec: temporary suppression for legacy code\n",
         encoding="utf-8",
     )
-    (root / "requirements.txt").write_text("flask\nrequests==2.31.0\n", encoding="utf-8")
+    (root / "requirements.txt").write_text(
+        "flask\nrequests==2.31.0\n", encoding="utf-8"
+    )
     (root / "package.json").write_text(
         '{"dependencies":{"express":"latest","left-pad":"file:../left-pad"},"devDependencies":{"vite":"*"}}',
         encoding="utf-8",
@@ -73,8 +75,13 @@ def test_security_audit_inventory_and_entrypoints(tmp_path: Path) -> None:
     inventory = toolset.audit_inventory()
     assert inventory["status"] == "success"
     assert "python" in inventory["data"]["languages"]
-    assert any(item["path"] == "requirements.txt" for item in inventory["data"]["manifests"])
-    assert any(item["kind"] == "http_route" for item in inventory["data"]["entrypoint_candidates"])
+    assert any(
+        item["path"] == "requirements.txt" for item in inventory["data"]["manifests"]
+    )
+    assert any(
+        item["kind"] == "http_route"
+        for item in inventory["data"]["entrypoint_candidates"]
+    )
 
     entrypoints = toolset.audit_entrypoints()
     assert entrypoints["status"] == "success"
@@ -95,7 +102,9 @@ def test_security_audit_sink_secret_config_and_notes(tmp_path: Path) -> None:
 
     secrets = toolset.audit_secret_scan()
     assert any(item["title"] == "GitHub token" for item in secrets["data"]["findings"])
-    assert not any("changeme" in item["evidence"].lower() for item in secrets["data"]["findings"])
+    assert not any(
+        "changeme" in item["evidence"].lower() for item in secrets["data"]["findings"]
+    )
 
     configs = toolset.audit_config_scan()
     config_categories = {item["category"] for item in configs["data"]["findings"]}
@@ -114,7 +123,9 @@ def test_security_dependency_inventory_and_hotspots(tmp_path: Path) -> None:
     inventory = toolset.audit_dependency_inventory()
     manifests = {item["path"]: item for item in inventory["data"]["manifests"]}
     assert manifests["requirements.txt"]["direct_dependency_count"] == 2
-    assert manifests["package.json"]["git_or_path_dependencies"] == ["left-pad:file:../left-pad"]
+    assert manifests["package.json"]["git_or_path_dependencies"] == [
+        "left-pad:file:../left-pad"
+    ]
     assert manifests["package.json"]["outdated_clues"]
 
     toolset.audit_sink_scan(category="all")
@@ -126,7 +137,9 @@ def test_security_dependency_inventory_and_hotspots(tmp_path: Path) -> None:
     assert hotspots["data"]["summary"]["finding_count"] >= 3
 
 
-def test_security_dependency_audit_handles_unavailable_and_external_outputs(tmp_path: Path, monkeypatch) -> None:
+def test_security_dependency_audit_handles_unavailable_and_external_outputs(
+    tmp_path: Path, monkeypatch
+) -> None:
     _write_repo(tmp_path)
     toolset = SecurityAuditToolSet(workspace_root=str(tmp_path), include_external=True)
 
@@ -165,4 +178,7 @@ def test_security_dependency_audit_handles_unavailable_and_external_outputs(tmp_
     audited = toolset.audit_dependency_audit()
     assert audited["status"] == "success"
     assert len(audited["data"]["findings"]) >= 3
-    assert any(item["category"] == "vulnerable_dependency" for item in audited["data"]["findings"])
+    assert any(
+        item["category"] == "vulnerable_dependency"
+        for item in audited["data"]["findings"]
+    )

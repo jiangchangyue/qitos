@@ -88,7 +88,11 @@ class CodingToolSet:
         self.expose_modern_names = bool(expose_modern_names)
         self.profile = str(profile or "full")
         self.include_http_tools = bool(include_http_tools)
-        self._notebook = NotebookToolSet(workspace_root=self.workspace_root) if self.include_notebook else None
+        self._notebook = (
+            NotebookToolSet(workspace_root=self.workspace_root)
+            if self.include_notebook
+            else None
+        )
         self._session_tasks: Dict[str, Dict[str, Any]] = {}
         self._task_counter = 0
 
@@ -130,10 +134,34 @@ class CodingToolSet:
             if self.expose_legacy_aliases:
                 items.append(self.web_fetch)
             if self.include_http_tools:
-                items.extend([self.http_request, self.http_get, self.http_post, self.extract_web_text])
-        if self.expose_modern_names and self.profile in {"full", "editor", "codebase", "shell"}:
-            items.extend([self.bash_v2, self.file_read_v2, self.file_edit_v2, self.glob_v2, self.grep_v2])
-        if self.expose_modern_names and self.enable_web and self.profile in {"full", "web"}:
+                items.extend(
+                    [
+                        self.http_request,
+                        self.http_get,
+                        self.http_post,
+                        self.extract_web_text,
+                    ]
+                )
+        if self.expose_modern_names and self.profile in {
+            "full",
+            "editor",
+            "codebase",
+            "shell",
+        }:
+            items.extend(
+                [
+                    self.bash_v2,
+                    self.file_read_v2,
+                    self.file_edit_v2,
+                    self.glob_v2,
+                    self.grep_v2,
+                ]
+            )
+        if (
+            self.expose_modern_names
+            and self.enable_web
+            and self.profile in {"full", "web"}
+        ):
             items.append(self.web_fetch_v2)
         if self.expose_modern_names and self.profile == "full":
             items.extend(
@@ -156,18 +184,28 @@ class CodingToolSet:
             if self.enable_lsp:
                 items.append(self.lsp_query)
             if self.enable_tasks:
-                items.extend([self.task_create, self.task_get, self.task_list, self.task_update])
+                items.extend(
+                    [self.task_create, self.task_get, self.task_list, self.task_update]
+                )
             if self._notebook is not None:
                 items.extend(self._notebook.tools())
         return items
 
     def _read_text_file(self, path: Path) -> tuple[str, str, float]:
         raw = path.read_bytes()
-        return raw.decode("utf-8", errors="ignore"), _detect_line_ending(raw), path.stat().st_mtime
+        return (
+            raw.decode("utf-8", errors="ignore"),
+            _detect_line_ending(raw),
+            path.stat().st_mtime,
+        )
 
-    def _write_text_file(self, path: Path, content: str, line_ending: str = "\n") -> None:
+    def _write_text_file(
+        self, path: Path, content: str, line_ending: str = "\n"
+    ) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        normalized = content.replace("\r\n", "\n").replace("\r", "\n").replace("\n", line_ending)
+        normalized = (
+            content.replace("\r\n", "\n").replace("\r", "\n").replace("\n", line_ending)
+        )
         path.write_text(normalized, encoding="utf-8", newline="")
 
     def _iter_files(self, base_dir: Path, include_hidden: bool = False) -> List[Path]:
@@ -175,14 +213,19 @@ class CodingToolSet:
         for root, dirs, names in os.walk(base_dir):
             if not include_hidden:
                 dirs[:] = [
-                    d for d in dirs if not d.startswith(".") and d not in {"__pycache__", "node_modules", ".venv"}
+                    d
+                    for d in dirs
+                    if not d.startswith(".")
+                    and d not in {"__pycache__", "node_modules", ".venv"}
                 ]
                 names = [n for n in names if not n.startswith(".")]
             for name in names:
                 files.append(Path(root) / name)
         return files
 
-    def _run_rg_files(self, target_dir: Path, pattern: str, include_hidden: bool) -> Optional[List[str]]:
+    def _run_rg_files(
+        self, target_dir: Path, pattern: str, include_hidden: bool
+    ) -> Optional[List[str]]:
         cmd = ["rg", "--files", str(target_dir), "-g", pattern]
         if include_hidden:
             cmd.insert(1, "--hidden")
@@ -226,7 +269,9 @@ class CodingToolSet:
             return None
         if result.returncode not in {0, 1}:
             return None
-        rows = [line.rstrip("\n") for line in result.stdout.splitlines() if line.strip()]
+        rows = [
+            line.rstrip("\n") for line in result.stdout.splitlines() if line.strip()
+        ]
         matches: List[Dict[str, Any]] = []
         for row in rows:
             if files_with_matches:
@@ -236,7 +281,13 @@ class CodingToolSet:
             if len(parts) != 3:
                 continue
             file_path, line_no, text = parts
-            matches.append({"path": os.path.relpath(file_path, self.workspace_root), "line": int(line_no), "text": text})
+            matches.append(
+                {
+                    "path": os.path.relpath(file_path, self.workspace_root),
+                    "line": int(line_no),
+                    "text": text,
+                }
+            )
         return matches
 
     def _tree_lines(self, path: Path, depth: int) -> List[str]:
@@ -245,13 +296,20 @@ class CodingToolSet:
         def walk(current: Path, indent: str, current_depth: int) -> None:
             if current_depth >= depth:
                 return
-            items = sorted([p for p in current.iterdir() if not p.name.startswith(".")], key=lambda p: (p.is_file(), p.name))
+            items = sorted(
+                [p for p in current.iterdir() if not p.name.startswith(".")],
+                key=lambda p: (p.is_file(), p.name),
+            )
             for index, item in enumerate(items):
                 is_last = index == len(items) - 1
                 connector = "`-- " if is_last else "|-- "
                 lines.append(f"{indent}{connector}{item.name}")
                 if item.is_dir():
-                    walk(item, indent + ("    " if is_last else "|   "), current_depth + 1)
+                    walk(
+                        item,
+                        indent + ("    " if is_last else "|   "),
+                        current_depth + 1,
+                    )
 
         walk(path, "", 1)
         return lines
@@ -272,7 +330,11 @@ class CodingToolSet:
     ) -> Dict[str, Any]:
         parsed = urlparse(str(url or ""))
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            return {"status": "error", "message": "URL must be an absolute http or https URL", "url": url}
+            return {
+                "status": "error",
+                "message": "URL must be an absolute http or https URL",
+                "url": url,
+            }
         try:
             response = requests.request(
                 method=str(method or "GET").upper(),
@@ -311,10 +373,18 @@ class CodingToolSet:
     def _extract_html_text(self, html: str) -> Dict[str, Any]:
         if BeautifulSoup is not None:
             soup = BeautifulSoup(html or "", "html.parser")
-            title = soup.title.string.strip() if soup.title and soup.title.string else ""
-            text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
+            title = (
+                soup.title.string.strip() if soup.title and soup.title.string else ""
+            )
+            text = "\n".join(
+                line.strip()
+                for line in soup.get_text("\n").splitlines()
+                if line.strip()
+            )
             return {"status": "success", "title": title, "text": text}
-        title_match = re.search(r"<title>(.*?)</title>", html or "", re.IGNORECASE | re.DOTALL)
+        title_match = re.search(
+            r"<title>(.*?)</title>", html or "", re.IGNORECASE | re.DOTALL
+        )
         title = title_match.group(1).strip() if title_match else ""
         text = re.sub(r"<[^>]+>", " ", html or "")
         text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
@@ -351,14 +421,41 @@ class CodingToolSet:
         text = str(command or "").strip()
         if not text:
             return {"status": "error", "message": "Command cannot be empty"}
-        destructive_tokens = ("rm -rf", "sudo rm", "mkfs", ":(){", "dd if=", "git reset --hard")
-        write_tokens = ("rm ", "mv ", "cp ", "mkdir ", "touch ", "sed -i", "> ", ">> ", "git commit", "git push")
+        destructive_tokens = (
+            "rm -rf",
+            "sudo rm",
+            "mkfs",
+            ":(){",
+            "dd if=",
+            "git reset --hard",
+        )
+        write_tokens = (
+            "rm ",
+            "mv ",
+            "cp ",
+            "mkdir ",
+            "touch ",
+            "sed -i",
+            "> ",
+            ">> ",
+            "git commit",
+            "git push",
+        )
         if not allow_destructive and any(token in text for token in destructive_tokens):
-            return {"status": "error", "message": "Destructive command blocked", "error_category": "destructive_command"}
+            return {
+                "status": "error",
+                "message": "Destructive command blocked",
+                "error_category": "destructive_command",
+            }
         if read_only and any(token in text for token in write_tokens):
-            return {"status": "error", "message": "Command appears to write to the workspace in read-only mode"}
+            return {
+                "status": "error",
+                "message": "Command appears to write to the workspace in read-only mode",
+            }
         if run_in_background:
-            fd, stdout_path = tempfile.mkstemp(prefix="qitos_bash_", suffix=".log", dir=self.workspace_root)
+            fd, stdout_path = tempfile.mkstemp(
+                prefix="qitos_bash_", suffix=".log", dir=self.workspace_root
+            )
             os.close(fd)
             with open(stdout_path, "w", encoding="utf-8") as handle:
                 process = subprocess.Popen(
@@ -368,7 +465,12 @@ class CodingToolSet:
                     stdout=handle,
                     stderr=subprocess.STDOUT,
                 )
-            return {"status": "success", "command": text, "pid": process.pid, "stdout_path": stdout_path}
+            return {
+                "status": "success",
+                "command": text,
+                "pid": process.pid,
+                "stdout_path": stdout_path,
+            }
         try:
             result = subprocess.run(
                 text,
@@ -397,8 +499,14 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "command": text}
 
-    @tool(name="run_command", permissions=ToolPermission(command=True), rule_scope_builder=_default_rule_scope)
-    def run_command(self, command: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="run_command",
+        permissions=ToolPermission(command=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def run_command(
+        self, command: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute one shell command inside the configured working directory.
 
@@ -407,7 +515,12 @@ class CodingToolSet:
         """
         return self.bash_v2(command=command, runtime_context=runtime_context)
 
-    @tool(name="file_read_v2", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="file_read_v2",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def file_read_v2(
         self,
         path: str,
@@ -447,27 +560,53 @@ class CodingToolSet:
                 "offset": start,
                 "limit": size,
                 "total_lines": len(lines),
-                "lines": [{"line": start + index + 1, "text": text} for index, text in enumerate(chunk)],
+                "lines": [
+                    {"line": start + index + 1, "text": text}
+                    for index, text in enumerate(chunk)
+                ],
                 "has_more": start + size < len(lines),
                 "truncated": truncated,
             }
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="read_file", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
-    def read_file(self, filename: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="read_file",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
+    def read_file(
+        self, filename: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Read the full text content of a workspace file.
 
         :param filename: Path relative to the workspace root.
         :param runtime_context: Optional runtime context injected by the executor.
         """
-        result = self.file_read_v2(path=filename, offset=0, limit=100_000, max_chars=200_000, runtime_context=runtime_context)
+        result = self.file_read_v2(
+            path=filename,
+            offset=0,
+            limit=100_000,
+            max_chars=200_000,
+            runtime_context=runtime_context,
+        )
         if result.get("status") != "success":
             return result
-        return {"status": "success", "path": filename, "content": result.get("content", ""), "size": len(result.get("content", ""))}
+        return {
+            "status": "success",
+            "path": filename,
+            "content": result.get("content", ""),
+            "size": len(result.get("content", "")),
+        }
 
-    @tool(name="view", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="view",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def view(self, path: str, view_range: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         View a file or directory under the workspace root.
@@ -482,11 +621,24 @@ class CodingToolSet:
             resolved = _resolve_workspace_path(self.workspace_root, path)
             if resolved.is_dir():
                 entries = []
-                for item in sorted(resolved.iterdir(), key=lambda p: (p.is_file(), p.name)):
+                for item in sorted(
+                    resolved.iterdir(), key=lambda p: (p.is_file(), p.name)
+                ):
                     if item.name.startswith("."):
                         continue
-                    entries.append({"name": item.name, "type": "directory" if item.is_dir() else "file"})
-                return {"status": "success", "kind": "directory", "path": path, "entries": entries, "count": len(entries)}
+                    entries.append(
+                        {
+                            "name": item.name,
+                            "type": "directory" if item.is_dir() else "file",
+                        }
+                    )
+                return {
+                    "status": "success",
+                    "kind": "directory",
+                    "path": path,
+                    "entries": entries,
+                    "count": len(entries),
+                }
             if not resolved.exists():
                 return {"status": "error", "message": f"File not found: {path}"}
             start = 0
@@ -500,8 +652,15 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="list_files", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
-    def list_files(self, path: str = ".", runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="list_files",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
+    def list_files(
+        self, path: str = ".", runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         List files and directories under a workspace-relative path.
 
@@ -512,7 +671,10 @@ class CodingToolSet:
         try:
             resolved = _resolve_workspace_path(self.workspace_root, path)
             if not resolved.is_dir():
-                return {"status": "error", "message": f"Path is not a directory: {path}"}
+                return {
+                    "status": "error",
+                    "message": f"Path is not a directory: {path}",
+                }
             items = []
             for item in sorted(resolved.iterdir(), key=lambda p: (p.is_file(), p.name)):
                 if item.name.startswith("."):
@@ -524,12 +686,26 @@ class CodingToolSet:
                         "size": item.stat().st_size if item.is_file() else None,
                     }
                 )
-            return {"status": "success", "path": path, "count": len(items), "files": items}
+            return {
+                "status": "success",
+                "path": path,
+                "count": len(items),
+                "files": items,
+            }
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="write_file", permissions=ToolPermission(filesystem_write=True), rule_scope_builder=_default_rule_scope)
-    def write_file(self, filename: str, content: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="write_file",
+        permissions=ToolPermission(filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def write_file(
+        self,
+        filename: str,
+        content: str,
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Write text content to a workspace file.
 
@@ -545,7 +721,11 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": filename}
 
-    @tool(name="create", permissions=ToolPermission(filesystem_write=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="create",
+        permissions=ToolPermission(filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def create(self, path: str, file_text: str = "") -> Dict[str, Any]:
         """
         Create a new file with the given content.
@@ -556,9 +736,18 @@ class CodingToolSet:
         result = self.write_file(filename=path, content=file_text)
         if result.get("status") != "success":
             return result
-        return {"status": "success", "path": path, "message": f"Created file: {path}", "size": len(file_text)}
+        return {
+            "status": "success",
+            "path": path,
+            "message": f"Created file: {path}",
+            "size": len(file_text),
+        }
 
-    @tool(name="file_edit_v2", permissions=ToolPermission(filesystem_read=True, filesystem_write=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="file_edit_v2",
+        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def file_edit_v2(
         self,
         path: str,
@@ -590,37 +779,75 @@ class CodingToolSet:
         try:
             resolved = _resolve_workspace_path(self.workspace_root, path)
             if not resolved.exists():
-                return {"status": "error", "message": f"File not found: {path}", "path": path}
+                return {
+                    "status": "error",
+                    "message": f"File not found: {path}",
+                    "path": path,
+                }
             old_content, line_ending, current_mtime = self._read_text_file(resolved)
-            if expected_mtime is not None and abs(float(expected_mtime) - float(current_mtime)) > 1e-6:
-                return {"status": "error", "message": "File was modified since the expected mtime.", "path": path}
+            if (
+                expected_mtime is not None
+                and abs(float(expected_mtime) - float(current_mtime)) > 1e-6
+            ):
+                return {
+                    "status": "error",
+                    "message": "File was modified since the expected mtime.",
+                    "path": path,
+                }
             normalized_action = str(action or "").strip()
             if normalized_action == "str_replace":
                 if not old_text:
-                    return {"status": "error", "message": "old_text cannot be empty", "path": path}
+                    return {
+                        "status": "error",
+                        "message": "old_text cannot be empty",
+                        "path": path,
+                    }
                 count = old_content.count(old_text)
                 if count == 0:
-                    return {"status": "error", "message": f"Text not found in {path}", "path": path}
+                    return {
+                        "status": "error",
+                        "message": f"Text not found in {path}",
+                        "path": path,
+                    }
                 if count > 1:
-                    return {"status": "error", "message": "Text replacement must be unique", "path": path, "occurrences": count}
+                    return {
+                        "status": "error",
+                        "message": "Text replacement must be unique",
+                        "path": path,
+                        "occurrences": count,
+                    }
                 new_content = old_content.replace(old_text, new_text, 1)
                 message = f"Replaced one occurrence in {path}"
             elif normalized_action == "insert":
                 lines = old_content.splitlines()
                 if insert_line < 0 or insert_line > len(lines):
-                    return {"status": "error", "message": f"Invalid insert_line: {insert_line}", "path": path}
+                    return {
+                        "status": "error",
+                        "message": f"Invalid insert_line: {insert_line}",
+                        "path": path,
+                    }
                 updated_lines = lines[:insert_line] + [new_text] + lines[insert_line:]
                 new_content = "\n".join(updated_lines)
                 message = f"Inserted content after line {insert_line} in {path}"
             elif normalized_action == "replace_lines":
                 lines = old_content.splitlines()
                 if start_line <= 0 or end_line < start_line or end_line > len(lines):
-                    return {"status": "error", "message": "Invalid line range", "path": path}
-                updated_lines = lines[: start_line - 1] + [replacement] + lines[end_line:]
+                    return {
+                        "status": "error",
+                        "message": "Invalid line range",
+                        "path": path,
+                    }
+                updated_lines = (
+                    lines[: start_line - 1] + [replacement] + lines[end_line:]
+                )
                 new_content = "\n".join(updated_lines)
                 message = f"Replaced lines {start_line}-{end_line} in {path}"
             else:
-                return {"status": "error", "message": f"Unsupported action: {normalized_action}", "path": path}
+                return {
+                    "status": "error",
+                    "message": f"Unsupported action: {normalized_action}",
+                    "path": path,
+                }
             self._write_text_file(resolved, new_content, line_ending)
             return {
                 "status": "success",
@@ -634,7 +861,11 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="str_replace", permissions=ToolPermission(filesystem_read=True, filesystem_write=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="str_replace",
+        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def str_replace(self, path: str, old_str: str, new_str: str = "") -> Dict[str, Any]:
         """
         Replace one unique string fragment in a file.
@@ -643,9 +874,15 @@ class CodingToolSet:
         :param old_str: The exact string to replace. Must be unique in the file.
         :param new_str: The new string to replace old_str with.
         """
-        return self.file_edit_v2(path=path, action="str_replace", old_text=old_str, new_text=new_str)
+        return self.file_edit_v2(
+            path=path, action="str_replace", old_text=old_str, new_text=new_str
+        )
 
-    @tool(name="insert", permissions=ToolPermission(filesystem_read=True, filesystem_write=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="insert",
+        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def insert(self, path: str, insert_line: int, new_str: str) -> Dict[str, Any]:
         """
         Insert new text after a given line number.
@@ -654,10 +891,18 @@ class CodingToolSet:
         :param insert_line: Line number after which to insert new_str.
         :param new_str: String to insert.
         """
-        return self.file_edit_v2(path=path, action="insert", insert_line=insert_line, new_text=new_str)
+        return self.file_edit_v2(
+            path=path, action="insert", insert_line=insert_line, new_text=new_str
+        )
 
-    @tool(name="replace_lines", permissions=ToolPermission(filesystem_read=True, filesystem_write=True), rule_scope_builder=_default_rule_scope)
-    def replace_lines(self, path: str, start_line: int, end_line: int, replacement: str = "") -> Dict[str, Any]:
+    @tool(
+        name="replace_lines",
+        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def replace_lines(
+        self, path: str, start_line: int, end_line: int, replacement: str = ""
+    ) -> Dict[str, Any]:
         """
         Replace an inclusive line range with new content.
 
@@ -674,8 +919,17 @@ class CodingToolSet:
             replacement=replacement,
         )
 
-    @tool(name="append_file", permissions=ToolPermission(filesystem_write=True), rule_scope_builder=_default_rule_scope)
-    def append_file(self, filename: str, content: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="append_file",
+        permissions=ToolPermission(filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def append_file(
+        self,
+        filename: str,
+        content: str,
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Append text to the end of a workspace file.
 
@@ -689,12 +943,23 @@ class CodingToolSet:
             resolved.parent.mkdir(parents=True, exist_ok=True)
             with resolved.open("a", encoding="utf-8") as handle:
                 handle.write(content)
-            return {"status": "success", "path": filename, "appended_size": len(content), "size": resolved.stat().st_size}
+            return {
+                "status": "success",
+                "path": filename,
+                "appended_size": len(content),
+                "size": resolved.stat().st_size,
+            }
         except Exception as e:
             return {"status": "error", "message": str(e), "path": filename}
 
-    @tool(name="make_directory", permissions=ToolPermission(filesystem_write=True), rule_scope_builder=_default_rule_scope)
-    def make_directory(self, path: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="make_directory",
+        permissions=ToolPermission(filesystem_write=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def make_directory(
+        self, path: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Create a directory inside the workspace.
 
@@ -709,7 +974,12 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="glob_v2", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="glob_v2",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def glob_v2(
         self,
         pattern: str,
@@ -737,7 +1007,9 @@ class CodingToolSet:
                 matches = []
                 for item in self._iter_files(target, include_hidden=include_hidden):
                     rel = os.path.relpath(str(item), self.workspace_root)
-                    if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(item.name, pattern):
+                    if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(
+                        item.name, pattern
+                    ):
                         matches.append(rel)
                 matches = sorted(matches)
             capped = matches[: max(1, int(limit))]
@@ -751,10 +1023,26 @@ class CodingToolSet:
                 "context": {"include_hidden": include_hidden},
             }
         except Exception as e:
-            return {"status": "error", "message": str(e), "pattern": pattern, "path": path}
+            return {
+                "status": "error",
+                "message": str(e),
+                "pattern": pattern,
+                "path": path,
+            }
 
-    @tool(name="glob_files", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
-    def glob_files(self, pattern: str, path: str = ".", include_hidden: bool = False, limit: int = 100) -> Dict[str, Any]:
+    @tool(
+        name="glob_files",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
+    def glob_files(
+        self,
+        pattern: str,
+        path: str = ".",
+        include_hidden: bool = False,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
         """
         Find files under the workspace that match a glob pattern.
 
@@ -763,12 +1051,19 @@ class CodingToolSet:
         :param include_hidden: Whether to include hidden files and directories.
         :param limit: Maximum number of matching files to return.
         """
-        result = self.glob_v2(pattern=pattern, path=path, include_hidden=include_hidden, limit=limit)
+        result = self.glob_v2(
+            pattern=pattern, path=path, include_hidden=include_hidden, limit=limit
+        )
         if result.get("status") == "success":
             result["num_files"] = result.get("match_count", 0)
         return result
 
-    @tool(name="grep_v2", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="grep_v2",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def grep_v2(
         self,
         pattern: str,
@@ -800,17 +1095,24 @@ class CodingToolSet:
             return {"status": "error", "message": "Pattern cannot be empty"}
         try:
             target = _resolve_workspace_path(self.workspace_root, path)
-            matches = self._run_rg_grep(pattern, target, glob, case_sensitive, regex, files_with_matches)
+            matches = self._run_rg_grep(
+                pattern, target, glob, case_sensitive, regex, files_with_matches
+            )
             if matches is None:
                 flags = 0 if case_sensitive else re.IGNORECASE
                 matcher = re.compile(pattern if regex else re.escape(pattern), flags)
                 matches = []
                 for file_path in self._iter_files(target):
                     rel = os.path.relpath(str(file_path), self.workspace_root)
-                    if glob and not (fnmatch.fnmatch(rel, glob) or fnmatch.fnmatch(file_path.name, glob)):
+                    if glob and not (
+                        fnmatch.fnmatch(rel, glob)
+                        or fnmatch.fnmatch(file_path.name, glob)
+                    ):
                         continue
                     try:
-                        lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+                        lines = file_path.read_text(
+                            encoding="utf-8", errors="ignore"
+                        ).splitlines()
                     except Exception:
                         continue
                     if files_with_matches:
@@ -828,14 +1130,28 @@ class CodingToolSet:
                 "matches": capped,
                 "match_count": len(capped),
                 "truncated": len(matches) > len(capped),
-                "context": {"glob": glob, "case_sensitive": case_sensitive, "regex": regex, "files_with_matches": files_with_matches},
+                "context": {
+                    "glob": glob,
+                    "case_sensitive": case_sensitive,
+                    "regex": regex,
+                    "files_with_matches": files_with_matches,
+                },
             }
         except re.error as e:
-            return {"status": "error", "message": f"Invalid regex: {e}", "pattern": pattern}
+            return {
+                "status": "error",
+                "message": f"Invalid regex: {e}",
+                "pattern": pattern,
+            }
         except Exception as e:
             return {"status": "error", "message": str(e), "pattern": pattern}
 
-    @tool(name="grep_files", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="grep_files",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def grep_files(
         self,
         pattern: str,
@@ -870,7 +1186,12 @@ class CodingToolSet:
             result["num_matches"] = result.get("match_count", 0)
         return result
 
-    @tool(name="read_file_range", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="read_file_range",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def read_file_range(
         self,
         filename: str,
@@ -886,7 +1207,9 @@ class CodingToolSet:
         :param limit: Maximum number of lines to return.
         :param runtime_context: Optional runtime context injected by the executor.
         """
-        result = self.file_read_v2(path=filename, offset=offset, limit=limit, runtime_context=runtime_context)
+        result = self.file_read_v2(
+            path=filename, offset=offset, limit=limit, runtime_context=runtime_context
+        )
         if result.get("status") != "success":
             return result
         return {
@@ -900,7 +1223,12 @@ class CodingToolSet:
             "has_more": result.get("has_more", False),
         }
 
-    @tool(name="search", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="search",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def search(self, path: str, keyword: str) -> Dict[str, Any]:
         """
         Search for a keyword inside files within a directory tree.
@@ -910,7 +1238,12 @@ class CodingToolSet:
         """
         return self.grep_v2(pattern=keyword, path=path, regex=False, limit=15)
 
-    @tool(name="list_tree", permissions=ToolPermission(filesystem_read=True), read_only=True, rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="list_tree",
+        permissions=ToolPermission(filesystem_read=True),
+        read_only=True,
+        rule_scope_builder=_default_rule_scope,
+    )
     def list_tree(self, path: str = ".", depth: int = 3) -> Dict[str, Any]:
         """
         List directory structure in a tree format.
@@ -921,14 +1254,27 @@ class CodingToolSet:
         try:
             resolved = _resolve_workspace_path(self.workspace_root, path)
             if not resolved.is_dir():
-                return {"status": "error", "message": f"Path is not a directory: {path}"}
+                return {
+                    "status": "error",
+                    "message": f"Path is not a directory: {path}",
+                }
             normalized_depth = min(max(int(depth), 1), 10)
             lines = self._tree_lines(resolved, normalized_depth)
-            return {"status": "success", "path": path, "depth": normalized_depth, "tree": "\n".join(lines), "lines": lines}
+            return {
+                "status": "success",
+                "path": path,
+                "depth": normalized_depth,
+                "tree": "\n".join(lines),
+                "lines": lines,
+            }
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(name="http_request", permissions=ToolPermission(network=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="http_request",
+        permissions=ToolPermission(network=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def http_request(
         self,
         method: str,
@@ -969,7 +1315,11 @@ class CodingToolSet:
             max_content_chars=max_content_chars,
         )
 
-    @tool(name="http_get", permissions=ToolPermission(network=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="http_get",
+        permissions=ToolPermission(network=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def http_get(
         self,
         url: str,
@@ -999,7 +1349,11 @@ class CodingToolSet:
             allow_redirects=allow_redirects,
         )
 
-    @tool(name="http_post", permissions=ToolPermission(network=True), rule_scope_builder=_default_rule_scope)
+    @tool(
+        name="http_post",
+        permissions=ToolPermission(network=True),
+        rule_scope_builder=_default_rule_scope,
+    )
     def http_post(
         self,
         url: str,
@@ -1040,10 +1394,23 @@ class CodingToolSet:
         :param html: Raw HTML string to process.
         """
         payload = self._extract_html_text(html)
-        return {"status": payload.get("status", "success"), "title": payload.get("title", ""), "content": payload.get("text", "")}
+        return {
+            "status": payload.get("status", "success"),
+            "title": payload.get("title", ""),
+            "content": payload.get("text", ""),
+        }
 
-    @tool(name="web_fetch_v2", permissions=ToolPermission(network=True), rule_scope_builder=_default_rule_scope)
-    def web_fetch_v2(self, url: str, prompt: str = "", runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="web_fetch_v2",
+        permissions=ToolPermission(network=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def web_fetch_v2(
+        self,
+        url: str,
+        prompt: str = "",
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Fetch one URL and extract concise text for coding workflows.
 
@@ -1058,14 +1425,22 @@ class CodingToolSet:
         if response.get("status_code") in {301, 302, 303, 307, 308}:
             headers = response.get("headers", {})
             redirect_url = headers.get("Location") or response.get("url")
-            return {"status": "success", "redirect_url": redirect_url, "url": response.get("url", url)}
+            return {
+                "status": "success",
+                "redirect_url": redirect_url,
+                "url": response.get("url", url),
+            }
         extracted = self.extract_web_text(html=str(response.get("content", "")))
         text = str(extracted.get("content", ""))
         result = text
         if prompt.strip():
             keywords = [item.lower() for item in prompt.split() if item.strip()]
             lines = [line.strip() for line in text.splitlines() if line.strip()]
-            picked = [line for line in lines if any(token in line.lower() for token in keywords)]
+            picked = [
+                line
+                for line in lines
+                if any(token in line.lower() for token in keywords)
+            ]
             if picked:
                 result = "\n".join(picked[:6])
         auth_hint = ""
@@ -1079,8 +1454,14 @@ class CodingToolSet:
             "auth_hint": auth_hint,
         }
 
-    @tool(name="web_fetch", permissions=ToolPermission(network=True), rule_scope_builder=_default_rule_scope)
-    def web_fetch(self, url: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    @tool(
+        name="web_fetch",
+        permissions=ToolPermission(network=True),
+        rule_scope_builder=_default_rule_scope,
+    )
+    def web_fetch(
+        self, url: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Fetch one web page and extract readable text.
 
@@ -1099,7 +1480,11 @@ class CodingToolSet:
         }
 
     @tool(name="ask_user_choice", requires_user_interaction=True)
-    def ask_user_choice(self, questions: List[Dict[str, Any]], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def ask_user_choice(
+        self,
+        questions: List[Dict[str, Any]],
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Emit a structured user-input request.
 
@@ -1110,7 +1495,11 @@ class CodingToolSet:
         return {"status": "needs_user_input", "questions": list(questions or [])}
 
     @tool(name="todo_write")
-    def todo_write(self, todos: List[Dict[str, Any]], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def todo_write(
+        self,
+        todos: List[Dict[str, Any]],
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Write lightweight todo items into runtime state metadata.
 
@@ -1124,7 +1513,9 @@ class CodingToolSet:
         return {"status": "success", "count": len(normalized), "todos": normalized}
 
     @tool(name="tool_search", read_only=True)
-    def tool_search(self, query: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def tool_search(
+        self, query: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Search the current tool registry by name or description.
 
@@ -1138,7 +1529,9 @@ class CodingToolSet:
             for name in registry.list_tools():
                 desc = ""
                 try:
-                    desc = str((registry.describe_tool(name) or {}).get("description", ""))
+                    desc = str(
+                        (registry.describe_tool(name) or {}).get("description", "")
+                    )
                 except Exception:
                     desc = ""
                 if needle in name.lower() or needle in desc.lower():
@@ -1146,7 +1539,9 @@ class CodingToolSet:
         return {"status": "success", "count": len(results), "results": results}
 
     @tool(name="enter_plan_mode")
-    def enter_plan_mode(self, reason: str = "", runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def enter_plan_mode(
+        self, reason: str = "", runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Switch runtime state into plan mode.
 
@@ -1160,7 +1555,9 @@ class CodingToolSet:
         return {"status": "success", "current_mode": "plan", "reason": reason}
 
     @tool(name="exit_plan_mode")
-    def exit_plan_mode(self, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def exit_plan_mode(
+        self, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Switch runtime state out of plan mode.
 
@@ -1172,7 +1569,9 @@ class CodingToolSet:
         return {"status": "success", "current_mode": "work"}
 
     @tool(name="enter_worktree")
-    def enter_worktree(self, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def enter_worktree(
+        self, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Record that the agent entered worktree mode.
 
@@ -1184,7 +1583,9 @@ class CodingToolSet:
         return {"status": "success", "current_mode": "worktree"}
 
     @tool(name="exit_worktree")
-    def exit_worktree(self, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def exit_worktree(
+        self, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Record that the agent exited worktree mode.
 
@@ -1210,7 +1611,7 @@ class CodingToolSet:
         :param symbol: Optional symbol or identifier hint.
         :param runtime_context: Optional runtime context injected by the executor.
         """
-        ops = ((runtime_context or {}).get("ops") or {})
+        ops = (runtime_context or {}).get("ops") or {}
         lsp = ops.get("lsp")
         if lsp is None or not hasattr(lsp, "query"):
             return {"status": "error", "message": "LSP capability unavailable"}
@@ -1239,7 +1640,10 @@ class CodingToolSet:
         _ = runtime_context
         normalized_status = str(status or "pending").strip()
         if normalized_status not in TASK_STATUSES:
-            return {"status": "error", "message": f"Unsupported status: {normalized_status}"}
+            return {
+                "status": "error",
+                "message": f"Unsupported status: {normalized_status}",
+            }
         task_id = self._next_task_id()
         task = {
             "id": task_id,
@@ -1258,7 +1662,9 @@ class CodingToolSet:
         return {"status": "success", "task": dict(task)}
 
     @tool(name="task_get", read_only=True)
-    def task_get(self, task_id: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def task_get(
+        self, task_id: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Fetch one session-native task by id.
 
@@ -1291,7 +1697,11 @@ class CodingToolSet:
             tasks = [task for task in tasks if task.get("status") == status]
         if not include_completed:
             tasks = [task for task in tasks if task.get("status") != "completed"]
-        return {"status": "success", "tasks": [dict(task) for task in tasks], "count": len(tasks)}
+        return {
+            "status": "success",
+            "tasks": [dict(task) for task in tasks],
+            "count": len(tasks),
+        }
 
     @tool(name="task_update")
     def task_update(
@@ -1320,7 +1730,10 @@ class CodingToolSet:
         if status:
             normalized_status = str(status).strip()
             if normalized_status not in TASK_STATUSES:
-                return {"status": "error", "message": f"Unsupported status: {normalized_status}"}
+                return {
+                    "status": "error",
+                    "message": f"Unsupported status: {normalized_status}",
+                }
             task["status"] = normalized_status
         blocks = list(task.get("blocks", []))
         for item in list(add_blocks or []):
@@ -1337,16 +1750,23 @@ class CodingToolSet:
         return {"status": "success", "task": dict(task)}
 
     @tool(name="mcp_list_resources", read_only=True)
-    def mcp_list_resources(self, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def mcp_list_resources(
+        self, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         List injected MCP resources.
 
         :param runtime_context: Optional runtime context injected by the executor.
         """
-        return {"status": "success", "resources": dict((runtime_context or {}).get("mcp_resources") or {})}
+        return {
+            "status": "success",
+            "resources": dict((runtime_context or {}).get("mcp_resources") or {}),
+        }
 
     @tool(name="mcp_read_resource", read_only=True)
-    def mcp_read_resource(self, server: str, uri: str, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def mcp_read_resource(
+        self, server: str, uri: str, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Read one MCP resource from injected snapshots.
 
@@ -1361,7 +1781,9 @@ class CodingToolSet:
         return {"status": "error", "message": f"Resource not found: {server}:{uri}"}
 
     @tool(name="agent_spawn")
-    def agent_spawn(self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    def agent_spawn(
+        self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
         """
         Stub sub-agent spawn tool.
 
@@ -1371,7 +1793,9 @@ class CodingToolSet:
         return {"status": "success", "spawned": False, "request": kwargs}
 
     @tool(name="cron_create")
-    def cron_create(self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    def cron_create(
+        self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
         """
         Stub cron-create tool.
 
@@ -1381,7 +1805,9 @@ class CodingToolSet:
         return {"status": "success", "created": True, "job": kwargs}
 
     @tool(name="cron_delete")
-    def cron_delete(self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    def cron_delete(
+        self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
         """
         Stub cron-delete tool.
 
@@ -1391,7 +1817,9 @@ class CodingToolSet:
         return {"status": "success", "deleted": True, "request": kwargs}
 
     @tool(name="cron_list", read_only=True)
-    def cron_list(self, runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def cron_list(
+        self, runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Stub cron-list tool.
 

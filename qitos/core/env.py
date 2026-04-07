@@ -44,7 +44,9 @@ class Env(ABC):
     version: str = "1.0"
 
     @abstractmethod
-    def reset(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> EnvObservation:
+    def reset(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> EnvObservation:
         """Initialize environment state for a task and return first observation."""
 
     @abstractmethod
@@ -55,7 +57,9 @@ class Env(ABC):
     def step(self, action: Any, state: Any = None) -> EnvStepResult:
         """Apply one action to environment and return step result."""
 
-    def setup(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> None:
+    def setup(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> None:
         """Prepare env before reset/run."""
         return None
 
@@ -71,7 +75,9 @@ class Env(ABC):
         """Whether this env provides one capability group."""
         return self.get_ops(group) is not None
 
-    def is_terminal(self, state: Any = None, last_result: Optional[EnvStepResult] = None) -> bool:
+    def is_terminal(
+        self, state: Any = None, last_result: Optional[EnvStepResult] = None
+    ) -> bool:
         """Return whether environment should terminate the episode."""
         if last_result is None:
             return False

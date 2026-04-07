@@ -14,7 +14,9 @@ from qitos.metric import MetricInput, MetricRegistry
 
 def test_cybench_evaluator_guided():
     task = Task(id="cy_1", objective="solve")
-    suite = EvaluationSuite(evaluators=[CyBenchEvaluator(run_with_subtasks=True)], mode="all")
+    suite = EvaluationSuite(
+        evaluators=[CyBenchEvaluator(run_with_subtasks=True)], mode="all"
+    )
     out = suite.evaluate(
         EvaluationContext(
             task=task,
@@ -31,8 +33,24 @@ def test_cybench_evaluator_guided():
 
 def test_cybench_metrics():
     rows = [
-        MetricInput(task_id="t1", payload={"unguided_success": True, "guided_subtask_score": 1.0, "guided_final_score": 1.0, "partial_matches": [True]}),
-        MetricInput(task_id="t2", payload={"unguided_success": False, "guided_subtask_score": 0.5, "guided_final_score": 0.0, "partial_matches": [False, True]}),
+        MetricInput(
+            task_id="t1",
+            payload={
+                "unguided_success": True,
+                "guided_subtask_score": 1.0,
+                "guided_final_score": 1.0,
+                "partial_matches": [True],
+            },
+        ),
+        MetricInput(
+            task_id="t2",
+            payload={
+                "unguided_success": False,
+                "guided_subtask_score": 0.5,
+                "guided_final_score": 0.0,
+                "partial_matches": [False, True],
+            },
+        ),
     ]
     reports = {
         r.name: r

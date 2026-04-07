@@ -31,8 +31,7 @@ It uses a strict **JSON decision protocol** (`JsonDecisionParser`) to reduce too
 This agent registers:
 
 - `HTTPGet` and `HTMLExtractText` (web evidence pipeline)
-- `WriteFile` and `ReadFile` (deliverable pipeline)
-- `RunCommand` (optional verification/debug)
+- `CodingToolSet` with the legacy-compatible file and shell surface
 
 ### `build_system_prompt`: JSON schema is the real safety rail
 

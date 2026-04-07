@@ -36,16 +36,22 @@ class ReplaySession:
 
     def step_into(self) -> ReplaySnapshot:
         if not self.has_next():
-            return ReplaySnapshot(cursor=self.cursor, current_event=None, current_step=None)
+            return ReplaySnapshot(
+                cursor=self.cursor, current_event=None, current_step=None
+            )
 
         event = self.events[self.cursor]
         self.cursor += 1
         step = self._find_step(event.get("step_id"))
-        return ReplaySnapshot(cursor=self.cursor, current_event=event, current_step=step)
+        return ReplaySnapshot(
+            cursor=self.cursor, current_event=event, current_step=step
+        )
 
     def step_over(self) -> ReplaySnapshot:
         if not self.has_next():
-            return ReplaySnapshot(cursor=self.cursor, current_event=None, current_step=None)
+            return ReplaySnapshot(
+                cursor=self.cursor, current_event=None, current_step=None
+            )
 
         start_step = self.events[self.cursor].get("step_id")
         last_event = None
@@ -54,7 +60,9 @@ class ReplaySession:
             self.cursor += 1
 
         step = self._find_step(start_step)
-        return ReplaySnapshot(cursor=self.cursor, current_event=last_event, current_step=step)
+        return ReplaySnapshot(
+            cursor=self.cursor, current_event=last_event, current_step=step
+        )
 
     def run_until_breakpoint(self, breakpoints: List[Breakpoint]) -> ReplaySnapshot:
         while self.has_next():
@@ -68,7 +76,9 @@ class ReplaySession:
 
         return ReplaySnapshot(cursor=self.cursor, current_event=None, current_step=None)
 
-    def fork_with_step_override(self, step_id: int, decision_override: Dict[str, Any]) -> Dict[str, Any]:
+    def fork_with_step_override(
+        self, step_id: int, decision_override: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Return in-memory forked replay view with modified decision for the target step."""
         forked_steps = [dict(s) for s in self.steps]
         for step in forked_steps:

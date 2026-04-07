@@ -6,31 +6,52 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from qitos.core.decision import Decision
-from qitos.engine.parser import BaseParser
+from qitos.engine.parser import BaseParser, attach_parser_warning, parser_wait_decision
+from qitos.kit.parser.parser_utils import (
+    extract_balanced_object_candidates,
+    parse_object_like_detailed,
+    strip_code_fences,
+)
 
 
 class TerminusJsonParser(BaseParser[dict[str, Any]]):
-    def parse(self, raw_output: Any, context: Optional[Dict[str, Any]] = None) -> Decision[dict[str, Any]]:
+    contract_id = "terminus_json_v1"
+
+    def parse(
+        self, raw_output: Any, context: Optional[Dict[str, Any]] = None
+    ) -> Decision[dict[str, Any]]:
         text = str(raw_output or "")
-        result, warnings = self._extract_payload(text)
+        result, warnings, extraction_mode = self._extract_payload(text)
         if result is None:
-            return Decision.wait(
-                rationale="Repair the response format and try again.",
-                meta={
-                    "parser_error": True,
-                    "parser_feedback": self._format_feedback("No valid JSON object found.", warnings),
-                    "raw_output": text,
-                    "output_format": "json",
-                },
+            return parser_wait_decision(
+                parser=self,
+                code="invalid_json",
+                summary="Could not parse a valid Terminus JSON payload.",
+                raw_output=text,
+                details=self._format_feedback("No valid JSON object found.", warnings),
+                repair_instruction="Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.",
+                expected_shape='{"analysis":"...","plan":"...","commands":[...],"tools":[...],"task_complete":false}',
+                extraction_mode=extraction_mode,
+                extra_meta={"raw_output": text, "output_format": "json"},
             )
 
         validation_error = self._validate_payload(result)
         if validation_error:
-            return Decision.wait(
-                rationale=result.get("analysis") or "Repair the response format and try again.",
-                meta={
-                    "parser_error": True,
-                    "parser_feedback": self._format_feedback(validation_error, warnings),
+            return parser_wait_decision(
+                parser=self,
+                code=(
+                    "missing_required_field"
+                    if validation_error.startswith("Missing required fields")
+                    else "invalid_action_schema"
+                ),
+                summary=validation_error,
+                raw_output=text,
+                details=self._format_feedback(validation_error, warnings),
+                repair_instruction="Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.",
+                expected_shape='{"analysis":"...","plan":"...","commands":[...],"tools":[...],"task_complete":false}',
+                extraction_mode=extraction_mode,
+                rationale=result.get("analysis") or validation_error,
+                extra_meta={
                     "raw_output": text,
                     "analysis": str(result.get("analysis") or ""),
                     "plan": str(result.get("plan") or ""),
@@ -46,53 +67,161 @@ class TerminusJsonParser(BaseParser[dict[str, Any]]):
             "output_format": "json",
         }
         if warnings:
-            meta["parser_warning"] = self._format_feedback("Parser warnings.", warnings)
+            meta = attach_parser_warning(
+                meta,
+                parser=self,
+                code="salvaged_json_payload",
+                summary="Parser warnings were recorded while reading Terminus JSON output.",
+                raw_output=text,
+                details=self._format_feedback("Parser warnings.", warnings),
+                expected_shape='{"analysis":"...","plan":"...","commands":[...],"tools":[...],"task_complete":false}',
+                extraction_mode=extraction_mode,
+                salvage_applied=True,
+                salvage_summary=self._format_feedback("Parser warnings.", warnings),
+            )
 
         commands, command_error = self._parse_commands(result.get("commands") or [])
+        tools, tool_error = self._parse_tools(result.get("tools") or [])
         is_complete = self._as_bool(result.get("task_complete", False))
-        if command_error:
+        action_error = command_error or tool_error
+        if action_error:
             if is_complete:
                 meta["task_complete_requested"] = True
-                meta["parser_warning"] = self._format_feedback(command_error, warnings)
+                meta = attach_parser_warning(
+                    meta,
+                    parser=self,
+                    code="invalid_action_schema",
+                    summary=action_error,
+                    raw_output=text,
+                    details=self._format_feedback(action_error, warnings),
+                    expected_shape='{"analysis":"...","plan":"...","commands":[...],"tools":[...],"task_complete":false}',
+                    extraction_mode=extraction_mode,
+                )
                 return Decision.wait(rationale=analysis, meta=meta)
-            meta["parser_error"] = True
-            meta["parser_feedback"] = self._format_feedback(command_error, warnings)
-            return Decision.wait(rationale=analysis or "Repair the response format and try again.", meta=meta)
+            return parser_wait_decision(
+                parser=self,
+                code="invalid_action_schema",
+                summary=action_error,
+                raw_output=text,
+                details=self._format_feedback(action_error, warnings),
+                repair_instruction="Return valid Terminus JSON with well-formed commands/tools entries, or set task_complete=true if the task is done.",
+                expected_shape='{"analysis":"...","plan":"...","commands":[{"keystrokes":"...","duration":0.1}],"tools":[{"name":"tool_name","args":{}}],"task_complete":false}',
+                extraction_mode=extraction_mode,
+                rationale=analysis or action_error,
+                extra_meta=meta,
+            )
 
-        if commands:
-            return Decision.act(actions=commands, rationale=analysis, meta=meta)
+        actions = commands + tools
+        if actions:
+            return Decision.act(actions=actions, rationale=analysis, meta=meta)
         if is_complete:
             meta["task_complete_requested"] = True
             return Decision.wait(rationale=analysis, meta=meta)
-        meta["parser_feedback"] = self._format_feedback(
-            "No terminal commands were provided. If you want to wait, send an empty keystroke command with a duration.",
-            warnings,
+        return parser_wait_decision(
+            parser=self,
+            code="missing_action_or_final",
+            summary="No actions were provided.",
+            raw_output=text,
+            details=self._format_feedback(
+                "The Terminus payload did not include commands, tools, or task_complete=true.",
+                warnings,
+            ),
+            repair_instruction="Return at least one terminal command, one tool action, or set task_complete=true if the task is complete.",
+            expected_shape='{"analysis":"...","plan":"...","commands":[...],"tools":[...],"task_complete":false}',
+            extraction_mode=extraction_mode,
+            rationale=analysis or "No actions were provided.",
+            extra_meta=meta,
         )
-        meta["parser_error"] = True
-        return Decision.wait(rationale=analysis or "Repair the response format and try again.", meta=meta)
 
-    def _extract_payload(self, text: str) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    def _extract_payload(
+        self, text: str
+    ) -> Tuple[Optional[Dict[str, Any]], List[str], str]:
         warnings: List[str] = []
+        extraction_mode = "direct"
+        stripped = strip_code_fences(text)
+        if stripped != text.strip():
+            warnings.append(
+                "AUTO-CORRECTED: stripped markdown code fences around Terminus JSON payload."
+            )
+            text = stripped
+            extraction_mode = "fenced"
+
         snippet, snippet_warnings = self._extract_json_snippet(text)
-        warnings.extend(snippet_warnings)
-        if not snippet:
-            return None, warnings
-        try:
-            parsed = json.loads(snippet)
+        candidate_specs: List[Tuple[str, str, List[str]]] = []
+        direct_candidate = text.strip()
+        if direct_candidate:
+            candidate_specs.append((direct_candidate, extraction_mode, []))
+        balanced = sorted(
+            extract_balanced_object_candidates(text), key=len, reverse=True
+        )
+        for candidate in balanced:
+            if (
+                candidate
+                and candidate != direct_candidate
+                and all(existing != candidate for existing, _, _ in candidate_specs)
+            ):
+                candidate_specs.append((candidate, "extracted", []))
+        if (
+            snippet
+            and snippet != direct_candidate
+            and all(existing != snippet for existing, _, _ in candidate_specs)
+        ):
+            candidate_specs.append((snippet, "extracted", list(snippet_warnings)))
+        for candidate, candidate_mode, candidate_warnings in candidate_specs:
+            if not candidate:
+                continue
+            parsed, parsed_mode = parse_object_like_detailed(
+                candidate,
+                json_mode=candidate_mode,
+                literal_mode="python_literal",
+            )
             if isinstance(parsed, dict):
-                return parsed, warnings
-            return None, warnings + ["Response must be a JSON object."]
-        except json.JSONDecodeError as exc:
-            fixed = self._try_fix_json(snippet)
+                final_mode = parsed_mode or candidate_mode
+                combined_warnings = warnings + list(candidate_warnings)
+                if candidate_mode == "extracted":
+                    combined_warnings.append(
+                        "AUTO-CORRECTED: extracted a JSON-like object from surrounding text."
+                    )
+                if final_mode == "python_literal":
+                    combined_warnings.append(
+                        "AUTO-CORRECTED: parsed JSON-like payload using Python literal rules."
+                    )
+                return parsed, combined_warnings, final_mode
+            fixed = self._try_fix_json(candidate)
             if fixed is not None:
                 try:
                     parsed = json.loads(fixed)
                     if isinstance(parsed, dict):
-                        warnings.append("AUTO-CORRECTED: inserted missing closing braces in JSON payload.")
-                        return parsed, warnings
+                        combined_warnings = warnings + list(candidate_warnings)
+                        combined_warnings.append(
+                            "AUTO-CORRECTED: inserted missing closing braces in JSON payload."
+                        )
+                        if candidate_mode == "extracted":
+                            combined_warnings.append(
+                                "AUTO-CORRECTED: extracted a JSON-like object from surrounding text."
+                            )
+                        return parsed, combined_warnings, "brace_fix"
                 except json.JSONDecodeError:
                     pass
-            return None, warnings + [f"Invalid JSON: {exc}"]
+        if not candidate_specs:
+            return (
+                None,
+                warnings + snippet_warnings,
+                extraction_mode if warnings else "",
+            )
+        try:
+            json.loads(candidate_specs[0][0])
+        except json.JSONDecodeError as exc:
+            return (
+                None,
+                warnings + candidate_specs[0][2] + [f"Invalid JSON: {exc}"],
+                candidate_specs[0][1],
+            )
+        return (
+            None,
+            warnings + candidate_specs[0][2] + ["Response must be a JSON object."],
+            candidate_specs[0][1],
+        )
 
     def _extract_json_snippet(self, text: str) -> Tuple[str, List[str]]:
         warnings: List[str] = []
@@ -162,18 +291,28 @@ class TerminusJsonParser(BaseParser[dict[str, Any]]):
         return None
 
     def _validate_payload(self, payload: Dict[str, Any]) -> Optional[str]:
-        missing = [field for field in ("analysis", "plan", "commands") if field not in payload]
+        missing = [field for field in ("analysis", "plan") if field not in payload]
         if missing:
             return f"Missing required fields: {', '.join(missing)}"
         if not isinstance(payload.get("analysis"), str):
             return "Field 'analysis' must be a string."
         if not isinstance(payload.get("plan"), str):
             return "Field 'plan' must be a string."
-        if not isinstance(payload.get("commands"), list):
+        if "commands" in payload and not isinstance(payload.get("commands"), list):
             return "Field 'commands' must be an array."
+        if "tools" in payload and not isinstance(payload.get("tools"), list):
+            return "Field 'tools' must be an array."
+        if (
+            "commands" not in payload
+            and "tools" not in payload
+            and not self._as_bool(payload.get("task_complete", False))
+        ):
+            return "At least one of 'commands', 'tools', or 'task_complete=true' is required."
         return None
 
-    def _parse_commands(self, commands_data: List[Any]) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    def _parse_commands(
+        self, commands_data: List[Any]
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         actions: List[Dict[str, Any]] = []
         for index, item in enumerate(commands_data, start=1):
             if not isinstance(item, dict):
@@ -192,6 +331,33 @@ class TerminusJsonParser(BaseParser[dict[str, Any]]):
                         "duration_sec": float(duration),
                     },
                     "metadata": {"command_index": index},
+                }
+            )
+        return actions, None
+
+    def _parse_tools(
+        self, tools_data: List[Any]
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        actions: List[Dict[str, Any]] = []
+        for index, item in enumerate(tools_data, start=1):
+            if not isinstance(item, dict):
+                return [], f"Tool action {index} must be an object."
+            name = item.get("name")
+            if not isinstance(name, str) or not name.strip():
+                return (
+                    [],
+                    f"Tool action {index} requires a non-empty string 'name' field.",
+                )
+            args = item.get("args", {})
+            if args is None:
+                args = {}
+            if not isinstance(args, dict):
+                return [], f"Tool action {index} must provide an object 'args' field."
+            actions.append(
+                {
+                    "name": name.strip(),
+                    "args": args,
+                    "metadata": {"tool_index": index},
                 }
             )
         return actions, None

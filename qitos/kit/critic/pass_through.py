@@ -9,7 +9,9 @@ from qitos.engine.critic import Critic
 
 
 class PassThroughCritic(Critic):
-    def evaluate(self, state: Any, decision: Decision[Any], results: list[Any]) -> Dict[str, Any]:
+    def evaluate(
+        self, state: Any, decision: Decision[Any], results: list[Any]
+    ) -> Dict[str, Any]:
         return {"action": "continue", "reason": "pass", "score": 1.0}
 
 

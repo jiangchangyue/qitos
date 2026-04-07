@@ -8,7 +8,9 @@ from qitos.core.memory import Memory, MemoryRecord
 
 
 class VectorMemory(Memory):
-    def __init__(self, embedder: Optional[Callable[[str], List[float]]] = None, top_k: int = 5):
+    def __init__(
+        self, embedder: Optional[Callable[[str], List[float]]] = None, top_k: int = 5
+    ):
         self.embedder = embedder or self._default_embedder
         self.top_k = top_k
         self._records: List[MemoryRecord] = []

@@ -4,7 +4,13 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from qitos import Action, StateSchema, ToolPermissionContext, ToolPermissionRule, ToolRegistry
+from qitos import (
+    Action,
+    StateSchema,
+    ToolPermissionContext,
+    ToolPermissionRule,
+    ToolRegistry,
+)
 from qitos.core.action import ActionStatus
 from qitos.core.tool import BaseTool, ToolPermission, ToolSpec, ToolValidationResult
 from qitos.engine.action_executor import ActionExecutor
@@ -57,25 +63,39 @@ def test_action_executor_applies_validation_permission_and_truncation():
     executor = ActionExecutor(registry)
     state = _ExecutorState(task="demo")
 
-    ok = executor.execute([Action(name="echo_tool", args={"value": "1234567890"})], state=state)[0]
+    ok = executor.execute(
+        [Action(name="echo_tool", args={"value": "1234567890"})], state=state
+    )[0]
     assert ok.status == ActionStatus.SUCCESS
     assert ok.output["result"].endswith("[truncated]")
 
-    invalid = executor.execute([Action(name="echo_tool", args={"value": "bad"})], state=state)[0]
+    invalid = executor.execute(
+        [Action(name="echo_tool", args={"value": "bad"})], state=state
+    )[0]
     assert invalid.status == ActionStatus.ERROR
     assert invalid.metadata["error_category"] == "bad_input"
 
     state.metadata["tool_permission_context"] = ToolPermissionContext(
-        deny_rules=[ToolPermissionRule(effect="deny", tool_name="echo_tool", message="blocked")]
+        deny_rules=[
+            ToolPermissionRule(effect="deny", tool_name="echo_tool", message="blocked")
+        ]
     )
-    denied = executor.execute([Action(name="echo_tool", args={"value": "ok"})], state=state)[0]
+    denied = executor.execute(
+        [Action(name="echo_tool", args={"value": "ok"})], state=state
+    )[0]
     assert denied.status == ActionStatus.SKIPPED
     assert denied.output["status"] == "denied"
 
     state.metadata["tool_permission_context"] = ToolPermissionContext(
-        ask_rules=[ToolPermissionRule(effect="ask", tool_name="echo_tool", message="need approval")]
+        ask_rules=[
+            ToolPermissionRule(
+                effect="ask", tool_name="echo_tool", message="need approval"
+            )
+        ]
     )
-    ask = executor.execute([Action(name="echo_tool", args={"value": "ok"})], state=state)[0]
+    ask = executor.execute(
+        [Action(name="echo_tool", args={"value": "ok"})], state=state
+    )[0]
     assert ask.status == ActionStatus.SKIPPED
     assert ask.output["status"] == "needs_user_input"
 
@@ -85,7 +105,9 @@ def test_bash_v2_supports_read_only_and_background(tmp_path):
     valid = tool.validate_input({"command": "rg --files .", "read_only": True})
     assert valid.valid
 
-    destructive = tool.validate_input({"command": "rm -rf tmp", "allow_destructive": False})
+    destructive = tool.validate_input(
+        {"command": "rm -rf tmp", "allow_destructive": False}
+    )
     assert not destructive.valid
 
     bg = tool.run(command="sleep 0.1; echo hi", run_in_background=True)
@@ -128,7 +150,14 @@ def test_file_read_and_edit_v2_preserve_line_endings_and_detect_conflicts(tmp_pa
 def test_web_fetch_v2_handles_redirect_and_prompt_extraction(monkeypatch):
     tool = WebFetchV2()
 
-    def _redirect(url: str, params=None, headers=None, timeout=None, verify_tls=True, allow_redirects: bool = False):
+    def _redirect(
+        url: str,
+        params=None,
+        headers=None,
+        timeout=None,
+        verify_tls=True,
+        allow_redirects: bool = False,
+    ):
         _ = params
         _ = headers
         _ = timeout
@@ -146,7 +175,14 @@ def test_web_fetch_v2_handles_redirect_and_prompt_extraction(monkeypatch):
     redirect = tool.run(url="https://example.com/doc", prompt="summarize")
     assert redirect["redirect_url"] == "https://redirected.example.com/doc"
 
-    def _content(url: str, params=None, headers=None, timeout=None, verify_tls=True, allow_redirects: bool = False):
+    def _content(
+        url: str,
+        params=None,
+        headers=None,
+        timeout=None,
+        verify_tls=True,
+        allow_redirects: bool = False,
+    ):
         _ = url
         _ = params
         _ = headers
@@ -162,7 +198,9 @@ def test_web_fetch_v2_handles_redirect_and_prompt_extraction(monkeypatch):
         }
 
     monkeypatch.setattr(tool._impl.http_get, "run", _content)
-    out = tool.run(url="https://github.com/openai/example", prompt="advanced tool search")
+    out = tool.run(
+        url="https://github.com/openai/example", prompt="advanced tool search"
+    )
     assert out["status"] == "success"
     assert "tool search" in out["result"].lower()
     assert out["auth_hint"]
@@ -173,13 +211,19 @@ def test_session_tools_and_tool_search(tmp_path):
     state = _ExecutorState(task="advanced")
     ctx = {"state": state, "tool_registry": registry}
 
-    todo = TodoWriteTool().run(todos=[{"content": "ship", "status": "pending"}], runtime_context=ctx)
+    todo = TodoWriteTool().run(
+        todos=[{"content": "ship", "status": "pending"}], runtime_context=ctx
+    )
     assert todo["count"] == 1
 
-    plan_enter = registry.get("enter_plan_mode").run(reason="decompose", runtime_context=ctx)
+    plan_enter = registry.get("enter_plan_mode").run(
+        reason="decompose", runtime_context=ctx
+    )
     assert plan_enter["current_mode"] == "plan"
 
-    create = registry.get("task_create").run(subject="Implement", description="Do the work", runtime_context=ctx)
+    create = registry.get("task_create").run(
+        subject="Implement", description="Do the work", runtime_context=ctx
+    )
     listed = registry.get("task_list").run(runtime_context=ctx)
     assert create["status"] == "success"
     assert listed["count"] == 1
@@ -194,7 +238,11 @@ def test_lsp_query_and_mcp_resource_tools():
             return {"status": "success", "kwargs": kwargs}
 
     lsp = LSPQueryTool()
-    out = lsp.run(operation="definition", symbol="demo", runtime_context={"ops": {"lsp": _FakeLSP()}})
+    out = lsp.run(
+        operation="definition",
+        symbol="demo",
+        runtime_context={"ops": {"lsp": _FakeLSP()}},
+    )
     assert out["status"] == "success"
     assert out["kwargs"]["operation"] == "definition"
 
@@ -207,7 +255,9 @@ def test_lsp_query_and_mcp_resource_tools():
     listed = MCPListResourcesTool().run(runtime_context={"mcp_resources": resources})
     assert "docs" in listed["resources"]
 
-    read = MCPReadResourceTool().run(server="docs", uri="memo://two", runtime_context={"mcp_resources": resources})
+    read = MCPReadResourceTool().run(
+        server="docs", uri="memo://two", runtime_context={"mcp_resources": resources}
+    )
     assert read["resource"]["text"] == "beta"
 
 

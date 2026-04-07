@@ -55,12 +55,10 @@ for the model.
 
 Tool kits (`qitos.kit.tool`):
 
-- `EditorToolSet`, `EpubToolSet`
-- `WriteFile`, `ReadFile`, `ListFiles`
-- `RunCommand`
+- `CodingToolSet`, `EpubToolSet`
 - `HTTPRequest`, `HTTPGet`, `HTTPPost`, `HTMLExtractText`
-- `WebSearch`, `VisitURL`, `PageDown`, `PageUp`, `FindInPage`, `FindNext`, `ArchiveSearch`
 - `ThinkingToolSet`
+- `WebSearch`, `VisitURL`, `PageDown`, `PageUp`, `FindInPage`, `FindNext`, `ArchiveSearch`
 
 Planning kits (`qitos.kit.planning`):
 - `NumberedPlanBuilder`

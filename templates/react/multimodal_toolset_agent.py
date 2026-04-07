@@ -43,12 +43,18 @@ class MultimodalToolSetAgent(AgentModule[MultimodalState, Dict[str, Any], Action
     def init_state(self, task: str, **kwargs: Any) -> MultimodalState:
         return MultimodalState(task=task, image_uri=kwargs.get("image_uri"))
 
-    def observe(self, state: MultimodalState, env_view: Dict[str, Any]) -> Dict[str, Any]:
+    def observe(
+        self, state: MultimodalState, env_view: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return {"task": state.task, "image_uri": state.image_uri}
 
-    def decide(self, state: MultimodalState, observation: Dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: MultimodalState, observation: Dict[str, Any]
+    ) -> Decision[Action]:
         if state.image_uri and state.current_step == 0:
-            return Decision.act([Action(name="vision.caption", args={"image_uri": state.image_uri})])
+            return Decision.act(
+                [Action(name="vision.caption", args={"image_uri": state.image_uri})]
+            )
         return Decision.final("done")
 
     def reduce(

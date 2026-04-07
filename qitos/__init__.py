@@ -13,6 +13,7 @@ from .core.decision import Decision
 from .core.env import Env, EnvSpec
 from .core.errors import QitosRuntimeError, StopReason
 from .core.memory import Memory
+from .core.model_response import ModelResponse
 from .core.history import History, HistoryPolicy
 from .core.state import StateSchema
 from .core.task import (
@@ -45,6 +46,7 @@ __all__ = [
     "Decision",
     "Action",
     "Memory",
+    "ModelResponse",
     "History",
     "HistoryPolicy",
     "Env",

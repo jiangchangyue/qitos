@@ -47,7 +47,6 @@ __all__ = [
     "print_observation",
     "print_final_answer",
     "print_error",
-    
     # Render hooks
     "RenderHook",
     "RenderStreamHook",

@@ -39,7 +39,9 @@ class _ContextRuntime:
         self.config = ContextConfig(**payload)
 
     def enabled(self) -> bool:
-        return bool(self.config.enabled and getattr(self.engine.agent, "llm", None) is not None)
+        return bool(
+            self.config.enabled and getattr(self.engine.agent, "llm", None) is not None
+        )
 
     def context_window(self, llm: Any) -> Optional[int]:
         if not self.enabled():
@@ -111,7 +113,11 @@ class _ContextRuntime:
     def history_budget(self, telemetry: ContextTelemetry) -> Optional[int]:
         if telemetry.available_input_budget is None:
             return None
-        remaining = int(telemetry.available_input_budget) - int(telemetry.system_prompt_tokens) - int(telemetry.prepared_tokens)
+        remaining = (
+            int(telemetry.available_input_budget)
+            - int(telemetry.system_prompt_tokens)
+            - int(telemetry.prepared_tokens)
+        )
         return max(1, remaining)
 
     def finalize_input(
@@ -124,15 +130,25 @@ class _ContextRuntime:
     ) -> ContextTelemetry:
         history_tokens, history_mode = self.count_tokens(history_messages, llm)
         telemetry.history_tokens = history_tokens
-        telemetry.input_tokens_total = int(telemetry.system_prompt_tokens) + int(telemetry.history_tokens) + int(telemetry.prepared_tokens)
+        telemetry.input_tokens_total = (
+            int(telemetry.system_prompt_tokens)
+            + int(telemetry.history_tokens)
+            + int(telemetry.prepared_tokens)
+        )
         telemetry.history_message_count = len(history_messages)
-        telemetry.compact_events = [dict(x) for x in compact_events if isinstance(x, dict)]
+        telemetry.compact_events = [
+            dict(x) for x in compact_events if isinstance(x, dict)
+        ]
         telemetry.history_budget = self.history_budget(telemetry)
         budget = telemetry.available_input_budget
         telemetry.occupancy_ratio = 0.0
         if isinstance(budget, int) and budget > 0:
-            telemetry.occupancy_ratio = min(1.0, float(telemetry.input_tokens_total) / float(budget))
-        telemetry.counting_mode = self._merge_counting_mode([telemetry.counting_mode, history_mode])
+            telemetry.occupancy_ratio = min(
+                1.0, float(telemetry.input_tokens_total) / float(budget)
+            )
+        telemetry.counting_mode = self._merge_counting_mode(
+            [telemetry.counting_mode, history_mode]
+        )
         return telemetry
 
     def finalize_output(
@@ -151,7 +167,9 @@ class _ContextRuntime:
                 telemetry.input_tokens_total = int(prompt_tokens)
                 budget = telemetry.available_input_budget
                 if isinstance(budget, int) and budget > 0:
-                    telemetry.occupancy_ratio = min(1.0, float(telemetry.input_tokens_total) / float(budget))
+                    telemetry.occupancy_ratio = min(
+                        1.0, float(telemetry.input_tokens_total) / float(budget)
+                    )
             if isinstance(completion_tokens, int) and completion_tokens >= 0:
                 telemetry.output_tokens = int(completion_tokens)
             else:
@@ -159,17 +177,25 @@ class _ContextRuntime:
             if isinstance(total_tokens, int) and total_tokens >= 0:
                 step_total = int(total_tokens)
             else:
-                step_total = int(telemetry.input_tokens_total) + int(telemetry.output_tokens)
+                step_total = int(telemetry.input_tokens_total) + int(
+                    telemetry.output_tokens
+                )
             telemetry.counting_mode = "provider_usage"
         else:
             telemetry.output_tokens = self.count_tokens(raw_output, llm)[0]
-            step_total = int(telemetry.input_tokens_total) + int(telemetry.output_tokens)
+            step_total = int(telemetry.input_tokens_total) + int(
+                telemetry.output_tokens
+            )
 
         self.prompt_tokens_total += int(telemetry.input_tokens_total)
         self.completion_tokens_total += int(telemetry.output_tokens)
         self.tokens_total += int(step_total)
-        self.peak_input_tokens = max(self.peak_input_tokens, int(telemetry.input_tokens_total))
-        self.peak_occupancy_ratio = max(self.peak_occupancy_ratio, float(telemetry.occupancy_ratio))
+        self.peak_input_tokens = max(
+            self.peak_input_tokens, int(telemetry.input_tokens_total)
+        )
+        self.peak_occupancy_ratio = max(
+            self.peak_occupancy_ratio, float(telemetry.occupancy_ratio)
+        )
         telemetry.prompt_tokens_total = self.prompt_tokens_total
         telemetry.completion_tokens_total = self.completion_tokens_total
         telemetry.tokens_total = self.tokens_total
@@ -179,7 +205,9 @@ class _ContextRuntime:
         self.engine._token_usage = self.tokens_total
         return telemetry
 
-    def maybe_note_warning(self, telemetry: ContextTelemetry) -> Optional[Dict[str, Any]]:
+    def maybe_note_warning(
+        self, telemetry: ContextTelemetry
+    ) -> Optional[Dict[str, Any]]:
         ratio = float(telemetry.occupancy_ratio or 0.0)
         if ratio < float(self.config.warning_ratio):
             return None
@@ -220,7 +248,9 @@ class _ContextRuntime:
         for event in events:
             if not isinstance(event, dict):
                 continue
-            if event.get("stage") == "context_history" and isinstance(event.get("context"), dict):
+            if event.get("stage") == "context_history" and isinstance(
+                event.get("context"), dict
+            ):
                 ctx = dict(event["context"])
                 kind = str(ctx.get("stage") or "within_budget")
                 if "warning" in kind:
@@ -266,23 +296,33 @@ class _ContextRuntime:
             "peak_occupancy_ratio": self.peak_occupancy_ratio,
             "compact_counts": dict(self.compact_counts),
             "warning_count": self.warning_count,
-            "last_request": self.telemetry_dict(self.last_request) if self.last_request is not None else None,
+            "last_request": (
+                self.telemetry_dict(self.last_request)
+                if self.last_request is not None
+                else None
+            ),
         }
 
     def run_meta(self, llm: Any) -> Dict[str, Any]:
-        budget = self.resolve_request_budget(llm) if llm is not None else {
-            "context_window": None,
-            "reserve_tokens": 0,
-            "available_input_budget": None,
-            "max_output_tokens": 0,
-        }
+        budget = (
+            self.resolve_request_budget(llm)
+            if llm is not None
+            else {
+                "context_window": None,
+                "reserve_tokens": 0,
+                "available_input_budget": None,
+                "max_output_tokens": 0,
+            }
+        )
         return {
             "context_window": budget.get("context_window"),
             "reserve_tokens": budget.get("reserve_tokens"),
             "available_input_budget": budget.get("available_input_budget"),
             "max_output_tokens": budget.get("max_output_tokens"),
-            "counting_mode": self.last_request.counting_mode if self.last_request is not None else (
-                "disabled" if llm is None else "hybrid"
+            "counting_mode": (
+                self.last_request.counting_mode
+                if self.last_request is not None
+                else ("disabled" if llm is None else "hybrid")
             ),
             "warning_ratio": float(self.config.warning_ratio),
             "compact_ratio": float(self.config.compact_ratio),

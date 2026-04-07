@@ -44,9 +44,15 @@ class CyBenchAdapter(BenchmarkAdapter):
         limit: Optional[int] = None,
     ) -> list[dict[str, Any]]:
         root = Path(cybench_root or self.cybench_root).expanduser().resolve()
-        guided = self.run_with_subtasks if run_with_subtasks is None else bool(run_with_subtasks)
+        guided = (
+            self.run_with_subtasks
+            if run_with_subtasks is None
+            else bool(run_with_subtasks)
+        )
 
-        rel_paths = self._load_task_paths(root=root, run_with_subtasks=guided, task_list_file=task_list_file)
+        rel_paths = self._load_task_paths(
+            root=root, run_with_subtasks=guided, task_list_file=task_list_file
+        )
         out: list[dict[str, Any]] = []
         for idx, rel in enumerate(rel_paths):
             if limit is not None and idx >= int(limit):
@@ -70,7 +76,12 @@ class CyBenchAdapter(BenchmarkAdapter):
             )
         return out
 
-    def to_tasks(self, records: Iterable[Mapping[str, Any]], split: str, limit: Optional[int] = None) -> list[Task]:
+    def to_tasks(
+        self,
+        records: Iterable[Mapping[str, Any]],
+        split: str,
+        limit: Optional[int] = None,
+    ) -> list[Task]:
         tasks: list[Task] = []
         for idx, row in enumerate(records):
             if limit is not None and idx >= int(limit):
@@ -95,9 +106,14 @@ class CyBenchAdapter(BenchmarkAdapter):
             task_id = f"{self.task_prefix}_{short}"
 
         if guided:
-            objective = str(meta.get("hard_prompt") or "Solve each subtask and submit answers.")
+            objective = str(
+                meta.get("hard_prompt") or "Solve each subtask and submit answers."
+            )
         else:
-            objective = str(meta.get("hard_prompt") or "Capture the flag and submit the final answer.")
+            objective = str(
+                meta.get("hard_prompt")
+                or "Capture the flag and submit the final answer."
+            )
 
         inputs: Dict[str, Any] = {
             "benchmark": "cybench",
@@ -113,7 +129,9 @@ class CyBenchAdapter(BenchmarkAdapter):
             "run_with_subtasks": guided,
         }
 
-        criteria: list[str] = ["Follow CyBench task objective and submit a valid answer."]
+        criteria: list[str] = [
+            "Follow CyBench task objective and submit a valid answer."
+        ]
         if guided:
             criteria.append("Guided score: average solved subtasks.")
             criteria.append("Guided-final score: last subtask solved.")
@@ -151,8 +169,12 @@ class CyBenchAdapter(BenchmarkAdapter):
             metadata=metadata,
         )
 
-    def _load_task_paths(self, root: Path, run_with_subtasks: bool, task_list_file: Optional[str]) -> list[str]:
-        file_name = task_list_file or ("subtask_list.txt" if run_with_subtasks else "task_list.txt")
+    def _load_task_paths(
+        self, root: Path, run_with_subtasks: bool, task_list_file: Optional[str]
+    ) -> list[str]:
+        file_name = task_list_file or (
+            "subtask_list.txt" if run_with_subtasks else "task_list.txt"
+        )
         list_path = root / file_name
         if not list_path.exists():
             raise FileNotFoundError(f"CyBench list file not found: {list_path}")
@@ -171,7 +193,9 @@ def load_cybench_tasks(
     run_with_subtasks: bool = True,
     limit: Optional[int] = None,
 ) -> list[Task]:
-    adapter = CyBenchAdapter(cybench_root=cybench_root, run_with_subtasks=run_with_subtasks)
+    adapter = CyBenchAdapter(
+        cybench_root=cybench_root, run_with_subtasks=run_with_subtasks
+    )
     rows = adapter.load_records(limit=limit)
     split = "guided" if run_with_subtasks else "unguided"
     return adapter.to_tasks(rows, split=split, limit=limit)

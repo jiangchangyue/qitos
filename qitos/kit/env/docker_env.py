@@ -46,7 +46,12 @@ class DockerCommandCapability(CommandCapability):
                 "container": self.container,
             }
         except Exception as exc:
-            return {"status": "error", "error": str(exc), "command": command, "container": self.container}
+            return {
+                "status": "error",
+                "error": str(exc),
+                "command": command,
+                "container": self.container,
+            }
 
 
 class DockerFSCapability(FileSystemCapability):
@@ -134,19 +139,29 @@ class DockerEnv(HostEnv):
             self.container = f"qitos_{Path(self.host_workspace or 'workspace').name}_{threading.get_ident()}"
 
         fs = DockerFSCapability(container=self.container or "", workdir=workspace_root)
-        cmd = DockerCommandCapability(container=self.container or "", workdir=workspace_root)
+        cmd = DockerCommandCapability(
+            container=self.container or "", workdir=workspace_root
+        )
         super().__init__(workspace_root=workspace_root, fs=fs, cmd=cmd)
 
-    def setup(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> None:
+    def setup(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> None:
         if workspace and not self.host_workspace:
             self.host_workspace = str(Path(workspace).resolve())
         if self.auto_create:
             self._ensure_container()
         if not self.container:
-            raise ValueError("DockerEnv requires `container` or `auto_create=True` with `image`")
+            raise ValueError(
+                "DockerEnv requires `container` or `auto_create=True` with `image`"
+            )
 
-        self.fs = DockerFSCapability(container=self.container, workdir=self.container_workspace)
-        self.cmd = DockerCommandCapability(container=self.container, workdir=self.container_workspace)
+        self.fs = DockerFSCapability(
+            container=self.container, workdir=self.container_workspace
+        )
+        self.cmd = DockerCommandCapability(
+            container=self.container, workdir=self.container_workspace
+        )
 
     def reset(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any):
         self.setup(task=task, workspace=workspace, **kwargs)
@@ -175,7 +190,11 @@ class DockerEnv(HostEnv):
                 "container": self.container,
                 "stderr": probe.get("stderr", ""),
             }
-        return {"ok": True, "container": self.container, "workspace_root": self.workspace_root}
+        return {
+            "ok": True,
+            "container": self.container,
+            "workspace_root": self.workspace_root,
+        }
 
     def close(self) -> None:
         if not self.container:
@@ -191,7 +210,9 @@ class DockerEnv(HostEnv):
         if inspect.returncode == 0:
             start = _run(["docker", "start", self.container], timeout=20)
             if start.returncode != 0:
-                raise RuntimeError(f"Failed to start container {self.container}: {start.stderr}")
+                raise RuntimeError(
+                    f"Failed to start container {self.container}: {start.stderr}"
+                )
             return
 
         if not self.image:
@@ -213,7 +234,9 @@ class DockerEnv(HostEnv):
         run_cmd += [self.image, "sh", "-lc", "while true; do sleep 3600; done"]
         proc = _run(run_cmd, timeout=self.create_timeout)
         if proc.returncode != 0:
-            raise RuntimeError(f"Failed to create container {self.container}: {proc.stderr}")
+            raise RuntimeError(
+                f"Failed to create container {self.container}: {proc.stderr}"
+            )
         self._created_here = True
 
 

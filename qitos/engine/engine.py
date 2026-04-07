@@ -16,6 +16,8 @@ from ..core.memory import Memory, MemoryRecord
 from ..core.state import StateSchema
 from ..core.task import Task, TaskResult, TaskValidationIssue
 from ..trace import TraceWriter
+from ..protocols import get_protocol, infer_protocol_from_parser
+from ..models.profile_registry import infer_default_protocol
 from ._action_runtime import _ActionRuntime
 from ._context_runtime import _ContextRuntime
 from ._control_runtime import _ControlRuntime
@@ -50,9 +52,19 @@ class _EngineWindowHistory(History):
         self._items.append(message)
         self.evict()
 
-    def retrieve(self, query: Optional[Dict[str, Any]] = None, state: Any = None, observation: Any = None) -> Any:
+    def retrieve(
+        self,
+        query: Optional[Dict[str, Any]] = None,
+        state: Any = None,
+        observation: Any = None,
+    ) -> Any:
         query = query or {}
-        max_items = int(query.get("max_items", self.window_size if self.window_size > 0 else len(self._items)))
+        max_items = int(
+            query.get(
+                "max_items",
+                self.window_size if self.window_size > 0 else len(self._items),
+            )
+        )
         roles = query.get("roles")
         step_min = query.get("step_min")
         step_max = query.get("step_max")
@@ -72,7 +84,11 @@ class _EngineWindowHistory(History):
         items = self.retrieve(query={"max_items": max_items})
         if not isinstance(items, list):
             return ""
-        return "\n".join(f"[{x.step_id}] {x.role}: {x.content[:120]}" for x in items if isinstance(x, HistoryMessage))
+        return "\n".join(
+            f"[{x.step_id}] {x.role}: {x.content[:120]}"
+            for x in items
+            if isinstance(x, HistoryMessage)
+        )
 
     def evict(self) -> int:
         if self.window_size <= 0 or len(self._items) <= self.window_size:
@@ -106,6 +122,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         recovery_policy: Optional[RecoveryPolicy] = None,
         trace_writer: Optional[TraceWriter] = None,
         parser: Optional[Parser[ActionT]] = None,
+        protocol: Any = None,
         stop_criteria: Optional[List[StopCriteria]] = None,
         branch_selector: Optional[BranchSelector[StateT, ObservationT, ActionT]] = None,
         search: Optional[Search[StateT, ObservationT, ActionT]] = None,
@@ -129,13 +146,17 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self.recovery_policy = recovery_policy or RecoveryPolicy()
         self.trace_writer = trace_writer
         self.parser = parser
+        self.protocol = protocol
+        self._resolved_protocol: Any = None
         self.branch_selector = branch_selector or FirstCandidateSelector()
         self.search = search
         self.critics = critics or []
         self.env = env
         self.history_policy = history_policy or HistoryPolicy()
-        self.context_config = context_config if isinstance(context_config, ContextConfig) else ContextConfig(
-            **dict(context_config or {})
+        self.context_config = (
+            context_config
+            if isinstance(context_config, ContextConfig)
+            else ContextConfig(**dict(context_config or {}))
         )
         self.hooks: List[Any] = list(hooks or [])
         if render_hooks:
@@ -147,7 +168,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             self._uses_default_stop_criteria = False
             self.stop_criteria = list(stop_criteria)
 
-        self.executor = ActionExecutor(tool_registry=self.tool_registry) if self.tool_registry is not None else None
+        self.executor = (
+            ActionExecutor(tool_registry=self.tool_registry)
+            if self.tool_registry is not None
+            else None
+        )
         self.events: List[RuntimeEvent] = []
         self.records: List[StepRecord] = []
         self._active_state: Optional[StateT] = None
@@ -160,13 +185,42 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self._runtime_history: History = _EngineWindowHistory(window_size=24)
         self._last_system_prompt: str = ""
         self._last_context_telemetry: Dict[str, Any] = {}
-        self._model_runtime: _ModelRuntime[StateT, ObservationT, ActionT] = _ModelRuntime(self)
+        self._model_runtime: _ModelRuntime[StateT, ObservationT, ActionT] = (
+            _ModelRuntime(self)
+        )
         self._action_runtime: _ActionRuntime[StateT, ActionT] = _ActionRuntime(self)
-        self._env_runtime: _EnvRuntime[StateT, ObservationT, ActionT] = _EnvRuntime(self)
-        self._control_runtime: _ControlRuntime[StateT, ObservationT, ActionT] = _ControlRuntime(self)
+        self._env_runtime: _EnvRuntime[StateT, ObservationT, ActionT] = _EnvRuntime(
+            self
+        )
+        self._control_runtime: _ControlRuntime[StateT, ObservationT, ActionT] = (
+            _ControlRuntime(self)
+        )
         self._trace_runtime: _TraceRuntime[StateT] = _TraceRuntime(self)
         self._context_runtime = _ContextRuntime(self)
         self._context_runtime.apply_config(self.context_config)
+
+    def resolve_protocol(self) -> Any:
+        if self._resolved_protocol is not None:
+            return self._resolved_protocol
+        explicit = self.protocol
+        if explicit is not None:
+            self._resolved_protocol = get_protocol(explicit)
+            return self._resolved_protocol
+        agent_protocol = getattr(self.agent, "model_protocol", None)
+        if agent_protocol is not None:
+            self._resolved_protocol = get_protocol(agent_protocol)
+            return self._resolved_protocol
+        parser = self.parser or getattr(self.agent, "model_parser", None)
+        if parser is not None:
+            inferred = infer_protocol_from_parser(parser)
+            if inferred is not None:
+                self._resolved_protocol = inferred
+                return self._resolved_protocol
+        llm = getattr(self.agent, "llm", None)
+        model_name = getattr(llm, "model", None) or getattr(llm, "model_name", None)
+        default_protocol = infer_default_protocol(model_name, fallback="react_text_v1")
+        self._resolved_protocol = get_protocol(default_protocol)
+        return self._resolved_protocol
 
     def register_hook(self, hook: Any) -> None:
         """Register one runtime hook instance."""
@@ -198,7 +252,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             except Exception:
                 pass
         self._active_run_id = (
-            str(getattr(self.trace_writer, "run_id", "")).strip() if self.trace_writer is not None else ""
+            str(getattr(self.trace_writer, "run_id", "")).strip()
+            if self.trace_writer is not None
+            else ""
         ) or f"run_{uuid4().hex[:12]}"
         self._last_system_prompt = ""
         task_obj, task_text = self._normalize_task(task)
@@ -206,6 +262,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self._token_usage = 0
         self._last_context_telemetry = {}
         self._context_runtime.reset()
+        self._resolved_protocol = self.resolve_protocol()
         state = self.agent.init_state(task_text, **kwargs)
         self._memory_append(
             "task",
@@ -221,7 +278,13 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         started_at = time.monotonic()
         self._hydrate_trace_metadata(task_obj=task_obj, task_text=task_text)
 
-        self._setup_toolsets({"state": state, "trace_writer": self.trace_writer, "task": task_obj or task_text})
+        self._setup_toolsets(
+            {
+                "state": state,
+                "trace_writer": self.trace_writer,
+                "task": task_obj or task_text,
+            }
+        )
         self._setup_env(task_obj=task_obj, state=state, kwargs=kwargs)
         self._emit(
             0,
@@ -235,10 +298,18 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             },
         )
         self._notify_run_start(task_text, state)
-        preflight_issues = self._preflight_validate(task_obj=task_obj, workspace=kwargs.get("workspace"))
+        preflight_issues = self._preflight_validate(
+            task_obj=task_obj, workspace=kwargs.get("workspace")
+        )
         if preflight_issues:
-            has_task_issue = any(not issue.code.startswith("ENV_") for issue in preflight_issues)
-            stop_reason = StopReason.TASK_VALIDATION_FAILED if has_task_issue else StopReason.ENV_CAPABILITY_MISMATCH
+            has_task_issue = any(
+                not issue.code.startswith("ENV_") for issue in preflight_issues
+            )
+            stop_reason = (
+                StopReason.TASK_VALIDATION_FAILED
+                if has_task_issue
+                else StopReason.ENV_CAPABILITY_MISMATCH
+            )
             state.set_stop(stop_reason)
             state.final_result = "Preflight validation failed."
             self._emit(
@@ -247,7 +318,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 ok=False,
                 payload={
                     "stop_reason": state.stop_reason,
-                    "error_category": ErrorCategory.TASK.value if has_task_issue else ErrorCategory.ENV.value,
+                    "error_category": (
+                        ErrorCategory.TASK.value
+                        if has_task_issue
+                        else ErrorCategory.ENV.value
+                    ),
                     "issues": [self._task_issue_to_dict(x) for x in preflight_issues],
                 },
             )
@@ -256,20 +331,35 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 records=self.records,
                 events=self.events,
                 step_count=0,
-                task_result=self._build_task_result(state, task_obj=task_obj, started_at=started_at),
+                task_result=self._build_task_result(
+                    state, task_obj=task_obj, started_at=started_at
+                ),
             )
             self._notify_run_end(result)
             self._clear_active_context()
             self._teardown_env()
-            self._teardown_toolsets({"state": state, "trace_writer": self.trace_writer, "task": task_obj or task_text})
+            self._teardown_toolsets(
+                {
+                    "state": state,
+                    "trace_writer": self.trace_writer,
+                    "task": task_obj or task_text,
+                }
+            )
             return result
 
         step_id = 0
-        current_observation = self._build_initial_observation(state, step_id, started_at)
+        current_observation = self._build_initial_observation(
+            state, step_id, started_at
+        )
         try:
             while True:
                 if self._budget_exhausted(step_id, started_at, state):
-                    self._emit(step_id, RuntimePhase.END, ok=False, payload={"stop_reason": state.stop_reason})
+                    self._emit(
+                        step_id,
+                        RuntimePhase.END,
+                        ok=False,
+                        payload={"stop_reason": state.stop_reason},
+                    )
                     break
 
                 self.validation_gate.before_phase(state, RuntimePhase.DECIDE.value)
@@ -305,7 +395,12 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                     failed_phase = self._infer_failed_phase(record)
                     if not self._recover(state, failed_phase, exc):
                         self._finalize_step(record, state)
-                        self._emit(step_id, RuntimePhase.END, ok=False, payload={"stop_reason": state.stop_reason})
+                        self._emit(
+                            step_id,
+                            RuntimePhase.END,
+                            ok=False,
+                            payload={"stop_reason": state.stop_reason},
+                        )
                         break
                     self._finalize_step(record, state)
                     self._dispatch_hook(
@@ -319,7 +414,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                             stop_reason=state.stop_reason,
                         ),
                     )
-                    current_observation = self._build_initial_observation(state, step_id + 1, started_at)
+                    current_observation = self._build_initial_observation(
+                        state, step_id + 1, started_at
+                    )
                     state.advance_step()
                     step_id += 1
                     continue
@@ -339,7 +436,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                             stop_reason=state.stop_reason,
                         ),
                     )
-                    self._emit(step_id, RuntimePhase.END, payload={"stop_reason": state.stop_reason})
+                    self._emit(
+                        step_id,
+                        RuntimePhase.END,
+                        payload={"stop_reason": state.stop_reason},
+                    )
                     break
                 if critic_action == "retry":
                     self._finalize_step(record, state)
@@ -375,7 +476,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 )
 
                 if stop:
-                    self._emit(step_id, RuntimePhase.END, payload={"stop_reason": state.stop_reason})
+                    self._emit(
+                        step_id,
+                        RuntimePhase.END,
+                        payload={"stop_reason": state.stop_reason},
+                    )
                     break
 
                 current_observation = observation
@@ -383,10 +488,20 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 step_id += 1
         finally:
             self._teardown_env()
-            self._teardown_toolsets({"state": state, "trace_writer": self.trace_writer, "task": task_obj or task_text})
+            self._teardown_toolsets(
+                {
+                    "state": state,
+                    "trace_writer": self.trace_writer,
+                    "task": task_obj or task_text,
+                }
+            )
 
         if self.trace_writer is not None:
-            status = "failed" if state.stop_reason == StopReason.UNRECOVERABLE_ERROR.value else "completed"
+            status = (
+                "failed"
+                if state.stop_reason == StopReason.UNRECOVERABLE_ERROR.value
+                else "completed"
+            )
             self.trace_writer.finalize(
                 status=status,
                 summary={
@@ -395,10 +510,15 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                     "steps": len(self.records),
                     "token_usage": self._context_runtime.tokens_total,
                     "context": self._context_runtime.run_summary(),
+                    "parser": self._trace_runtime.parser_summary(),
                     "task_meta": self._task_meta(task_obj),
-                    "task_result": self._build_task_result(state, task_obj=task_obj, started_at=started_at).to_dict(),
+                    "task_result": self._build_task_result(
+                        state, task_obj=task_obj, started_at=started_at
+                    ).to_dict(),
                     "run_meta": self._run_meta(),
-                    "failure_report": build_failure_report(self.recovery_policy, state.stop_reason),
+                    "failure_report": build_failure_report(
+                        self.recovery_policy, state.stop_reason
+                    ),
                 },
             )
 
@@ -407,7 +527,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             records=self.records,
             events=self.events,
             step_count=len(self.records),
-            task_result=self._build_task_result(state, task_obj=task_obj, started_at=started_at),
+            task_result=self._build_task_result(
+                state, task_obj=task_obj, started_at=started_at
+            ),
         )
         self._notify_run_end(result)
         self._clear_active_context()
@@ -428,10 +550,14 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         if self._uses_default_stop_criteria:
             self.stop_criteria = [FinalResultCriteria()]
 
-    def _build_env_view(self, state: StateT, step_id: int, started_at: float) -> Dict[str, Any]:
+    def _build_env_view(
+        self, state: StateT, step_id: int, started_at: float
+    ) -> Dict[str, Any]:
         return self._env_runtime.build_env_view(state, step_id, started_at)
 
-    def _build_initial_observation(self, state: StateT, step_id: int, started_at: float) -> ObservationT:
+    def _build_initial_observation(
+        self, state: StateT, step_id: int, started_at: float
+    ) -> ObservationT:
         return self._env_runtime.build_initial_observation(state, step_id, started_at)
 
     def _build_observation_after_action(
@@ -442,9 +568,13 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         decision: Decision[ActionT],
         action_results: List[Any],
     ) -> ObservationT:
-        return self._env_runtime.build_observation_after_action(state, step_id, started_at, decision, action_results)
+        return self._env_runtime.build_observation_after_action(
+            state, step_id, started_at, decision, action_results
+        )
 
-    def _run_decide(self, state: StateT, observation: ObservationT, record: StepRecord) -> Decision[ActionT]:
+    def _run_decide(
+        self, state: StateT, observation: ObservationT, record: StepRecord
+    ) -> Decision[ActionT]:
         return self._model_runtime.run_decide(state, observation, record)
 
     def _select_branch(
@@ -455,7 +585,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     ) -> Decision[ActionT]:
         return self._model_runtime.select_branch(state, observation, branch_decision)
 
-    def _run_act(self, state: StateT, decision: Decision[ActionT], record: StepRecord) -> List[Any]:
+    def _run_act(
+        self, state: StateT, decision: Decision[ActionT], record: StepRecord
+    ) -> List[Any]:
         return self._action_runtime.run_act(state, decision, record)
 
     def _run_reduce(
@@ -470,8 +602,16 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _apply_critics(self, state: StateT, record: StepRecord) -> str:
         return self._control_runtime.apply_critics(state, record)
 
-    def _run_check_stop(self, state: StateT, decision: Decision[ActionT], step_id: int, started_at: float) -> bool:
-        return self._control_runtime.run_check_stop(state, decision, step_id, started_at)
+    def _run_check_stop(
+        self,
+        state: StateT,
+        decision: Decision[ActionT],
+        step_id: int,
+        started_at: float,
+    ) -> bool:
+        return self._control_runtime.run_check_stop(
+            state, decision, step_id, started_at
+        )
 
     def _finish_check_stop(
         self,
@@ -481,10 +621,16 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         stop: bool,
         extra_payload: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self._control_runtime._finish_check_stop(step_id, state, decision, stop, extra_payload)
+        self._control_runtime._finish_check_stop(
+            step_id, state, decision, stop, extra_payload
+        )
 
-    def _should_stop_by_criteria(self, state: StateT, step_id: int, elapsed_seconds: float) -> tuple[bool, Optional[StopReason], Optional[str]]:
-        return self._control_runtime.should_stop_by_criteria(state, step_id, elapsed_seconds)
+    def _should_stop_by_criteria(
+        self, state: StateT, step_id: int, elapsed_seconds: float
+    ) -> tuple[bool, Optional[StopReason], Optional[str]]:
+        return self._control_runtime.should_stop_by_criteria(
+            state, step_id, elapsed_seconds
+        )
 
     def _budget_exhausted(self, step_id: int, started_at: float, state: StateT) -> bool:
         return self._control_runtime.budget_exhausted(step_id, started_at, state)
@@ -492,7 +638,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _normalize_decision(self, raw_decision: Any, step: int) -> Decision[ActionT]:
         return self._model_runtime.normalize_decision(raw_decision, step)
 
-    def _compute_state_diff(self, before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
+    def _compute_state_diff(
+        self, before: Dict[str, Any], after: Dict[str, Any]
+    ) -> Dict[str, Any]:
         diff: Dict[str, Any] = {}
         all_keys = set(before.keys()) | set(after.keys())
         for key in all_keys:
@@ -534,7 +682,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         memory = self._memory()
         if memory is None:
             return
-        memory.append(MemoryRecord(role=role, content=content, step_id=step_id, metadata=metadata or {}))
+        memory.append(
+            MemoryRecord(
+                role=role, content=content, step_id=step_id, metadata=metadata or {}
+            )
+        )
 
     def _memory(self) -> Optional[Memory]:
         mem = getattr(self.agent, "memory", None)
@@ -553,7 +705,14 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                         llm=getattr(self.agent, "llm", None),
                         max_tokens=max(
                             1024,
-                            int((self._context_runtime.resolve_request_budget(getattr(self.agent, "llm", None)).get("available_input_budget") or 16000)),
+                            int(
+                                (
+                                    self._context_runtime.resolve_request_budget(
+                                        getattr(self.agent, "llm", None)
+                                    ).get("available_input_budget")
+                                    or 16000
+                                )
+                            ),
                         ),
                     )
             except Exception:
@@ -568,7 +727,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         history = self._history()
-        history.append(HistoryMessage(role=role, content=content, step_id=step_id, metadata=metadata or {}))
+        history.append(
+            HistoryMessage(
+                role=role, content=content, step_id=step_id, metadata=metadata or {}
+            )
+        )
 
     def _normalize_history_messages(self, payload: Any) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
@@ -599,11 +762,17 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             return task, task.objective
         return None, str(task)
 
-    def _preflight_validate(self, task_obj: Optional[Task], workspace: Any = None) -> List[TaskValidationIssue]:
+    def _preflight_validate(
+        self, task_obj: Optional[Task], workspace: Any = None
+    ) -> List[TaskValidationIssue]:
         issues: List[TaskValidationIssue] = []
         if task_obj is not None:
             try:
-                issues.extend(task_obj.validate_structured(workspace=str(workspace) if workspace else None))
+                issues.extend(
+                    task_obj.validate_structured(
+                        workspace=str(workspace) if workspace else None
+                    )
+                )
             except Exception as exc:
                 issues.append(
                     TaskValidationIssue(
@@ -617,9 +786,15 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             issues.append(
                 TaskValidationIssue(
                     code=str(issue.get("code", "ENV_CAPABILITY_ERROR")),
-                    message=str(issue.get("message", "Environment capability mismatch")),
+                    message=str(
+                        issue.get("message", "Environment capability mismatch")
+                    ),
                     field=str(issue.get("field", "env")),
-                    details=issue.get("details", {}) if isinstance(issue.get("details", {}), dict) else {},
+                    details=(
+                        issue.get("details", {})
+                        if isinstance(issue.get("details", {}), dict)
+                        else {}
+                    ),
                 )
             )
         health = self._validate_env_health()
@@ -627,9 +802,15 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             issues.append(
                 TaskValidationIssue(
                     code=str(health.get("code", "ENV_HEALTH_CHECK_FAILED")),
-                    message=str(health.get("message", "Environment health check failed")),
+                    message=str(
+                        health.get("message", "Environment health check failed")
+                    ),
                     field=str(health.get("field", "env")),
-                    details=health.get("details", {}) if isinstance(health.get("details", {}), dict) else {},
+                    details=(
+                        health.get("details", {})
+                        if isinstance(health.get("details", {}), dict)
+                        else {}
+                    ),
                 )
             )
         return issues
@@ -643,16 +824,22 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _validate_env_health(self) -> Optional[Dict[str, Any]]:
         return self._env_runtime.validate_env_health()
 
-    def _setup_env(self, task_obj: Optional[Task], state: StateT, kwargs: Dict[str, Any]) -> None:
+    def _setup_env(
+        self, task_obj: Optional[Task], state: StateT, kwargs: Dict[str, Any]
+    ) -> None:
         self._env_runtime.setup_env(task_obj, state, kwargs)
 
-    def _build_env_from_spec(self, env_spec: Any, fallback_workspace: Any = None) -> Optional[Env]:
+    def _build_env_from_spec(
+        self, env_spec: Any, fallback_workspace: Any = None
+    ) -> Optional[Env]:
         return self._env_runtime.build_env_from_spec(env_spec, fallback_workspace)
 
     def _teardown_env(self) -> None:
         self._env_runtime.teardown_env()
 
-    def _run_env_step(self, decision: Decision[ActionT], action_results: List[Any]) -> Optional[EnvStepResult]:
+    def _run_env_step(
+        self, decision: Decision[ActionT], action_results: List[Any]
+    ) -> Optional[EnvStepResult]:
         return self._env_runtime.run_env_step(decision, action_results)
 
     def _env_payload(self) -> Dict[str, Any]:
@@ -661,10 +848,14 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _env_identity(self) -> Dict[str, Any]:
         return self._env_runtime.env_identity()
 
-    def _env_observation_to_dict(self, observation: Optional[EnvObservation]) -> Optional[Dict[str, Any]]:
+    def _env_observation_to_dict(
+        self, observation: Optional[EnvObservation]
+    ) -> Optional[Dict[str, Any]]:
         return self._env_runtime.env_observation_to_dict(observation)
 
-    def _env_step_result_to_dict(self, result: Optional[EnvStepResult]) -> Optional[Dict[str, Any]]:
+    def _env_step_result_to_dict(
+        self, result: Optional[EnvStepResult]
+    ) -> Optional[Dict[str, Any]]:
         return self._env_runtime.env_step_result_to_dict(result)
 
     def _setup_toolsets(self, context: Dict[str, Any]) -> None:
@@ -675,7 +866,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             self.tool_registry.setup(context)
             self._write_lifecycle_event("toolset_setup_end", context)
         except Exception as exc:
-            self._write_lifecycle_event("toolset_setup_error", context, ok=False, error=str(exc))
+            self._write_lifecycle_event(
+                "toolset_setup_error", context, ok=False, error=str(exc)
+            )
 
     def _teardown_toolsets(self, context: Dict[str, Any]) -> None:
         if not hasattr(self.tool_registry, "teardown"):
@@ -685,9 +878,17 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             self.tool_registry.teardown(context)
             self._write_lifecycle_event("toolset_teardown_end", context)
         except Exception as exc:
-            self._write_lifecycle_event("toolset_teardown_error", context, ok=False, error=str(exc))
+            self._write_lifecycle_event(
+                "toolset_teardown_error", context, ok=False, error=str(exc)
+            )
 
-    def _write_lifecycle_event(self, phase: str, payload: Dict[str, Any], ok: bool = True, error: Optional[str] = None) -> None:
+    def _write_lifecycle_event(
+        self,
+        phase: str,
+        payload: Dict[str, Any],
+        ok: bool = True,
+        error: Optional[str] = None,
+    ) -> None:
         self._trace_runtime.write_lifecycle_event(phase, payload, ok=ok, error=error)
 
     def _estimate_tokens(self, payload: Any) -> int:
@@ -708,7 +909,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _run_meta(self) -> Dict[str, Any]:
         return self._trace_runtime.run_meta()
 
-    def _build_task_result(self, state: StateT, task_obj: Optional[Task], started_at: float) -> TaskResult:
+    def _build_task_result(
+        self, state: StateT, task_obj: Optional[Task], started_at: float
+    ) -> TaskResult:
         return self._trace_runtime.build_task_result(state, task_obj, started_at)
 
     def _sanitize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -731,6 +934,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
 
     def _reset_run_state(self) -> None:
         self._trace_runtime.reset_run_state()
+        self._resolved_protocol = None
 
     def _clear_active_context(self) -> None:
         self._trace_runtime.clear_active_context()

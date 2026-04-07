@@ -120,7 +120,9 @@ def split_args_robust(arg_str: str) -> List[str]:
             elif c == "}":
                 if curly_level > 0:
                     curly_level -= 1
-            elif c == "," and paren_level == 0 and square_level == 0 and curly_level == 0:
+            elif (
+                c == "," and paren_level == 0 and square_level == 0 and curly_level == 0
+            ):
                 item = "".join(current).strip()
                 if item:
                     args.append(item)

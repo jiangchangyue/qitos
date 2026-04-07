@@ -42,13 +42,18 @@ class GeminiModel(Model):
             max_tokens=max_tokens,
             context_window=context_window,
         )
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.base_url = (
-            base_url or os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
-        ).rstrip("/")
+        self.api_key = (
+            api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        )
+        resolved_base_url = base_url or os.getenv(
+            "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
+        )
+        self.base_url = str(resolved_base_url).rstrip("/")
         self.timeout = timeout
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY not set. Please set one or pass api_key.")
+            raise ValueError(
+                "GEMINI_API_KEY or GOOGLE_API_KEY not set. Please set one or pass api_key."
+            )
 
     def _call_api(self, messages: List[Dict[str, str]]) -> str:
         payload: Dict[str, Any] = {
@@ -134,7 +139,9 @@ class GeminiModel(Model):
             return "\n".join(actions)
         return "\n".join(texts).strip()
 
-    def _usage_from_response(self, response: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _usage_from_response(
+        self, response: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         usage = response.get("usageMetadata")
         if not isinstance(usage, dict):
             return None

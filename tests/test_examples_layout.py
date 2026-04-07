@@ -23,6 +23,7 @@ def test_canonical_examples_exist_and_parse() -> None:
         "examples/real/code_security_audit_agent.py",
         "examples/real/react_compact_agent.py",
         "examples/real/terminus_2.py",
+        "examples/real/whitzard_agent.py",
         "examples/benchmarks/gaia_eval.py",
         "examples/benchmarks/tau_bench_eval.py",
         "examples/benchmarks/cybench_eval.py",

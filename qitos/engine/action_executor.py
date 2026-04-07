@@ -18,16 +18,24 @@ from ..core.tool import (
 class ActionExecutor:
     """Executes normalized actions against a tool registry."""
 
-    def __init__(self, tool_registry: Any, policy: Optional[ActionExecutionPolicy] = None):
+    def __init__(
+        self, tool_registry: Any, policy: Optional[ActionExecutionPolicy] = None
+    ):
         self.tool_registry = tool_registry
         self.policy = policy or ActionExecutionPolicy()
 
-    def execute(self, actions: Sequence[Action], env: Optional[Env] = None, state: Any = None) -> List[ActionResult]:
+    def execute(
+        self, actions: Sequence[Action], env: Optional[Env] = None, state: Any = None
+    ) -> List[ActionResult]:
         if self.policy.mode == "parallel":
-            raise NotImplementedError("ActionExecutionPolicy.mode='parallel' is not implemented in the canonical executor")
+            raise NotImplementedError(
+                "ActionExecutionPolicy.mode='parallel' is not implemented in the canonical executor"
+            )
         return [self._execute_one(action, env=env, state=state) for action in actions]
 
-    def _execute_one(self, action: Action, env: Optional[Env] = None, state: Any = None) -> ActionResult:
+    def _execute_one(
+        self, action: Action, env: Optional[Env] = None, state: Any = None
+    ) -> ActionResult:
         start = time.monotonic()
         attempts = 0
         last_error = None
@@ -95,7 +103,9 @@ class ActionExecutor:
                     )
 
                 effective_args = dict(permission.updated_args or action.args)
-                output = self._call_tool(tool, action.name, effective_args, runtime_context=runtime_context)
+                output = self._call_tool(
+                    tool, action.name, effective_args, runtime_context=runtime_context
+                )
                 normalized_output = self._normalize_output(tool, output)
                 latency = (time.monotonic() - start) * 1000
                 return ActionResult(
@@ -161,7 +171,9 @@ class ActionExecutor:
             metadata=metadata,
         )
 
-    def _build_runtime_context(self, name: str, env: Optional[Env], state: Any) -> Dict[str, Any]:
+    def _build_runtime_context(
+        self, name: str, env: Optional[Env], state: Any
+    ) -> Dict[str, Any]:
         required_ops = self._required_ops(name)
         permission_context = self._resolve_permission_context(env=env, state=state)
         progress_events: List[Dict[str, Any]] = []
@@ -192,7 +204,12 @@ class ActionExecutor:
                 return tool
         return None
 
-    def _validate(self, tool: Optional[BaseTool], args: Dict[str, Any], runtime_context: Dict[str, Any]) -> ToolValidationResult:
+    def _validate(
+        self,
+        tool: Optional[BaseTool],
+        args: Dict[str, Any],
+        runtime_context: Dict[str, Any],
+    ) -> ToolValidationResult:
         if tool is None or not hasattr(tool, "validate_input"):
             return ToolValidationResult.ok()
         result = tool.validate_input(dict(args), runtime_context=runtime_context)
@@ -241,7 +258,9 @@ class ActionExecutor:
         if tool is not None:
             return tool.call(args, runtime_context=runtime_context)
         if hasattr(self.tool_registry, "call"):
-            return self.tool_registry.call(name, runtime_context=runtime_context, **args)
+            return self.tool_registry.call(
+                name, runtime_context=runtime_context, **args
+            )
 
         if hasattr(self.tool_registry, "get"):
             fallback = self.tool_registry.get(name)
@@ -255,7 +274,9 @@ class ActionExecutor:
                 return fallback.run(**args)
             return fallback(**args)
 
-        raise TypeError("Unsupported tool registry. Expected object with call() or get().")
+        raise TypeError(
+            "Unsupported tool registry. Expected object with call() or get()."
+        )
 
     def _normalize_output(self, tool: Optional[BaseTool], output: Any) -> Any:
         if tool is None:
@@ -279,7 +300,9 @@ class ActionExecutor:
             return text
         return text[:max_chars] + "\n... [truncated]"
 
-    def _resolve_permission_context(self, env: Optional[Env], state: Any) -> ToolPermissionContext:
+    def _resolve_permission_context(
+        self, env: Optional[Env], state: Any
+    ) -> ToolPermissionContext:
         candidate = None
         if state is not None:
             metadata = getattr(state, "metadata", None)
@@ -298,15 +321,17 @@ class ActionExecutor:
             "decision": decision.decision,
             "message": decision.message,
             "scope": decision.scope,
-            "matched_rule": {
-                "effect": decision.matched_rule.effect,
-                "tool_name": decision.matched_rule.tool_name,
-                "tool_family": decision.matched_rule.tool_family,
-                "scope": decision.matched_rule.scope,
-                "message": decision.matched_rule.message,
-            }
-            if decision.matched_rule is not None
-            else None,
+            "matched_rule": (
+                {
+                    "effect": decision.matched_rule.effect,
+                    "tool_name": decision.matched_rule.tool_name,
+                    "tool_family": decision.matched_rule.tool_family,
+                    "scope": decision.matched_rule.scope,
+                    "message": decision.matched_rule.message,
+                }
+                if decision.matched_rule is not None
+                else None
+            ),
         }
 
     def _required_ops(self, name: str) -> List[str]:
@@ -323,16 +348,22 @@ class ActionExecutor:
                 return []
         return []
 
-    def _resolve_ops(self, required_ops: List[str], env: Optional[Env]) -> Dict[str, Any]:
+    def _resolve_ops(
+        self, required_ops: List[str], env: Optional[Env]
+    ) -> Dict[str, Any]:
         if not required_ops:
             return {}
         if env is None:
-            raise ValueError(f"Tool requires ops {required_ops} but no env was provided")
+            raise ValueError(
+                f"Tool requires ops {required_ops} but no env was provided"
+            )
         out: Dict[str, Any] = {}
         for group in required_ops:
             ops = env.get_ops(group)
             if ops is None:
-                raise ValueError(f"Env '{getattr(env, 'name', 'env')}' missing required ops group: {group}")
+                raise ValueError(
+                    f"Env '{getattr(env, 'name', 'env')}' missing required ops group: {group}"
+                )
             out[group] = ops
         return out
 
@@ -349,4 +380,9 @@ class ActionExecutor:
                 }
             except Exception:
                 pass
-        return {"tool_name": name, "toolset_name": None, "toolset_version": None, "source": "unknown"}
+        return {
+            "tool_name": name,
+            "toolset_name": None,
+            "toolset_version": None,
+            "source": "unknown",
+        }

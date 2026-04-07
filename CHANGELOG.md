@@ -20,17 +20,22 @@ How to update:
 ### Added
 
 - Added PR/push CI gates covering tests, packaging validation, stable-surface linting, and stable-surface type checking.
+- Added dedicated maturity docs for architecture, development workflow, security reporting, community conduct, and environment configuration.
 - Added an explicit `qitos.kit.tool.experimental.security_research` namespace for opt-in security research tool imports and registry builders.
 - Added thin module boundaries for `qita` data/server/views and `render` terminal/themes façades to make future maintenance easier.
 - Added a root-level changelog to document ongoing project evolution.
+- Added a dedicated `requirements-dev.txt` entrypoint for full contributor installs from a local clone.
 
 ### Changed
 
 - Normalized the class-based tool contract around `execute(args, runtime_context)` while keeping `run(...)` as a compatibility path.
+- Removed deprecated editor/codebase/file/shell compatibility shims in favor of the canonical `CodingToolSet` surface.
 - Tightened default public exports from `qitos.kit` and `qitos.kit.tool` so experimental and higher-risk tool families are no longer part of the default surface.
 - Preserved old security research import paths as short-term deprecation shims instead of keeping them as primary public entrypoints.
 - Extracted shared coding-tool helper logic into internal utility modules to reduce coupling inside the canonical coding toolset.
 - Slimmed `qita` and `render` entry modules so public behavior stays the same while implementation can evolve behind clearer boundaries.
+- Reworked root installation guidance so `requirements.txt` is now a lightweight repo install path instead of a drifting copy of runtime and dev dependencies.
+- Added coverage, dependency audit, and pre-commit tooling to the standard contributor workflow.
 
 ### Fixed
 

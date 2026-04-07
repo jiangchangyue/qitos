@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 class RenderHook(EngineHook):
     """Alias for render-specific hook implementations."""
 
+
 _CLAUDE_THEME_PRESETS: Dict[str, Dict[str, Any]] = {
     "research": {
         "spinner": "dots",
@@ -121,10 +122,20 @@ class RenderStreamHook(RenderHook):
             self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def on_run_start(self, task: str, state: Any, engine: "Engine") -> None:
-        self._emit("lifecycle", "run_start", step_id=0, payload={"task": task, "max_steps": engine.budget.max_steps})
+        self._emit(
+            "lifecycle",
+            "run_start",
+            step_id=0,
+            payload={"task": task, "max_steps": engine.budget.max_steps},
+        )
 
     def on_before_step(self, ctx: HookContext, engine: "Engine") -> None:
-        self._emit("lifecycle", "step_start", step_id=ctx.step_id, payload={"phase": ctx.phase.value})
+        self._emit(
+            "lifecycle",
+            "step_start",
+            step_id=ctx.step_id,
+            payload={"phase": ctx.phase.value},
+        )
 
     def on_after_decide(self, ctx: HookContext, engine: "Engine") -> None:
         decision = ctx.decision
@@ -138,40 +149,74 @@ class RenderStreamHook(RenderHook):
         }
         self._emit("thinking", "decision", step_id=ctx.step_id, payload=payload)
         if payload["actions"]:
-            self._emit("action", "planned_actions", step_id=ctx.step_id, payload={"actions": payload["actions"]})
+            self._emit(
+                "action",
+                "planned_actions",
+                step_id=ctx.step_id,
+                payload={"actions": payload["actions"]},
+            )
 
     def on_after_act(self, ctx: HookContext, engine: "Engine") -> None:
         if ctx.record is not None and ctx.record.tool_invocations:
-            self._emit("action", "tool_invocations", step_id=ctx.step_id, payload={"tool_invocations": ctx.record.tool_invocations})
+            self._emit(
+                "action",
+                "tool_invocations",
+                step_id=ctx.step_id,
+                payload={"tool_invocations": ctx.record.tool_invocations},
+            )
         if ctx.action_results:
-            self._emit("observation", "action_results", step_id=ctx.step_id, payload={"action_results": ctx.action_results})
+            self._emit(
+                "observation",
+                "action_results",
+                step_id=ctx.step_id,
+                payload={"action_results": ctx.action_results},
+            )
 
     def on_after_critic(self, ctx: HookContext, engine: "Engine") -> None:
         self._emit("critic", "critic", step_id=ctx.step_id, payload=ctx.payload or {})
 
     def on_after_reduce(self, ctx: HookContext, engine: "Engine") -> None:
-        self._emit("state", "state_diff", step_id=ctx.step_id, payload=ctx.payload or {})
+        self._emit(
+            "state", "state_diff", step_id=ctx.step_id, payload=ctx.payload or {}
+        )
 
     def on_after_check_stop(self, ctx: HookContext, engine: "Engine") -> None:
         self._emit(
             "lifecycle",
             "check_stop",
             step_id=ctx.step_id,
-            payload={"result": (ctx.payload or {}).get("result"), "stop_reason": ctx.stop_reason},
+            payload={
+                "result": (ctx.payload or {}).get("result"),
+                "stop_reason": ctx.stop_reason,
+            },
         )
 
     def on_recover(self, ctx: HookContext, engine: "Engine") -> None:
-        self._emit("error", "recover", step_id=ctx.step_id, payload={"phase": ctx.phase.value, "error": str(ctx.error)})
+        self._emit(
+            "error",
+            "recover",
+            step_id=ctx.step_id,
+            payload={"phase": ctx.phase.value, "error": str(ctx.error)},
+        )
 
     def on_after_step(self, ctx: HookContext, engine: "Engine") -> None:
-        self._emit("lifecycle", "step_end", step_id=ctx.step_id, payload={"stop_reason": ctx.stop_reason})
+        self._emit(
+            "lifecycle",
+            "step_end",
+            step_id=ctx.step_id,
+            payload={"stop_reason": ctx.stop_reason},
+        )
 
     def on_run_end(self, result: "EngineResult", engine: "Engine") -> None:
         self._emit(
             "lifecycle",
             "done",
             step_id=max(0, result.step_count - 1),
-            payload={"stop_reason": result.state.stop_reason, "final_result": result.state.final_result, "steps": result.step_count},
+            payload={
+                "stop_reason": result.state.stop_reason,
+                "final_result": result.state.final_result,
+                "steps": result.step_count,
+            },
         )
 
     def on_event(self, event, state, record, engine) -> None:
@@ -180,14 +225,22 @@ class RenderStreamHook(RenderHook):
             stage = str(event.payload.get("stage", ""))
             if stage == "state_ready":
                 observation = event.payload.get("observation")
-                self._emit("observation", "state", step_id=event.step_id, payload={"observation": observation})
+                self._emit(
+                    "observation",
+                    "state",
+                    step_id=event.step_id,
+                    payload={"observation": observation},
+                )
                 if isinstance(observation, dict):
                     if "plan_steps" in observation:
                         self._emit(
                             "plan",
                             "plan",
                             step_id=event.step_id,
-                            payload={"plan_steps": observation.get("plan_steps"), "plan_cursor": observation.get("plan_cursor")},
+                            payload={
+                                "plan_steps": observation.get("plan_steps"),
+                                "plan_cursor": observation.get("plan_cursor"),
+                            },
                         )
             elif stage == "model_input":
                 self._emit(
@@ -196,7 +249,9 @@ class RenderStreamHook(RenderHook):
                     step_id=event.step_id,
                     payload={
                         "prepared": event.payload.get("prepared"),
-                        "history_message_count": event.payload.get("history_message_count"),
+                        "history_message_count": event.payload.get(
+                            "history_message_count"
+                        ),
                         "messages": event.payload.get("messages"),
                         "context": event.payload.get("context"),
                         "state_stats": event.payload.get("state_stats"),
@@ -207,7 +262,11 @@ class RenderStreamHook(RenderHook):
                     "thinking",
                     "model_output",
                     step_id=event.step_id,
-                    payload={"raw_output": event.payload.get("raw_output"), "context": event.payload.get("context")},
+                    payload={
+                        "raw_output": event.payload.get("raw_output"),
+                        "model_response": event.payload.get("model_response"),
+                        "context": event.payload.get("context"),
+                    },
                 )
             elif stage == "context_history":
                 self._emit(
@@ -216,6 +275,20 @@ class RenderStreamHook(RenderHook):
                     step_id=event.step_id,
                     payload={"context": event.payload.get("context")},
                 )
+            elif stage == "parser_result":
+                self._emit(
+                    "parser",
+                    "parser_result",
+                    step_id=event.step_id,
+                    payload=dict(event.payload),
+                )
+            elif stage == "parser_diagnostics":
+                self._emit(
+                    "parser",
+                    "parser_diagnostics",
+                    step_id=event.step_id,
+                    payload={"diagnostics": event.payload.get("diagnostics")},
+                )
         self._emit(
             "engine_event",
             event.phase.value.lower(),
@@ -223,8 +296,16 @@ class RenderStreamHook(RenderHook):
             payload={"ok": event.ok, "payload": event.payload, "error": event.error},
         )
 
-    def _emit(self, channel: str, node: str, step_id: int, payload: Optional[Dict[str, Any]] = None) -> None:
-        evt = RenderEvent(channel=channel, node=node, step_id=step_id, payload=payload or {})
+    def _emit(
+        self,
+        channel: str,
+        node: str,
+        step_id: int,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        evt = RenderEvent(
+            channel=channel, node=node, step_id=step_id, payload=payload or {}
+        )
         self.events.append(evt)
         if self._path is not None:
             with self._path.open("a", encoding="utf-8") as f:
@@ -260,7 +341,19 @@ class ClaudeStyleHook(RenderStreamHook):
         self._observation_steps: set[int] = set()
         self._state_steps: set[int] = set()
         self._memory_steps: set[int] = set()
+        self._parser_steps: set[tuple[int, str]] = set()
         self._pending_state_stats: Dict[int, Dict[str, Any]] = {}
+
+    def _should_render_parser_diagnostic(self, diag: Dict[str, Any]) -> bool:
+        severity = str(diag.get("severity") or "error").lower()
+        if severity == "error":
+            return True
+        if diag.get("salvage_applied"):
+            return False
+        code = str(diag.get("code") or "").strip().lower()
+        if code.startswith("salvaged_"):
+            return False
+        return True
 
     def on_run_start(self, task: str, state: Any, engine: "Engine") -> None:
         super().on_run_start(task, state, engine)
@@ -312,7 +405,15 @@ class ClaudeStyleHook(RenderStreamHook):
                 return
             thought = self._renderer.thought_text(event)
             if thought:
-                self._rail("purple", "[purple]⦿[/purple] [italic slate_blue3]" + thought + "[/italic slate_blue3]")
+                self._rail(
+                    "purple",
+                    "[purple]⦿[/purple] [italic slate_blue3]"
+                    + thought
+                    + "[/italic slate_blue3]",
+                )
+                response_summary = self._renderer.model_response_summary(event)
+                if response_summary:
+                    self._rail("gray50", f"[dim]{response_summary}[/dim]")
                 self._thought_steps.add(event.step_id)
             return
 
@@ -320,8 +421,81 @@ class ClaudeStyleHook(RenderStreamHook):
             compact = self._renderer.compact_summary(event)
             if compact:
                 self._update_status("[dim]Agent is compacting context...[/dim]")
-                self._rail(compact.get("color", "gray50"), compact.get("text", "Context update"))
+                self._rail(
+                    compact.get("color", "gray50"),
+                    compact.get("text", "Context update"),
+                )
             return
+
+        if event.channel == "parser":
+            if event.node == "parser_result":
+                payload = event.payload or {}
+                if (
+                    payload.get("has_diagnostics")
+                    and str(payload.get("severity") or "").lower() == "error"
+                ):
+                    self._update_status(
+                        "[dim]Agent is repairing output contract...[/dim]"
+                    )
+                return
+            if event.node == "parser_diagnostics":
+                key = (event.step_id, event.node)
+                if key in self._parser_steps:
+                    return
+                diag = self._renderer.parser_diagnostic_summary(event)
+                if diag:
+                    if not self._should_render_parser_diagnostic(diag):
+                        self._parser_steps.add(key)
+                        return
+                    color = str(diag.get("color") or "red")
+                    severity = str(diag.get("severity") or "error")
+                    badge = "PARSER ERROR" if severity == "error" else "PARSER WARNING"
+                    line = f"[bold white on {color}] {badge} [/bold white on {color}]"
+                    suffix = " · ".join(
+                        part for part in (diag.get("parser"), diag.get("code")) if part
+                    )
+                    if suffix:
+                        line += f" [dim]{suffix}[/dim]"
+                    self._rail(color, line)
+                    self._rail(color, str(diag.get("summary") or ""))
+                    if diag.get("details"):
+                        self._rail(color, f"[dim]{diag.get('details')}[/dim]")
+                    if diag.get("protocol"):
+                        self._rail(
+                            color, f"[dim]Protocol:[/dim] {diag.get('protocol')}"
+                        )
+                    if diag.get("selected_parser"):
+                        parser_line = (
+                            f"[dim]Selected parser:[/dim] {diag.get('selected_parser')}"
+                        )
+                        if diag.get("fallback_used"):
+                            parser_line += " [dim](fallback)[/dim]"
+                        self._rail(color, parser_line)
+                    if diag.get("extraction_mode"):
+                        self._rail(
+                            color,
+                            f"[dim]Extraction:[/dim] {diag.get('extraction_mode')}",
+                        )
+                    if diag.get("expected_shape"):
+                        self._rail(
+                            color, f"[dim]Expected:[/dim] {diag.get('expected_shape')}"
+                        )
+                    if diag.get("repair_instruction"):
+                        self._rail(
+                            color,
+                            f"[bold]Repair:[/bold] {diag.get('repair_instruction')}",
+                        )
+                    if diag.get("raw_output_preview"):
+                        self._rail(
+                            color,
+                            f"[dim]Raw preview:[/dim] {diag.get('raw_output_preview')}",
+                        )
+                    if diag.get("salvage_summary"):
+                        self._rail(
+                            color, f"[dim]Salvage:[/dim] {diag.get('salvage_summary')}"
+                        )
+                self._parser_steps.add(key)
+                return
 
         if event.channel == "action":
             if event.step_id in self._action_steps:
@@ -350,19 +524,28 @@ class ClaudeStyleHook(RenderStreamHook):
             obs = self._renderer.observation_summary(event)
             if obs:
                 status = str(obs.get("status", "neutral"))
-                color = "green" if status == "success" else ("red" if status == "error" else "blue")
+                color = (
+                    "green"
+                    if status == "success"
+                    else ("red" if status == "error" else "blue")
+                )
                 title = str(obs.get("title", "Observation"))
                 if status == "error":
                     self._rail("red", f"[red][✘] Error: {title}[/red]")
                     self._observation_steps.add(event.step_id)
                     return
-                self._rail(color, f"🔎 [bold {color}]Observation[/bold {color}] [bold italic]Title:[/bold italic] {title}")
+                self._rail(
+                    color,
+                    f"🔎 [bold {color}]Observation[/bold {color}] [bold italic]Title:[/bold italic] {title}",
+                )
                 url = str(obs.get("url", "")).strip()
                 if url:
                     self._rail(color, f"[dim]URL: {url}[/dim]")
                 body = str(obs.get("body", "")).strip()
                 if body:
-                    self._rail(color, body if status != "error" else f"[red]{body}[/red]")
+                    self._rail(
+                        color, body if status != "error" else f"[red]{body}[/red]"
+                    )
                 table = obs.get("table")
                 syntax = obs.get("syntax")
                 if table is not None:
@@ -389,19 +572,33 @@ class ClaudeStyleHook(RenderStreamHook):
 
         if event.node == "done":
             self.console.print(Rule("[bold]DONE[/bold]", style="gray23"))
-            summary = self._renderer.done_summary(stop_reason=event.payload.get("stop_reason"), final_result=event.payload.get("final_result"))
+            summary = self._renderer.done_summary(
+                stop_reason=event.payload.get("stop_reason"),
+                final_result=event.payload.get("final_result"),
+            )
             self._rail("green", f"[bold green]{summary}[/bold green]")
             return
 
     def _print_banner(self) -> None:
-        self.console.print(Rule("[bold bright_cyan]QitOS: A Relaxable Agentic Framework for Reseachers [/bold bright_cyan]", style="bright_cyan"))
-        self.console.print("[bright_cyan]   ██████╗ ██╗████████╗ ██████╗ ███████╗[/bright_cyan]")
+        self.console.print(
+            Rule(
+                "[bold bright_cyan]QitOS: A Relaxable Agentic Framework for Reseachers [/bold bright_cyan]",
+                style="bright_cyan",
+            )
+        )
+        self.console.print(
+            "[bright_cyan]   ██████╗ ██╗████████╗ ██████╗ ███████╗[/bright_cyan]"
+        )
         self.console.print("[cyan]  ██╔═══██╗██║╚══██╔══╝██╔═══██╗██╔════╝[/cyan]")
         self.console.print("[blue]  ██║   ██║██║   ██║   ██║   ██║███████╗[/blue]")
-        self.console.print("[bright_blue]  ██║▄▄ ██║██║   ██║   ██║   ██║╚════██║[/bright_blue]")
+        self.console.print(
+            "[bright_blue]  ██║▄▄ ██║██║   ██║   ██║   ██║╚════██║[/bright_blue]"
+        )
         self.console.print("[blue]  ╚██████╔╝██║   ██║   ╚██████╔╝███████║[/blue]")
         self.console.print("[cyan]   ╚══▀▀═╝ ╚═╝   ╚═╝    ╚═════╝ ╚══════╝[/cyan]")
-        self.console.print(f"[dim]minimalist stream runtime · theme={self.theme_name}[/dim]")
+        self.console.print(
+            f"[dim]minimalist stream runtime · theme={self.theme_name}[/dim]"
+        )
         self.console.print()
 
     def _rail(self, color: str, line: str) -> None:
@@ -437,6 +634,7 @@ class ClaudeStyleHook(RenderStreamHook):
         memory_name = self._memory_name(engine)
         history_name = self._history_name(engine)
         model_name = self._model_name(engine)
+        protocol_name = self._protocol_name(engine)
         planning_name = self._planning_name(engine)
         tools = self._tool_list(engine)
         tools_desc = ", ".join(tools[:8]) if tools else "none"
@@ -446,6 +644,7 @@ class ClaudeStyleHook(RenderStreamHook):
             ("memory", memory_name),
             ("history", history_name),
             ("base_model", model_name),
+            ("protocol", protocol_name),
             ("context", self._context_row(engine)),
             ("planning", planning_name),
             ("tools", f"{tools_desc} ({len(tools)})"),
@@ -493,6 +692,15 @@ class ClaudeStyleHook(RenderStreamHook):
             return planner.__class__.__name__
         return "none"
 
+    def _protocol_name(self, engine: "Engine") -> str:
+        protocol = engine.resolve_protocol() if hasattr(engine, "resolve_protocol") else None
+        if protocol is None:
+            return "none"
+        fallbacks = list(getattr(protocol, "fallback_protocols", ()) or [])
+        if not fallbacks:
+            return str(getattr(protocol, "id", protocol))
+        return f"{getattr(protocol, 'id', protocol)} -> {', '.join(str(x) for x in fallbacks)}"
+
     def _tool_list(self, engine: "Engine") -> List[str]:
         registry = getattr(engine, "tool_registry", None)
         if registry is None:
@@ -509,12 +717,20 @@ class ClaudeStyleHook(RenderStreamHook):
     def _context_row(self, engine: "Engine") -> str:
         runtime = getattr(engine, "_context_runtime", None)
         llm = getattr(getattr(engine, "agent", None), "llm", None)
-        info = runtime.run_meta(llm) if runtime is not None and callable(getattr(runtime, "run_meta", None)) else {}
+        info = (
+            runtime.run_meta(llm)
+            if runtime is not None and callable(getattr(runtime, "run_meta", None))
+            else {}
+        )
         window = info.get("context_window") or "-"
         counting = info.get("counting_mode") or "disabled"
         reserve = info.get("reserve_tokens")
         reserve_text = f"reserve={reserve}" if reserve is not None else "reserve=-"
-        compact = "auto" if getattr(getattr(engine, "context_config", None), "enabled", False) else "off"
+        compact = (
+            "auto"
+            if getattr(getattr(engine, "context_config", None), "enabled", False)
+            else "off"
+        )
         return f"{window} window · {counting} counting · {reserve_text} · compact={compact}"
 
     def _composition_row(self, key: str, value: str) -> str:
@@ -528,7 +744,6 @@ class ClaudeStyleHook(RenderStreamHook):
         if len(text) <= limit:
             return text
         return text[: max(8, limit - 3)] + "..."
-
 
     def _start_status(self, text: str) -> None:
         if self._status is None:
@@ -573,9 +788,17 @@ class RichConsoleHook(RenderHook):
 
     def on_step_end(self, record, state, engine) -> None:
         decision = record.decision
-        if decision is not None and self.show_thought and getattr(decision, "rationale", None):
+        if (
+            decision is not None
+            and self.show_thought
+            and getattr(decision, "rationale", None)
+        ):
             RichRender.print_thought(str(decision.rationale), record.step_id)
-        if decision is not None and self.show_action and getattr(decision, "actions", None):
+        if (
+            decision is not None
+            and self.show_action
+            and getattr(decision, "actions", None)
+        ):
             for action in decision.actions:
                 obj = action if isinstance(action, Action) else Action.from_dict(action)
                 self._tools_used.append(obj.name)
@@ -586,17 +809,31 @@ class RichConsoleHook(RenderHook):
 
     def on_run_end(self, result: "EngineResult", engine: "Engine") -> None:
         if self.show_final_answer and result.state.final_result is not None:
-            RichRender.print_final_answer(str(result.state.final_result), result.state.task)
+            RichRender.print_final_answer(
+                str(result.state.final_result), result.state.task
+            )
 
 
 class SimpleRichConsoleHook(RichConsoleHook):
     def __init__(self):
-        super().__init__(show_step_header=False, show_thought=False, show_action=False, show_observation=False, show_final_answer=True)
+        super().__init__(
+            show_step_header=False,
+            show_thought=False,
+            show_action=False,
+            show_observation=False,
+            show_final_answer=True,
+        )
 
 
 class VerboseRichConsoleHook(RichConsoleHook):
     def __init__(self):
-        super().__init__(show_step_header=True, show_thought=True, show_action=True, show_observation=True, show_final_answer=True)
+        super().__init__(
+            show_step_header=True,
+            show_thought=True,
+            show_action=True,
+            show_observation=True,
+            show_final_answer=True,
+        )
 
 
 __all__ = [

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
-from qitos.kit.tool.editor import EditorToolSet
+from qitos.kit.tool import CodingToolSet
 
 
 @dataclass
@@ -23,7 +23,17 @@ class PlanActEditorAgent(AgentModule[PlanActEditorState, Dict[str, Any], Action]
 
     def __init__(self, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+                profile="editor",
+            )
+        )
         super().__init__(tool_registry=registry)
 
     def init_state(self, task: str, **kwargs: Any) -> PlanActEditorState:
@@ -34,7 +44,9 @@ class PlanActEditorAgent(AgentModule[PlanActEditorState, Dict[str, Any], Action]
             max_steps=8,
         )
 
-    def observe(self, state: PlanActEditorState, env_view: Dict[str, Any]) -> Dict[str, Any]:
+    def observe(
+        self, state: PlanActEditorState, env_view: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return {
             "task": state.task,
             "plan_steps": list(state.plan_steps),
@@ -42,7 +54,9 @@ class PlanActEditorAgent(AgentModule[PlanActEditorState, Dict[str, Any], Action]
             "last_observation": state.last_observation,
         }
 
-    def decide(self, state: PlanActEditorState, observation: Dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: PlanActEditorState, observation: Dict[str, Any]
+    ) -> Decision[Action]:
         if not state.plan_steps:
             state.plan_steps = [
                 "create_file",
@@ -61,7 +75,15 @@ class PlanActEditorAgent(AgentModule[PlanActEditorState, Dict[str, Any], Action]
 
         if current == "create_file":
             return Decision.act(
-                actions=[Action(name="create", args={"path": state.target_path, "file_text": state.target_content})],
+                actions=[
+                    Action(
+                        name="create",
+                        args={
+                            "path": state.target_path,
+                            "file_text": state.target_content,
+                        },
+                    )
+                ],
                 rationale="Execute plan step create_file",
             )
 

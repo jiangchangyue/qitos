@@ -50,19 +50,27 @@ def security_research_tools(
     if include_authorized_ops:
         _register_explicit_toolset(
             registry,
-            ReconToolSet(authorized_targets=authorized_targets, workspace_root=workspace_root),
+            ReconToolSet(
+                authorized_targets=authorized_targets, workspace_root=workspace_root
+            ),
         )
         _register_explicit_toolset(
             registry,
-            ExploitToolSet(authorized_targets=authorized_targets, workspace_root=workspace_root),
+            ExploitToolSet(
+                authorized_targets=authorized_targets, workspace_root=workspace_root
+            ),
         )
         _register_explicit_toolset(
             registry,
-            PasswordToolSet(authorized_targets=authorized_targets, workspace_root=workspace_root),
+            PasswordToolSet(
+                authorized_targets=authorized_targets, workspace_root=workspace_root
+            ),
         )
         _register_explicit_toolset(
             registry,
-            VulnScanToolSet(authorized_targets=authorized_targets, workspace_root=workspace_root),
+            VulnScanToolSet(
+                authorized_targets=authorized_targets, workspace_root=workspace_root
+            ),
         )
     return registry
 

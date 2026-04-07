@@ -55,7 +55,9 @@ class EpubToTState(StateSchema):
 class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.register_toolset(EpubToolSet(workspace_root=workspace_root), namespace="epub")
+        registry.register_toolset(
+            EpubToolSet(workspace_root=workspace_root), namespace="epub"
+        )
         super().__init__(tool_registry=registry, llm=llm)
 
     def init_state(self, task: str, **kwargs: Any) -> EpubToTState:
@@ -71,12 +73,26 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
             return Decision.branch(
                 candidates=[
                     Decision.act(
-                        [Action(name="epub.list_chapters", args={"path": state.epub_path})],
+                        [
+                            Action(
+                                name="epub.list_chapters",
+                                args={"path": state.epub_path},
+                            )
+                        ],
                         rationale="enumerate_chapters",
                         meta={"score": 0.95},
                     ),
                     Decision.act(
-                        [Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 4})],
+                        [
+                            Action(
+                                name="epub.search",
+                                args={
+                                    "path": state.epub_path,
+                                    "query": state.question,
+                                    "top_k": 4,
+                                },
+                            )
+                        ],
                         rationale="keyword_probe",
                         meta={"score": 0.8},
                     ),
@@ -126,7 +142,10 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
                 Decision.act(
                     [Action(name=name, args=args)],
                     rationale=idea,
-                    meta={"score": float(score), "id": f"tot_{state.current_step}_{idx}"},
+                    meta={
+                        "score": float(score),
+                        "id": f"tot_{state.current_step}_{idx}",
+                    },
                 )
             )
 
@@ -134,8 +153,17 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
             return self._fallback_decision(state)
         return Decision.branch(candidates=candidates, rationale="tot_branch")
 
-    def reduce(self, state: EpubToTState, observation: dict[str, Any], decision: Decision[Action]) -> EpubToTState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: EpubToTState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> EpubToTState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.thoughts.append(decision.rationale)
             state.scratchpad.append(f"Thought: {decision.rationale}")
@@ -148,11 +176,15 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
                 if isinstance(result.get("chapters"), list):
                     state.chapter_count = len(result.get("chapters") or [])
                     if result.get("chapters"):
-                        state.evidence.append(f"chapter_catalog_hint: {result['chapters'][0]}")
+                        state.evidence.append(
+                            f"chapter_catalog_hint: {result['chapters'][0]}"
+                        )
                 if isinstance(result.get("hits"), list):
                     for hit in result.get("hits", [])[:3]:
                         if isinstance(hit, dict):
-                            state.evidence.append(f"search_hit: {hit.get('snippet', '')}")
+                            state.evidence.append(
+                                f"search_hit: {hit.get('snippet', '')}"
+                            )
                 if isinstance(result.get("content"), str):
                     text = result["content"].strip()
                     if text:
@@ -169,9 +201,20 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
                 rationale="fallback_list_chapters",
                 meta={"score": 0.6},
             )
-        next_idx = min(max(0, len(state.evidence) // 2), max(0, state.chapter_count - 1))
+        next_idx = min(
+            max(0, len(state.evidence) // 2), max(0, state.chapter_count - 1)
+        )
         return Decision.act(
-            [Action(name="epub.read_chapter", args={"path": state.epub_path, "chapter_index": int(next_idx), "max_chars": 5000})],
+            [
+                Action(
+                    name="epub.read_chapter",
+                    args={
+                        "path": state.epub_path,
+                        "chapter_index": int(next_idx),
+                        "max_chars": 5000,
+                    },
+                )
+            ],
             rationale="fallback_read_next",
             meta={"score": 0.55},
         )
@@ -202,7 +245,9 @@ class EpubTreeOfThoughtAgent(AgentModule[EpubToTState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

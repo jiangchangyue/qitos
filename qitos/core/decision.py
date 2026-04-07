@@ -35,7 +35,9 @@ class Decision(Generic[ActionT]):
         rationale: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> "Decision[ActionT]":
-        return cls(mode="final", final_answer=answer, rationale=rationale, meta=meta or {})
+        return cls(
+            mode="final", final_answer=answer, rationale=rationale, meta=meta or {}
+        )
 
     @classmethod
     def wait(
@@ -52,7 +54,9 @@ class Decision(Generic[ActionT]):
         rationale: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> "Decision[ActionT]":
-        return cls(mode="branch", candidates=candidates, rationale=rationale, meta=meta or {})
+        return cls(
+            mode="branch", candidates=candidates, rationale=rationale, meta=meta or {}
+        )
 
     def validate(self) -> None:
         if not isinstance(self.meta, dict):
@@ -66,5 +70,7 @@ class Decision(Generic[ActionT]):
         if self.mode == "branch":
             for candidate in self.candidates:
                 if not isinstance(candidate, Decision):
-                    raise ValueError("Decision(mode='branch') requires Decision candidates")
+                    raise ValueError(
+                        "Decision(mode='branch') requires Decision candidates"
+                    )
                 candidate.validate()

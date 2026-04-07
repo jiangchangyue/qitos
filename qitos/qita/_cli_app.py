@@ -31,7 +31,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "board":
-        return _cmd_board(logdir=args.logdir, host=args.host, port=args.port, focus_run_id=None, replay=False)
+        return _cmd_board(
+            logdir=args.logdir,
+            host=args.host,
+            port=args.port,
+            focus_run_id=None,
+            replay=False,
+        )
     if args.command == "replay":
         return _cmd_replay(run=args.run, host=args.host, port=args.port)
     if args.command == "export":
@@ -39,7 +45,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 1
 
 
-def _cmd_board(logdir: str, host: str, port: int, focus_run_id: Optional[str], replay: bool) -> int:
+def _cmd_board(
+    logdir: str, host: str, port: int, focus_run_id: Optional[str], replay: bool
+) -> int:
     root = Path(logdir).resolve()
     root.mkdir(parents=True, exist_ok=True)
     handler_cls = _build_handler(root=root)
@@ -64,7 +72,9 @@ def _cmd_replay(run: str, host: str, port: int) -> int:
         raise FileNotFoundError(f"Run dir not found: {run_dir}")
     root = run_dir.parent
     run_id = run_dir.name
-    return _cmd_board(logdir=str(root), host=host, port=port, focus_run_id=run_id, replay=True)
+    return _cmd_board(
+        logdir=str(root), host=host, port=port, focus_run_id=run_id, replay=True
+    )
 
 
 def _cmd_export(run: str, html_path: str) -> int:
@@ -95,7 +105,9 @@ def _build_handler(root: Path):
                 run_id = _slug_run_id(route.split("/", 3)[-1])
                 run_dir = _resolve_run(root, run_id)
                 if run_dir is None:
-                    self._send_json({"error": "run not found", "run_id": run_id}, status=404)
+                    self._send_json(
+                        {"error": "run not found", "run_id": run_id}, status=404
+                    )
                     return
                 self._send_json(_load_run_payload(run_dir))
                 return
@@ -105,7 +117,9 @@ def _build_handler(root: Path):
                 if run_dir is None:
                     self._send_html(_render_not_found(run_id), status=404)
                     return
-                self._send_html(_render_run_html(_load_run_payload(run_dir), embedded=False))
+                self._send_html(
+                    _render_run_html(_load_run_payload(run_dir), embedded=False)
+                )
                 return
             if route.startswith("/replay/"):
                 run_id = _slug_run_id(route.split("/", 2)[-1])
@@ -114,34 +128,46 @@ def _build_handler(root: Path):
                     self._send_html(_render_not_found(run_id), status=404)
                     return
                 speed = int((qs.get("speed") or ["500"])[0])
-                self._send_html(_render_replay_html(_load_run_payload(run_dir), speed_ms=max(100, speed)))
+                self._send_html(
+                    _render_replay_html(
+                        _load_run_payload(run_dir), speed_ms=max(100, speed)
+                    )
+                )
                 return
             if route.startswith("/export/raw/"):
                 run_id = _slug_run_id(route.split("/", 3)[-1])
                 run_dir = _resolve_run(root, run_id)
                 if run_dir is None:
-                    self._send_json({"error": "run not found", "run_id": run_id}, status=404)
+                    self._send_json(
+                        {"error": "run not found", "run_id": run_id}, status=404
+                    )
                     return
                 payload = _load_run_payload(run_dir)
                 body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
                 self._send_bytes(
                     body,
                     content_type="application/json; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{run_id}.json"'},
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{run_id}.json"'
+                    },
                 )
                 return
             if route.startswith("/export/html/"):
                 run_id = _slug_run_id(route.split("/", 3)[-1])
                 run_dir = _resolve_run(root, run_id)
                 if run_dir is None:
-                    self._send_json({"error": "run not found", "run_id": run_id}, status=404)
+                    self._send_json(
+                        {"error": "run not found", "run_id": run_id}, status=404
+                    )
                     return
                 payload = _load_run_payload(run_dir)
                 body = _render_run_html(payload, embedded=True).encode("utf-8")
                 self._send_bytes(
                     body,
                     content_type="text/html; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{run_id}.html"'},
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{run_id}.html"'
+                    },
                 )
                 return
             self._send_json({"error": "not found", "route": route}, status=404)
@@ -152,7 +178,11 @@ def _build_handler(root: Path):
             _ = args
 
         def _send_html(self, body: str, status: int = 200) -> None:
-            self._send_bytes(body.encode("utf-8"), content_type="text/html; charset=utf-8", status=status)
+            self._send_bytes(
+                body.encode("utf-8"),
+                content_type="text/html; charset=utf-8",
+                status=status,
+            )
 
         def _send_json(self, obj: Any, status: int = 200) -> None:
             self._send_bytes(
@@ -222,6 +252,7 @@ def _discover_runs(logdir: Path) -> List[Dict[str, Any]]:
                     "summary_steps": summary.get("steps"),
                     "token_usage": summary.get("token_usage"),
                     "context": summary.get("context"),
+                    "parser": summary.get("parser"),
                 },
             }
         )
@@ -243,7 +274,9 @@ def _load_run_payload(run_dir: Path) -> Dict[str, Any]:
     }
 
 
-def _group_events_by_step(events: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+def _group_events_by_step(
+    events: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
     grouped: Dict[str, List[Dict[str, Any]]] = {}
     for ev in events:
         sid = str(ev.get("step_id", "none"))
@@ -416,6 +449,7 @@ function paint(){
         <div class="meta">schema=${m.schema_version||''} seed=${m.seed===null?'null':(m.seed||'')}</div>
         <div class="meta">prompt_hash=${m.prompt_hash||''}</div>
         <div class="meta">tokens=${(m.token_usage||0)} peak_ctx=${ctxPeak(m.context)}</div>
+        <div class="meta">parser_err=${((m.parser||{}).error_count||0)} salvage=${((m.parser||{}).salvage_count||0)}</div>
         <details class="manifest-meta-tree">
           <summary>Full manifest meta</summary>
           ${metaTree('manifest_meta', m, 0)}
@@ -504,7 +538,9 @@ def _render_not_found(run_id: str) -> str:
 def _render_run_html(payload: Dict[str, Any], embedded: bool) -> str:
     run_id = html.escape(str(payload.get("run_id", "")))
     run_path = html.escape(str(payload.get("run", "")))
-    manifest = html.escape(json.dumps(payload.get("manifest", {}), ensure_ascii=False, indent=2))
+    manifest = html.escape(
+        json.dumps(payload.get("manifest", {}), ensure_ascii=False, indent=2)
+    )
     payload_json = _json_for_script(payload)
     buttons = ""
     if not embedded:
@@ -629,6 +665,10 @@ pre{{margin:0;background:#0b1220;border:1px solid #1c2b44;padding:10px;border-ra
           <h4>context timeline</h4>
           <div id="contextTimeline"></div>
         </section>
+        <section class="timeline">
+          <h4>parser timeline</h4>
+          <div id="parserTimeline"></div>
+        </section>
         <section class="flow" id="flow"></section>
       </section>
       <section class="panel" id="panelManifest">
@@ -646,6 +686,7 @@ const flow = document.getElementById('flow');
 const toc = document.getElementById('toc');
 const timelineRoot = document.getElementById('timeline');
 const contextTimelineRoot = document.getElementById('contextTimeline');
+const parserTimelineRoot = document.getElementById('parserTimeline');
 const overview = document.getElementById('overview');
 const fontDownBtn = document.getElementById('fontDown');
 const fontResetBtn = document.getElementById('fontReset');
@@ -708,6 +749,32 @@ function extractThought(decision, events){{
     return truncateText(raw, 220);
   }}
   return '';
+}}
+function latestModelResponse(events){{
+  const es = Array.isArray(events) ? events : [];
+  for(let i = es.length - 1; i >= 0; i -= 1){{
+    const p = es[i] && es[i].payload;
+    if(!p || typeof p !== 'object') continue;
+    if(String(p.stage || '') !== 'model_output') continue;
+    const response = p.model_response;
+    if(response && typeof response === 'object') return response;
+  }}
+  return null;
+}}
+function renderModelResponseSummary(response){{
+  if(!response || typeof response !== 'object') return '';
+  const rows = [];
+  if(response.provider) rows.push(kvRow('provider', response.provider));
+  if(response.model_name) rows.push(kvRow('model', response.model_name));
+  if(response.finish_reason) rows.push(kvRow('finish_reason', response.finish_reason));
+  if(Array.isArray(response.tool_calls) && response.tool_calls.length) rows.push(kvRow('tool_calls', response.tool_calls.length));
+  const usage = response.usage;
+  if(usage && typeof usage === 'object'){{
+    if(usage.prompt_tokens !== undefined) rows.push(kvRow('prompt_tokens', usage.prompt_tokens));
+    if(usage.completion_tokens !== undefined) rows.push(kvRow('completion_tokens', usage.completion_tokens));
+    if(usage.total_tokens !== undefined) rows.push(kvRow('total_tokens', usage.total_tokens));
+  }}
+  return rows.length ? ('<div style="margin-top:8px">' + kvBlock(rows) + '</div>') : '';
 }}
 function firstActionLabel(actions){{
   if(!Array.isArray(actions) || !actions.length) return '';
@@ -787,8 +854,9 @@ function renderDirectObservation(actionResults){{
 }}
 function renderThought(decision, events){{
   const thought = extractThought(decision, events);
-  if(!thought) return '<div class="muted">No explicit thought.</div>';
-  return '<div style="white-space:pre-wrap;line-height:1.6;background:#0b1220;border:1px solid #1c2b44;border-radius:8px;padding:10px;color:#cfe6ff">'+esc(thought)+'</div>';
+  const summary = renderModelResponseSummary(latestModelResponse(events));
+  if(!thought) return (summary || '<div class="muted">No explicit thought.</div>');
+  return '<div style="white-space:pre-wrap;line-height:1.6;background:#0b1220;border:1px solid #1c2b44;border-radius:8px;padding:10px;color:#cfe6ff">'+esc(thought)+'</div>' + summary;
 }}
 function renderAction(actions){{
   const label = firstActionLabel(actions);
@@ -803,6 +871,25 @@ function renderMemoryUpdate(observeOut){{
   if(Array.isArray(mem.records)) rows.push(kvRow('records', mem.records.length));
   if(typeof mem.summary === 'string' && mem.summary.trim()) rows.push(kvRow('summary', truncateText(mem.summary, 220)));
   return rows.length ? kvBlock(rows) : '<div class="muted">No memory update.</div>';
+}}
+function renderParserDiagnostics(diag){{
+  if(!diag || typeof diag !== 'object' || !Object.keys(diag).length) return '<div class="muted">No parser diagnostics.</div>';
+  const rows = [];
+  if(diag.protocol) rows.push(kvRow('protocol', diag.protocol));
+  if(diag.parser) rows.push(kvRow('parser', diag.parser));
+  if(diag.selected_parser) rows.push(kvRow('selected_parser', diag.selected_parser));
+  if(diag.fallback_used !== undefined) rows.push(kvRow('fallback_used', diag.fallback_used));
+  if(diag.contract) rows.push(kvRow('contract', diag.contract));
+  if(diag.code) rows.push(kvRow('code', diag.code));
+  if(diag.severity) rows.push(kvRow('severity', diag.severity));
+  if(diag.extraction_mode) rows.push(kvRow('extraction', diag.extraction_mode));
+  if(diag.summary) rows.push(kvRow('summary', diag.summary));
+  if(diag.details) rows.push(kvRow('details', truncateText(diag.details, 260)));
+  if(diag.expected_shape) rows.push(kvRow('expected', truncateText(diag.expected_shape, 220)));
+  if(diag.repair_instruction) rows.push(kvRow('repair', truncateText(diag.repair_instruction, 220)));
+  if(diag.salvage_summary) rows.push(kvRow('salvage', truncateText(diag.salvage_summary, 220)));
+  if(diag.raw_output_preview) rows.push(kvRow('raw_preview', truncateText(diag.raw_output_preview, 240)));
+  return kvBlock(rows);
 }}
 function renderCritic(data){{
   if(!Array.isArray(data) || !data.length) return '<div class="muted">No critic outputs.</div>';
@@ -820,11 +907,22 @@ function renderEvents(events){{
   if(!Array.isArray(events) || !events.length) return '<div class="muted">No events.</div>';
   const items = [];
   for(const e of events){{
-    items.push('<div class="item">' + kvBlock([
+    const rows = [
       kvRow('phase', e.phase || ''),
       kvRow('ok', e.ok),
       kvRow('error', e.error || ''),
-    ]) + '</div>');
+    ];
+    const payload = e.payload && typeof e.payload === 'object' ? e.payload : null;
+    if(payload && String(payload.stage || '') === 'model_output'){{
+      const response = payload.model_response;
+      if(response && typeof response === 'object'){{
+        if(response.finish_reason) rows.push(kvRow('finish_reason', response.finish_reason));
+        if(Array.isArray(response.tool_calls) && response.tool_calls.length) rows.push(kvRow('tool_calls', response.tool_calls.length));
+        const usage = response.usage;
+        if(usage && typeof usage === 'object' && usage.total_tokens !== undefined) rows.push(kvRow('total_tokens', usage.total_tokens));
+      }}
+    }}
+    items.push('<div class="item">' + kvBlock(rows) + '</div>');
   }}
   return '<div class="list">' + items.join('') + '</div>';
 }}
@@ -942,6 +1040,7 @@ function paintOverview(items){{
   const m = payload.manifest || {{}};
   const s = m.summary || {{}};
   const c = s.context || {{}};
+  const p = s.parser || {{}};
   const total = items.length;
   const avgEvents = total ? (items.reduce((a,it)=>a + (it.events||[]).length, 0) / total).toFixed(1) : '0.0';
   overview.innerHTML = [
@@ -954,6 +1053,8 @@ function paintOverview(items){{
     ['tokens total', String(c.tokens_total || s.token_usage || 0)],
     ['peak ctx', c.peak_occupancy_ratio ? ((Number(c.peak_occupancy_ratio) * 100).toFixed(1) + '%') : '-'],
     ['compacts', JSON.stringify(c.compact_counts || {{}})],
+    ['parser errors', String(p.error_count || 0)],
+    ['parser salvage', String(p.salvage_count || 0)],
   ].map(([k,v])=>'<div class="ov"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>').join('');
 }}
 function buildTimeline(items){{
@@ -1081,6 +1182,25 @@ function buildContextTimeline(items){{
   const list = compactRows.length ? ('<div class="compact-list">' + compactRows.join('') + '</div>') : '<div class="muted">No compact or warning markers recorded.</div>';
   contextTimelineRoot.innerHTML = '<div class="context-chart">' + head + svg + list + '</div>';
 }}
+function buildParserTimeline(items){{
+  const rows = [];
+  for(const it of items){{
+    const diag = (it.step && typeof it.step.parser_diagnostics === 'object') ? it.step.parser_diagnostics : null;
+    if(!diag || !Object.keys(diag).length) continue;
+    const sev = String(diag.severity || 'error').toLowerCase();
+    const color = sev === 'error' ? '#ff6b6b' : '#f7b955';
+    const marker = diag.salvage_applied ? ' · salvage' : '';
+    const protocol = diag.protocol ? (' · ' + String(diag.protocol)) : '';
+    const fallback = diag.fallback_used ? ' · fallback' : '';
+    const extraction = diag.extraction_mode ? (' · ' + String(diag.extraction_mode)) : '';
+    rows.push(
+      '<div class="compact-item"><div class="compact-step">STEP ' + esc(it.sid) + '</div><div class="compact-desc">' +
+      '<span style="color:' + color + ';font-weight:700">' + esc(String(diag.code || sev)) + '</span> · ' +
+      esc(truncateText(diag.summary || 'Parser diagnostic', 220)) + protocol + extraction + fallback + marker + '</div></div>'
+    );
+  }}
+  parserTimelineRoot.innerHTML = rows.length ? ('<div class="compact-list">' + rows.join('') + '</div>') : '<div class="muted">No parser diagnostics recorded.</div>';
+}}
 function render(){{
   const q = (document.getElementById('q').value||'').toLowerCase();
   const eventFilter = document.getElementById('eventFilter').value;
@@ -1094,6 +1214,7 @@ function render(){{
   paintOverview(items);
   buildTimeline(items);
   buildContextTimeline(items);
+  buildParserTimeline(items);
   flow.innerHTML = '';
   toc.innerHTML = '';
   for(const it of items){{
@@ -1108,6 +1229,7 @@ function render(){{
     let h = '<div class="card-head"><div class="step">STEP ' + it.sid + '</div><div class="muted">events ' + it.events.length + '</div></div>';
     if(showObs) h += sectionHtml('State', renderState(obsInput), obsInput, 'state', collapsedAll);
     h += sectionHtml('Thought', renderThought(d, it.events), d, 'thought', collapsedAll);
+    h += sectionHtml('Parser Diagnostics', renderParserDiagnostics(it.step.parser_diagnostics || {{}}), it.step.parser_diagnostics || {{}}, 'parser', collapsedAll);
     h += sectionHtml('Action', renderAction(it.step.actions||[]), it.step.actions||[], 'action', collapsedAll);
     h += sectionHtml('Direct Observation', renderDirectObservation(it.step.action_results||[]), it.step.action_results||[], 'direct_observation', collapsedAll);
     h += sectionHtml('Memory Update', renderMemoryUpdate(obsInput.observe_output || {{}}), obsInput.observe_output || {{}}, 'memory', collapsedAll);
@@ -1176,7 +1298,11 @@ render();
 
 def _json_for_script(payload: Dict[str, Any]) -> str:
     raw = json.dumps(payload, ensure_ascii=False)
-    return raw.replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    return (
+        raw.replace("</", "<\\/")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 def _build_replay_records(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1197,7 +1323,9 @@ def _build_replay_records(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             "action_results": step.get("action_results", []),
             "critic_outputs": step.get("critic_outputs", []),
             "context": step.get("context", {}),
+            "parser_diagnostics": step.get("parser_diagnostics", {}),
             "event_context": (ev.get("payload") or {}).get("context", {}),
+            "event_diagnostics": (ev.get("payload") or {}).get("diagnostics", {}),
         }
         records.append(
             {
@@ -1232,6 +1360,8 @@ def _infer_kind(phase: str, node: str, error: Any) -> str:
     if error:
         return "error"
     key = f"{phase} {node}".lower()
+    if "parser" in key:
+        return "parser"
     if "plan" in key:
         return "plan"
     if "state" in key or "observe" in key:
@@ -1279,7 +1409,7 @@ body{{margin:0;background:radial-gradient(circle at 20% 0%,#12233f,#090d16 62%);
 .ctitle{{font-size:12px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}}
 .tag{{font-size:10px;border:1px solid var(--line);padding:1px 6px;border-radius:999px;color:#a8bbdf}}
 .kind-plan{{border-color:#8393ff}} .kind-thinking{{border-color:#ae8dff}} .kind-action{{border-color:#3dd68c}}
-.kind-memory{{border-color:#46d1c2}} .kind-observation{{border-color:#4db5ff}} .kind-critic{{border-color:#f7b955}}
+.kind-parser{{border-color:#f7b955}} .kind-memory{{border-color:#46d1c2}} .kind-observation{{border-color:#4db5ff}} .kind-critic{{border-color:#f7b955}}
 .kind-done{{border-color:#ff9d9d}} .kind-error{{border-color:#ff6b6b}}
 .cbody{{white-space:pre-wrap;word-break:break-word;background:#081021;border:1px solid #1b2a44;padding:8px;border-radius:8px;font-size:12px}}
 .cursor{{display:inline-block;width:8px;height:16px;background:var(--ok);margin-left:3px;animation:blink 1s steps(2,start) infinite}}
@@ -1339,6 +1469,20 @@ function thoughtFromDecision(d){{
   const r = d.rationale;
   if(typeof r !== 'string') return '';
   return truncateText(r, 260);
+}}
+function modelResponseSummary(response){{
+  if(!response || typeof response !== 'object') return '';
+  const parts = [];
+  if(response.provider) parts.push('provider=' + truncateText(response.provider, 40));
+  if(response.model_name) parts.push('model=' + truncateText(response.model_name, 60));
+  if(response.finish_reason) parts.push('finish=' + truncateText(response.finish_reason, 40));
+  if(Array.isArray(response.tool_calls) && response.tool_calls.length) parts.push('tool_calls=' + response.tool_calls.length);
+  const usage = response.usage;
+  if(usage && typeof usage === 'object'){{
+    if(usage.total_tokens !== undefined) parts.push('tokens=' + usage.total_tokens);
+    else if(usage.prompt_tokens !== undefined || usage.completion_tokens !== undefined) parts.push('usage=' + (usage.prompt_tokens || 0) + '/' + (usage.completion_tokens || 0));
+  }}
+  return parts.join(' · ');
 }}
 function actionLabel(actions){{
   if(!Array.isArray(actions) || !actions.length) return '';
@@ -1400,13 +1544,34 @@ function renderRecordBody(r){{
     }}
     return '📦 <b>Context:</b> ' + esc(stage);
   }}
+  if(String(r.node||'').toLowerCase() === 'parser_diagnostics') {{
+    const d = (r.body && (r.body.event_diagnostics || r.body.parser_diagnostics)) || {{}};
+    const protocol = d.protocol ? ('<br/>🧬 <b>Protocol:</b> ' + esc(String(d.protocol))) : '';
+    const fallback = d.fallback_used ? '<br/>↪️ <b>Fallback:</b> yes' : '';
+    const extraction = d.extraction_mode ? ('<br/>🧲 <b>Extraction:</b> ' + esc(String(d.extraction_mode))) : '';
+    const repair = d.repair_instruction ? ('<br/>🛠️ <b>Repair:</b> ' + esc(truncateText(d.repair_instruction, 220))) : '';
+    const raw = d.raw_output_preview ? ('<br/>🧾 <b>Raw preview:</b> ' + esc(truncateText(d.raw_output_preview, 220))) : '';
+    return '🧩 <b>Parser:</b> ' + esc(String(d.code || 'parser')) + ' · ' + esc(String(d.summary || 'Parser diagnostic')) + protocol + fallback + extraction + repair + raw;
+  }}
+  if(String(r.node||'').toLowerCase() === 'parser_result') {{
+    const p = (r.body && r.body.event && r.body.event.payload) || {{}};
+    const protocol = p.protocol ? (' · protocol=' + esc(String(p.protocol))) : '';
+    const fallback = p.fallback_used ? ' · fallback=yes' : '';
+    return '🧩 <b>Parser Result:</b> ' + esc(String(p.parser || 'parser')) + protocol + fallback + ' · mode=' + esc(String(p.parsed_mode || '-')) + ' · diagnostics=' + esc(String(!!p.has_diagnostics));
+  }}
   if(phase.includes('state') || phase.includes('observe')) return '🧭 <b>State:</b> ' + esc(stateSummary(r.body && r.body.observation));
   if(r.body && r.body.context && r.body.context.input_tokens_total !== undefined) {{
     return '🧭 <b>State:</b> ' + esc(stateSummary(r.body && r.body.observation)) + '<br/>📏 <b>Context:</b> ' + esc(
       String(r.body.context.input_tokens_total || 0) + ' tokens · ' + String((((Number(r.body.context.occupancy_ratio) || 0) * 100).toFixed(1))) + '%'
     );
   }}
-  if(r.kind === 'thinking') return '🧠 <b>Thought:</b> ' + esc(thoughtFromDecision(r.body && r.body.decision));
+  if(r.kind === 'thinking') {{
+    const eventPayload = (r.body && r.body.event && r.body.event.payload) || {{}};
+    const raw = truncateText(eventPayload.raw_output || thoughtFromDecision(r.body && r.body.decision), 220);
+    const summary = modelResponseSummary(eventPayload.model_response);
+    return '🧠 <b>Thought:</b> ' + esc(raw) + (summary ? ('<br/>📦 <b>Model:</b> ' + esc(summary)) : '');
+  }}
+  if(r.kind === 'parser') return '🧩 <b>Parser:</b> ' + esc(truncateText(JSON.stringify((r.body && (r.body.event_diagnostics || r.body.parser_diagnostics || (r.body.event && r.body.event.payload) || {{}})), 220), 220));
   if(r.kind === 'action') return '🛠️ <b>Action:</b> ' + esc(actionLabel(r.body && r.body.actions)) + '<br/>✅ <b>Direct Observation:</b> ' + esc(observationSummary(r.body && r.body.action_results));
   if(r.kind === 'observation') return '✅ <b>Direct Observation:</b> ' + esc(observationSummary(r.body && r.body.action_results));
   if(r.kind === 'memory') return '💾 <b>Memory Update:</b> ' + esc('memory context updated');

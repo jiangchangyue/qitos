@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 import hashlib
 import json
 import time
@@ -22,6 +23,10 @@ StateT = TypeVar("StateT", bound=StateSchema)
 class _TraceRuntime(Generic[StateT]):
     def __init__(self, engine: Any):
         self.engine = engine
+        self.parser_error_count = 0
+        self.parser_warning_count = 0
+        self.parser_salvage_count = 0
+        self.parser_error_codes: Counter[str] = Counter()
 
     def emit(
         self,
@@ -38,7 +43,14 @@ class _TraceRuntime(Generic[StateT]):
         event_payload.setdefault("step_id", step_id)
         event_payload.setdefault("phase", phase.value)
         event_payload.setdefault("ts", event_ts)
-        event = RuntimeEvent(step_id=step_id, phase=phase, ok=ok, payload=event_payload, error=error, ts=event_ts)
+        event = RuntimeEvent(
+            step_id=step_id,
+            phase=phase,
+            ok=ok,
+            payload=event_payload,
+            error=error,
+            ts=event_ts,
+        )
         engine.events.append(event)
         if engine.records and engine.records[-1].step_id == step_id:
             engine.records[-1].phase_events.append(event)
@@ -50,7 +62,9 @@ class _TraceRuntime(Generic[StateT]):
     def write_trace_event(self, event: RuntimeEvent) -> None:
         if self.engine.trace_writer is None:
             return
-        self.engine.trace_writer.write_event(runtime_event_to_trace(self.engine.trace_writer.run_id, event))
+        self.engine.trace_writer.write_event(
+            runtime_event_to_trace(self.engine.trace_writer.run_id, event)
+        )
 
     def write_trace_step(self, step: StepRecord) -> None:
         if self.engine.trace_writer is None:
@@ -103,7 +117,12 @@ class _TraceRuntime(Generic[StateT]):
         }
 
     def task_issue_to_dict(self, issue: TaskValidationIssue) -> Dict[str, Any]:
-        return {"code": issue.code, "message": issue.message, "field": issue.field, "details": issue.details}
+        return {
+            "code": issue.code,
+            "message": issue.message,
+            "field": issue.field,
+            "details": issue.details,
+        }
 
     def hydrate_trace_metadata(self, task_obj: Optional[Task], task_text: str) -> None:
         engine = self.engine
@@ -118,9 +137,13 @@ class _TraceRuntime(Generic[StateT]):
             "model_name": run_meta.get("model_name"),
             "tool_count": run_meta.get("tool_count"),
         }
-        prompt_hash = hashlib.sha256(json.dumps(prompt_seed, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        prompt_hash = hashlib.sha256(
+            json.dumps(prompt_seed, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16]
         run_cfg_hash = hashlib.sha256(
-            json.dumps({"task_meta": task_meta, "run_meta": run_meta}, sort_keys=True).encode("utf-8")
+            json.dumps(
+                {"task_meta": task_meta, "run_meta": run_meta}, sort_keys=True
+            ).encode("utf-8")
         ).hexdigest()[:16]
         engine.trace_writer.metadata.update(
             {
@@ -131,9 +154,11 @@ class _TraceRuntime(Generic[StateT]):
                     for item in run_meta.get("tools", [])
                     if isinstance(item, dict)
                 },
-                "seed": getattr(engine.agent, "config", {}).get("seed")
-                if isinstance(getattr(engine.agent, "config", {}), dict)
-                else None,
+                "seed": (
+                    getattr(engine.agent, "config", {}).get("seed")
+                    if isinstance(getattr(engine.agent, "config", {}), dict)
+                    else None
+                ),
                 "run_config_hash": run_cfg_hash,
                 "task_hash": task_meta.get("input_hash"),
                 "env_fingerprint": run_meta.get("env"),
@@ -144,11 +169,20 @@ class _TraceRuntime(Generic[StateT]):
         engine = self.engine
         llm = getattr(engine.agent, "llm", None)
         model_name = getattr(llm, "model", None) if llm is not None else None
-        parser_name = engine.parser.__class__.__name__ if engine.parser is not None else (
-            engine.agent.model_parser.__class__.__name__ if getattr(engine.agent, "model_parser", None) is not None else None
+        protocol = engine.resolve_protocol() if hasattr(engine, "resolve_protocol") else None
+        parser_name = (
+            engine.parser.__class__.__name__
+            if engine.parser is not None
+            else (
+                engine.agent.model_parser.__class__.__name__
+                if getattr(engine.agent, "model_parser", None) is not None
+                else None
+            )
         )
         tools = []
-        if engine.tool_registry is not None and hasattr(engine.tool_registry, "list_tools"):
+        if engine.tool_registry is not None and hasattr(
+            engine.tool_registry, "list_tools"
+        ):
             try:
                 for name in engine.tool_registry.list_tools():
                     if hasattr(engine.tool_registry, "describe_tool"):
@@ -160,6 +194,7 @@ class _TraceRuntime(Generic[StateT]):
         env_info = engine._env_identity()
         return {
             "model_name": model_name,
+            "protocol": getattr(protocol, "id", None) if protocol is not None else None,
             "parser": parser_name,
             "tool_count": len(tools),
             "tools": tools,
@@ -167,7 +202,28 @@ class _TraceRuntime(Generic[StateT]):
             "context": engine._context_runtime.run_meta(llm),
         }
 
-    def build_task_result(self, state: StateT, task_obj: Optional[Task], started_at: float) -> TaskResult:
+    def record_parser_diagnostics(self, diagnostics: Dict[str, Any]) -> None:
+        severity = str(diagnostics.get("severity") or "")
+        if severity == "error":
+            self.parser_error_count += 1
+            code = str(diagnostics.get("code") or "unknown")
+            self.parser_error_codes[code] += 1
+        elif severity == "warning":
+            self.parser_warning_count += 1
+        if diagnostics.get("salvage_applied"):
+            self.parser_salvage_count += 1
+
+    def parser_summary(self) -> Dict[str, Any]:
+        return {
+            "error_count": self.parser_error_count,
+            "warning_count": self.parser_warning_count,
+            "salvage_count": self.parser_salvage_count,
+            "error_codes": dict(self.parser_error_codes),
+        }
+
+    def build_task_result(
+        self, state: StateT, task_obj: Optional[Task], started_at: float
+    ) -> TaskResult:
         stop_reason = state.stop_reason
         success = stop_reason in {
             StopReason.SUCCESS.value,
@@ -185,8 +241,16 @@ class _TraceRuntime(Generic[StateT]):
                     evidence=str(state.final_result or stop_reason or ""),
                 )
             )
-        workspace = getattr(self.engine.env, "workspace_root", None) if self.engine.env is not None else None
-        artifacts = task_obj.resolve_resources(workspace=workspace) if task_obj is not None else []
+        workspace = (
+            getattr(self.engine.env, "workspace_root", None)
+            if self.engine.env is not None
+            else None
+        )
+        artifacts = (
+            task_obj.resolve_resources(workspace=workspace)
+            if task_obj is not None
+            else []
+        )
         elapsed_seconds = max(0.0, time.monotonic() - started_at)
         return TaskResult(
             task_id=task_obj.id if task_obj is not None else "",
@@ -203,7 +267,10 @@ class _TraceRuntime(Generic[StateT]):
                 "completion_tokens_total": self.engine._context_runtime.completion_tokens_total,
                 "peak_context_occupancy_ratio": self.engine._context_runtime.peak_occupancy_ratio,
             },
-            metadata={"task_meta": self.task_meta(task_obj), "run_meta": self.run_meta()},
+            metadata={
+                "task_meta": self.task_meta(task_obj),
+                "run_meta": self.run_meta(),
+            },
         )
 
     def sanitize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -213,7 +280,11 @@ class _TraceRuntime(Generic[StateT]):
                 safe[key] = value
             elif isinstance(value, dict):
                 safe[key] = {
-                    str(k): (v if isinstance(v, (str, int, float, bool)) or v is None else repr(v))
+                    str(k): (
+                        v
+                        if isinstance(v, (str, int, float, bool)) or v is None
+                        else repr(v)
+                    )
                     for k, v in value.items()
                 }
             else:
@@ -280,7 +351,9 @@ class _TraceRuntime(Generic[StateT]):
         payload.setdefault("phase", ctx.phase.value)
         payload.setdefault("hook", method_name)
         payload.setdefault("task", ctx.task)
-        payload.setdefault("stop_reason", ctx.stop_reason or getattr(ctx.state, "stop_reason", None))
+        payload.setdefault(
+            "stop_reason", ctx.stop_reason or getattr(ctx.state, "stop_reason", None)
+        )
         payload.setdefault("ts", ctx.ts)
         payload.setdefault(
             "state_digest",
@@ -293,16 +366,32 @@ class _TraceRuntime(Generic[StateT]):
         payload.setdefault(
             "decision_digest",
             {
-                "mode": getattr(ctx.decision, "mode", None) if ctx.decision is not None else None,
-                "has_actions": bool(getattr(ctx.decision, "actions", None)) if ctx.decision is not None else False,
-                "has_final_answer": bool(getattr(ctx.decision, "final_answer", None)) if ctx.decision is not None else False,
+                "mode": (
+                    getattr(ctx.decision, "mode", None)
+                    if ctx.decision is not None
+                    else None
+                ),
+                "has_actions": (
+                    bool(getattr(ctx.decision, "actions", None))
+                    if ctx.decision is not None
+                    else False
+                ),
+                "has_final_answer": (
+                    bool(getattr(ctx.decision, "final_answer", None))
+                    if ctx.decision is not None
+                    else False
+                ),
             },
         )
         payload.setdefault(
             "action_digest",
             {
                 "result_count": len(ctx.action_results or []),
-                "tool_invocation_count": len(getattr(ctx.record, "tool_invocations", []) or []) if ctx.record is not None else 0,
+                "tool_invocation_count": (
+                    len(getattr(ctx.record, "tool_invocations", []) or [])
+                    if ctx.record is not None
+                    else 0
+                ),
             },
         )
         payload.setdefault("error", str(ctx.error) if ctx.error is not None else None)

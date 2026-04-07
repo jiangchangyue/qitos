@@ -36,7 +36,9 @@ class TokenBudgetSummaryHistory(History):
     ) -> List[HistoryMessage]:
         query = query or {}
         items = self._filter_messages(query)
-        max_items = int(query.get("max_items", len(items) if items else self.hard_window))
+        max_items = int(
+            query.get("max_items", len(items) if items else self.hard_window)
+        )
         if max_items > 0:
             items = items[-max_items:]
 
@@ -98,7 +100,11 @@ class TokenBudgetSummaryHistory(History):
                         "stage": "compact_skipped",
                         "before_tokens": before_tokens,
                         "after_tokens": self._estimate_tokens(result) + pending_tokens,
-                        "saved_tokens": max(0, before_tokens - (self._estimate_tokens(result) + pending_tokens)),
+                        "saved_tokens": max(
+                            0,
+                            before_tokens
+                            - (self._estimate_tokens(result) + pending_tokens),
+                        ),
                         "budget": budget,
                         "pending_tokens": pending_tokens,
                         "messages_before": len(items),
@@ -110,7 +116,9 @@ class TokenBudgetSummaryHistory(History):
                 }
             )
             self._pending_runtime_events = events
-            self._last_message_metadata = [self._metadata_for_message(m) for m in result]
+            self._last_message_metadata = [
+                self._metadata_for_message(m) for m in result
+            ]
             return result
 
         recent = items[-self.keep_last :]

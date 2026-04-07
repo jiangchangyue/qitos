@@ -66,7 +66,9 @@ class GaiaAdapter(BenchmarkAdapter):
     source: BenchmarkSource = field(init=False)
 
     def __post_init__(self) -> None:
-        self.source = BenchmarkSource(name="GAIA", split="validation", subset=self.default_subset)
+        self.source = BenchmarkSource(
+            name="GAIA", split="validation", subset=self.default_subset
+        )
 
     def load_huggingface_records(
         self,
@@ -79,13 +81,17 @@ class GaiaAdapter(BenchmarkAdapter):
         try:
             from datasets import load_dataset  # type: ignore
         except Exception as exc:  # pragma: no cover - dependency gate
-            raise RuntimeError("Missing optional dependency: datasets. Install with `pip install datasets`.") from exc
+            raise RuntimeError(
+                "Missing optional dependency: datasets. Install with `pip install datasets`."
+            ) from exc
 
         ds_kwargs: dict[str, Any] = {"split": split}
         if cache_dir:
             ds_kwargs["cache_dir"] = cache_dir
         selected_subset = subset if subset is not None else self.default_subset
-        repo_name = self.annotated_dataset_name if use_annotated_dataset else self.dataset_name
+        repo_name = (
+            self.annotated_dataset_name if use_annotated_dataset else self.dataset_name
+        )
 
         if selected_subset:
             dataset = load_dataset(repo_name, selected_subset, **ds_kwargs)
@@ -133,7 +139,9 @@ class GaiaAdapter(BenchmarkAdapter):
         try:
             from datasets import load_dataset  # type: ignore
         except Exception as exc:  # pragma: no cover - dependency gate
-            raise RuntimeError("Missing optional dependency: datasets. Install with `pip install datasets`.") from exc
+            raise RuntimeError(
+                "Missing optional dependency: datasets. Install with `pip install datasets`."
+            ) from exc
 
         ds_root = Path(local_dir or self.local_dir).expanduser()
         script_path = ds_root / "GAIA.py"
@@ -145,11 +153,18 @@ class GaiaAdapter(BenchmarkAdapter):
         rows: list[dict[str, Any]] = []
         for row in dataset:
             rec = dict(row)
-            normalized = self._normalize_record(rec, split=split, local_dir=str(ds_root))
+            normalized = self._normalize_record(
+                rec, split=split, local_dir=str(ds_root)
+            )
             rows.append(normalized)
         return rows
 
-    def to_tasks(self, records: Iterable[Mapping[str, Any]], split: str, limit: Optional[int] = None) -> list[Task]:
+    def to_tasks(
+        self,
+        records: Iterable[Mapping[str, Any]],
+        split: str,
+        limit: Optional[int] = None,
+    ) -> list[Task]:
         tasks: list[Task] = []
         for idx, row in enumerate(records):
             if limit is not None and idx >= int(limit):
@@ -158,10 +173,20 @@ class GaiaAdapter(BenchmarkAdapter):
         return tasks
 
     def to_task(self, record: Mapping[str, Any], split: str, idx: int) -> Task:
-        normalized = self._normalize_record(dict(record), split=split, local_dir=self.local_dir)
+        normalized = self._normalize_record(
+            dict(record), split=split, local_dir=self.local_dir
+        )
         question = _first_non_empty(
             record,
-            ["question", "Question", "problem", "prompt", "task", "query", "instruction"],
+            [
+                "question",
+                "Question",
+                "problem",
+                "prompt",
+                "task",
+                "query",
+                "instruction",
+            ],
         )
         if question is None:
             question = normalized.get("question")
@@ -175,11 +200,21 @@ class GaiaAdapter(BenchmarkAdapter):
             task_id = f"{self.task_prefix}_{split}_{idx:05d}"
 
         ref_answer = _first_non_empty(
-            normalized, ["true_answer", "final_answer", "Final answer", "answer", "gold_answer", "label"]
+            normalized,
+            [
+                "true_answer",
+                "final_answer",
+                "Final answer",
+                "answer",
+                "gold_answer",
+                "label",
+            ],
         )
         level = _first_non_empty(normalized, ["task", "level", "Level", "difficulty"])
         files = _normalize_files(
-            _first_non_empty(normalized, ["file_name", "file", "files", "attachments", "attachment"])
+            _first_non_empty(
+                normalized, ["file_name", "file", "files", "attachments", "attachment"]
+            )
         )
 
         resources = [
@@ -226,7 +261,9 @@ class GaiaAdapter(BenchmarkAdapter):
             metadata=metadata,
         )
 
-    def _normalize_record(self, record: dict[str, Any], split: str, local_dir: Optional[str]) -> dict[str, Any]:
+    def _normalize_record(
+        self, record: dict[str, Any], split: str, local_dir: Optional[str]
+    ) -> dict[str, Any]:
         """Normalize mixed GAIA schemas to one stable shape."""
         rec = dict(record)
         if "Question" in rec and "question" not in rec:
@@ -253,5 +290,7 @@ def load_gaia_tasks(
 ) -> list[Task]:
     """Convenience loader: Hugging Face GAIA -> list[Task]."""
     adapter = GaiaAdapter(default_subset=subset)
-    rows = adapter.load_huggingface_records(split=split, subset=subset, cache_dir=cache_dir)
+    rows = adapter.load_huggingface_records(
+        split=split, subset=subset, cache_dir=cache_dir
+    )
     return adapter.to_tasks(rows, split=split, limit=limit)

@@ -7,13 +7,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, HistoryPolicy, StateSchema, ToolRegistry
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    HistoryPolicy,
+    StateSchema,
+    ToolRegistry,
+)
 from qitos.kit import (
-    EditorToolSet,
+    CodingToolSet,
     MarkdownFileMemory,
     ReActSelfReflectionCritic,
     ReActTextParser,
-    RunCommand,
     format_action,
     render_prompt,
 )
@@ -61,11 +67,26 @@ class CodingState(StateSchema):
 
 
 class CodingMemoryReactAgent(AgentModule[CodingState, dict[str, Any], Action]):
-    def __init__(self, llm: Any, workspace_root: str, memory: MarkdownFileMemory | None = None):
+    def __init__(
+        self, llm: Any, workspace_root: str, memory: MarkdownFileMemory | None = None
+    ):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser(), memory=memory)
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry,
+            llm=llm,
+            model_parser=ReActTextParser(),
+            memory=memory,
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> CodingState:
         return CodingState(
@@ -77,7 +98,9 @@ class CodingMemoryReactAgent(AgentModule[CodingState, dict[str, Any], Action]):
         )
 
     def build_system_prompt(self, state: CodingState) -> str | None:
-        return render_prompt(SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()}
+        )
 
     def prepare(self, state: CodingState) -> str:
         lines = [
@@ -88,7 +111,9 @@ class CodingMemoryReactAgent(AgentModule[CodingState, dict[str, Any], Action]):
             f"Step: {state.current_step}/{state.max_steps}",
         ]
         if self.memory is not None:
-            memory_rows = self.memory.retrieve(query=None, state=state, observation=None) or []
+            memory_rows = (
+                self.memory.retrieve(query=None, state=state, observation=None) or []
+            )
             if memory_rows:
                 lines.append("Retrieved memory:")
                 for item in memory_rows[-4:]:
@@ -98,8 +123,17 @@ class CodingMemoryReactAgent(AgentModule[CodingState, dict[str, Any], Action]):
             lines.extend(state.scratchpad[-10:])
         return "\n".join(lines)
 
-    def reduce(self, state: CodingState, observation: dict[str, Any], decision: Decision[Action]) -> CodingState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: CodingState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> CodingState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -116,7 +150,9 @@ class CodingMemoryReactAgent(AgentModule[CodingState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

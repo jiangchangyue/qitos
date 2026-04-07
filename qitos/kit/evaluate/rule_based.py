@@ -20,7 +20,11 @@ class RuleBasedEvaluator(TrajectoryEvaluator):
         reasons: List[str] = []
         evidence: Dict[str, Any] = {}
 
-        summary = context.manifest.get("summary", {}) if isinstance(context.manifest, dict) else {}
+        summary = (
+            context.manifest.get("summary", {})
+            if isinstance(context.manifest, dict)
+            else {}
+        )
         stop_reason = str(summary.get("stop_reason", ""))
         final_result = summary.get("final_result")
 
@@ -65,4 +69,6 @@ class RuleBasedEvaluator(TrajectoryEvaluator):
                 "extras": payload,
             }
         )
-        return EvaluationResult(name=self.name, success=ok, score=score, reasons=reasons, evidence=evidence)
+        return EvaluationResult(
+            name=self.name, success=ok, score=score, reasons=reasons, evidence=evidence
+        )

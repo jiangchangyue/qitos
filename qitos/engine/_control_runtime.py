@@ -49,7 +49,11 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
         after = state.to_dict()
         engine._memory_append("next_state", after, record.step_id)
         record.state_diff = engine._compute_state_diff(before, after)
-        engine._emit(record.step_id, RuntimePhase.REDUCE, payload={"stage": "state_reduced", "state_diff": record.state_diff})
+        engine._emit(
+            record.step_id,
+            RuntimePhase.REDUCE,
+            payload={"stage": "state_reduced", "state_diff": record.state_diff},
+        )
         engine._dispatch_hook(
             "on_after_reduce",
             engine._hook_context(
@@ -79,17 +83,33 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
                 record=record,
             ),
         )
-        engine._emit(record.step_id, RuntimePhase.CRITIC, payload={"stage": "start", "critic_count": len(engine.critics)})
+        engine._emit(
+            record.step_id,
+            RuntimePhase.CRITIC,
+            payload={"stage": "start", "critic_count": len(engine.critics)},
+        )
         outputs: List[Dict[str, Any]] = []
         for critic in engine.critics:
             out = critic.evaluate(state, record.decision, record.action_results)
-            outputs.append(out if isinstance(out, dict) else {"action": "continue", "reason": "invalid_critic_output"})
+            outputs.append(
+                out
+                if isinstance(out, dict)
+                else {"action": "continue", "reason": "invalid_critic_output"}
+            )
         record.critic_outputs = outputs
-        engine._emit(record.step_id, RuntimePhase.CRITIC, payload={"stage": "outputs", "critic_outputs": outputs})
+        engine._emit(
+            record.step_id,
+            RuntimePhase.CRITIC,
+            payload={"stage": "outputs", "critic_outputs": outputs},
+        )
         for output in outputs:
             action = str(output.get("action", "continue"))
             if action == "stop":
-                engine._emit(record.step_id, RuntimePhase.CRITIC, payload={"stage": "stop", "reason": output.get("reason")})
+                engine._emit(
+                    record.step_id,
+                    RuntimePhase.CRITIC,
+                    payload={"stage": "stop", "reason": output.get("reason")},
+                )
                 engine._dispatch_hook(
                     "on_after_critic",
                     engine._hook_context(
@@ -104,7 +124,11 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
                 )
                 return "stop"
             if action == "retry":
-                engine._emit(record.step_id, RuntimePhase.CRITIC, payload={"stage": "retry", "reason": output.get("reason")})
+                engine._emit(
+                    record.step_id,
+                    RuntimePhase.CRITIC,
+                    payload={"stage": "retry", "reason": output.get("reason")},
+                )
                 engine._dispatch_hook(
                     "on_after_critic",
                     engine._hook_context(
@@ -133,7 +157,13 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
         )
         return "continue"
 
-    def run_check_stop(self, state: StateT, decision: Decision[ActionT], step_id: int, started_at: float) -> bool:
+    def run_check_stop(
+        self,
+        state: StateT,
+        decision: Decision[ActionT],
+        step_id: int,
+        started_at: float,
+    ) -> bool:
         engine = self.engine
         engine._dispatch_hook(
             "on_before_check_stop",
@@ -144,32 +174,56 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
                 decision=decision,
             ),
         )
-        engine._emit(state.current_step, RuntimePhase.CHECK_STOP, payload={"stage": "start"})
+        engine._emit(
+            state.current_step, RuntimePhase.CHECK_STOP, payload={"stage": "start"}
+        )
 
         if decision.mode == "final":
             state.set_stop(StopReason.FINAL, decision.final_answer)
-            self._finish_check_stop(step_id=step_id, state=state, decision=decision, stop=True)
+            self._finish_check_stop(
+                step_id=step_id, state=state, decision=decision, stop=True
+            )
             return True
         if engine.agent.should_stop(state):
             if state.stop_reason is None:
                 state.set_stop(StopReason.AGENT_CONDITION)
-            self._finish_check_stop(step_id=step_id, state=state, decision=decision, stop=True)
+            self._finish_check_stop(
+                step_id=step_id, state=state, decision=decision, stop=True
+            )
             return True
-        if engine.env is not None and engine.env.is_terminal(state=state, last_result=engine._last_env_result):
+        if engine.env is not None and engine.env.is_terminal(
+            state=state, last_result=engine._last_env_result
+        ):
             if state.stop_reason is None:
                 state.set_stop(StopReason.ENV_TERMINAL)
-            self._finish_check_stop(step_id=step_id, state=state, decision=decision, stop=True, extra_payload={"env_terminal": True})
+            self._finish_check_stop(
+                step_id=step_id,
+                state=state,
+                decision=decision,
+                stop=True,
+                extra_payload={"env_terminal": True},
+            )
             return True
 
         elapsed = time.monotonic() - started_at
-        should_stop, reason, detail = self.should_stop_by_criteria(state, step_id, elapsed)
+        should_stop, reason, detail = self.should_stop_by_criteria(
+            state, step_id, elapsed
+        )
         if should_stop:
             if state.stop_reason is None:
                 state.set_stop(reason or StopReason.UNRECOVERABLE_ERROR)
-            self._finish_check_stop(step_id=step_id, state=state, decision=decision, stop=True, extra_payload={"stop_detail": detail})
+            self._finish_check_stop(
+                step_id=step_id,
+                state=state,
+                decision=decision,
+                stop=True,
+                extra_payload={"stop_detail": detail},
+            )
             return True
 
-        self._finish_check_stop(step_id=step_id, state=state, decision=decision, stop=False)
+        self._finish_check_stop(
+            step_id=step_id, state=state, decision=decision, stop=False
+        )
         return False
 
     def _finish_check_stop(
@@ -191,7 +245,11 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
                 payload.update(extra_payload)
             engine._emit(state.current_step, RuntimePhase.CHECK_STOP, payload=payload)
         else:
-            engine._emit(state.current_step, RuntimePhase.CHECK_STOP, payload={"stage": "continue"})
+            engine._emit(
+                state.current_step,
+                RuntimePhase.CHECK_STOP,
+                payload={"stage": "continue"},
+            )
         engine._dispatch_hook(
             "on_after_check_stop",
             engine._hook_context(
@@ -236,7 +294,9 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
             if elapsed > engine.budget.max_runtime_seconds:
                 state.set_stop(StopReason.BUDGET_TIME)
                 return True
-        if engine.budget.max_tokens is not None and engine._token_usage >= int(engine.budget.max_tokens):
+        if engine.budget.max_tokens is not None and engine._token_usage >= int(
+            engine.budget.max_tokens
+        ):
             state.set_stop(StopReason.BUDGET_TOKENS)
             return True
         return False

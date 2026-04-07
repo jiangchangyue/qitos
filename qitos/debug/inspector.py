@@ -34,7 +34,9 @@ class InspectorPayload:
         }
 
 
-def build_inspector_payload(step: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None) -> InspectorPayload:
+def build_inspector_payload(
+    step: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None
+) -> InspectorPayload:
     decision = step.get("decision") or {}
     stop_reason = None
     if isinstance(manifest, dict):
@@ -56,10 +58,16 @@ def build_inspector_payload(step: Dict[str, Any], manifest: Optional[Dict[str, A
     )
 
 
-def compare_steps(base_step: Dict[str, Any], other_step: Dict[str, Any]) -> Dict[str, Any]:
+def compare_steps(
+    base_step: Dict[str, Any], other_step: Dict[str, Any]
+) -> Dict[str, Any]:
     """Return a compact comparison payload for two step snapshots."""
     fields = ["decision", "actions", "action_results", "critic_outputs", "state_diff"]
-    diff: Dict[str, Any] = {"step_a": base_step.get("step_id"), "step_b": other_step.get("step_id"), "changes": {}}
+    diff: Dict[str, Any] = {
+        "step_a": base_step.get("step_id"),
+        "step_b": other_step.get("step_id"),
+        "changes": {},
+    }
     for field in fields:
         a = base_step.get(field)
         b = other_step.get(field)

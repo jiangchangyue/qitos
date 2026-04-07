@@ -12,7 +12,9 @@ from qitos.evaluate import EvaluationContext, EvaluationResult, TrajectoryEvalua
 class ModelBasedEvaluator(TrajectoryEvaluator):
     name: str = "model_based"
     llm: Any = None
-    rubric: str = "Judge whether the agent solved the task. Return JSON: {\"success\": bool, \"score\": number, \"reason\": str}."
+    rubric: str = (
+        'Judge whether the agent solved the task. Return JSON: {"success": bool, "score": number, "reason": str}.'
+    )
 
     def evaluate(self, context: EvaluationContext) -> EvaluationResult:
         if self.llm is None:
@@ -26,10 +28,15 @@ class ModelBasedEvaluator(TrajectoryEvaluator):
 
         prompt = self._build_prompt(context)
         try:
-            raw = self.llm([
-                {"role": "system", "content": "You are a strict trajectory evaluator."},
-                {"role": "user", "content": prompt},
-            ])
+            raw = self.llm(
+                [
+                    {
+                        "role": "system",
+                        "content": "You are a strict trajectory evaluator.",
+                    },
+                    {"role": "user", "content": prompt},
+                ]
+            )
             text = str(raw)
             parsed = self._parse_jsonish(text)
             success = bool(parsed.get("success", False))
@@ -53,7 +60,11 @@ class ModelBasedEvaluator(TrajectoryEvaluator):
             )
 
     def _build_prompt(self, context: EvaluationContext) -> str:
-        summary = context.manifest.get("summary", {}) if isinstance(context.manifest, dict) else {}
+        summary = (
+            context.manifest.get("summary", {})
+            if isinstance(context.manifest, dict)
+            else {}
+        )
         return "\n".join(
             [
                 self.rubric,

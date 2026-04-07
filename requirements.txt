@@ -1,12 +1,12 @@
-# Runtime dependencies for examples/templates
-openai>=1.0.0
-pyyaml>=6.0
-requests>=2.31.0
-beautifulsoup4>=4.12.3
+# Core source install for working from a local clone of QitOS.
+#
+# This keeps setup.py as the single source of truth for runtime dependencies
+# while still giving contributors and evaluators a one-command install path:
+#   pip install -r requirements.txt
+#
+# For optional provider SDKs and contributor tooling, use:
+#   pip install -r requirements-dev.txt
+#   pip install -e ".[models]"
+#   pip install -e ".[benchmarks]"
 
-# Development dependencies
-pytest>=7.0.0
-pytest-cov>=4.0.0
-black>=23.0.0
-flake8>=6.0.0
-mypy>=1.0.0
+-e .

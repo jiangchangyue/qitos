@@ -62,7 +62,9 @@ class SkillToolSet:
         )
 
     @tool(name="install_skill_hub")
-    def install_skill_hub(self, hub_url: str, runtime_context: Optional[dict[str, Any]] = None) -> str:
+    def install_skill_hub(
+        self, hub_url: str, runtime_context: Optional[dict[str, Any]] = None
+    ) -> str:
         """
         Install a skill hub manifest from a local or remote provider URL.
 
@@ -139,7 +141,9 @@ class SkillToolSet:
         return f"Skill '{skill_ref}' is not installed."
 
     @tool(name="list_installed_skills")
-    def list_installed_skills(self, runtime_context: Optional[dict[str, Any]] = None) -> str:
+    def list_installed_skills(
+        self, runtime_context: Optional[dict[str, Any]] = None
+    ) -> str:
         """
         List all skills installed in the current workspace context.
 
@@ -195,13 +199,19 @@ class SkillToolSet:
             lines.append(f"Homepage: {described.homepage}")
         return "\n".join(lines)
 
-    def _manager_from_runtime(self, runtime_context: Optional[dict[str, Any]]) -> SkillManager:
+    def _manager_from_runtime(
+        self, runtime_context: Optional[dict[str, Any]]
+    ) -> SkillManager:
         runtime_context = runtime_context or {}
         env = runtime_context.get("env")
         workspace_root = self.workspace_root
         if workspace_root is None and env is not None:
             workspace_root = getattr(env, "workspace_root", None)
-        if self._manager is None or (workspace_root and Path(workspace_root).resolve() != Path(self.manager.workspace_root or ".").resolve()):
+        if self._manager is None or (
+            workspace_root
+            and Path(workspace_root).resolve()
+            != Path(self.manager.workspace_root or ".").resolve()
+        ):
             self._manager = SkillManager(
                 workspace_root=workspace_root,
                 registry=self.registry,

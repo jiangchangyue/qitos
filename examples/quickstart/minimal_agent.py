@@ -34,11 +34,19 @@ class MinimalAgent(AgentModule[CalcState, dict[str, Any], Action]):
 
     def decide(self, state: CalcState, observation: dict[str, Any]) -> Decision[Action]:
         if state.current_step == 0:
-            return Decision.act([Action(name="add", args={"a": 40, "b": 2})], rationale="compute_answer")
+            return Decision.act(
+                [Action(name="add", args={"a": 40, "b": 2})], rationale="compute_answer"
+            )
         return Decision.final("42")
 
-    def reduce(self, state: CalcState, observation: dict[str, Any], decision: Decision[Action]) -> CalcState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self, state: CalcState, observation: dict[str, Any], decision: Decision[Action]
+    ) -> CalcState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if action_results:
             state.final_result = str(action_results[0])
         return state

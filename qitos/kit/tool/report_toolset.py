@@ -25,18 +25,54 @@ class ReportToolSet:
 
     # MITRE ATT&CK Enterprise Tactics
     ATTACK_TACTICS = {
-        "TA0001": {"name": "Initial Access", "description": "The adversary is trying to get into your network."},
-        "TA0002": {"name": "Execution", "description": "The adversary is trying to run malicious code."},
-        "TA0003": {"name": "Persistence", "description": "The adversary is trying to maintain their foothold."},
-        "TA0004": {"name": "Privilege Escalation", "description": "The adversary is trying to gain higher-level permissions."},
-        "TA0005": {"name": "Defense Evasion", "description": "The adversary is trying to avoid being detected."},
-        "TA0006": {"name": "Credential Access", "description": "The adversary is trying to steal account names and passwords."},
-        "TA0007": {"name": "Discovery", "description": "The adversary is trying to figure out your environment."},
-        "TA0008": {"name": "Lateral Movement", "description": "The adversary is trying to move into your network."},
-        "TA0009": {"name": "Collection", "description": "The adversary is trying to gather data of interest."},
-        "TA0010": {"name": "Exfiltration", "description": "The adversary is trying to steal data."},
-        "TA0011": {"name": "Command and Control", "description": "The adversary is trying to communicate with compromised systems."},
-        "TA0040": {"name": "Impact", "description": "The adversary is trying to manipulate, interrupt, or destroy your systems and data."},
+        "TA0001": {
+            "name": "Initial Access",
+            "description": "The adversary is trying to get into your network.",
+        },
+        "TA0002": {
+            "name": "Execution",
+            "description": "The adversary is trying to run malicious code.",
+        },
+        "TA0003": {
+            "name": "Persistence",
+            "description": "The adversary is trying to maintain their foothold.",
+        },
+        "TA0004": {
+            "name": "Privilege Escalation",
+            "description": "The adversary is trying to gain higher-level permissions.",
+        },
+        "TA0005": {
+            "name": "Defense Evasion",
+            "description": "The adversary is trying to avoid being detected.",
+        },
+        "TA0006": {
+            "name": "Credential Access",
+            "description": "The adversary is trying to steal account names and passwords.",
+        },
+        "TA0007": {
+            "name": "Discovery",
+            "description": "The adversary is trying to figure out your environment.",
+        },
+        "TA0008": {
+            "name": "Lateral Movement",
+            "description": "The adversary is trying to move into your network.",
+        },
+        "TA0009": {
+            "name": "Collection",
+            "description": "The adversary is trying to gather data of interest.",
+        },
+        "TA0010": {
+            "name": "Exfiltration",
+            "description": "The adversary is trying to steal data.",
+        },
+        "TA0011": {
+            "name": "Command and Control",
+            "description": "The adversary is trying to communicate with compromised systems.",
+        },
+        "TA0040": {
+            "name": "Impact",
+            "description": "The adversary is trying to manipulate, interrupt, or destroy your systems and data.",
+        },
     }
 
     # Common ATT&CK Technique to Tactic mappings
@@ -123,10 +159,19 @@ class ReportToolSet:
         with open(findings_path, "w") as f:
             json.dump(self._findings, f, indent=2, default=str)
 
-    @tool(name='finding_add')
-    def finding_add(self, title: str, severity: str = "medium", description: str = "",
-                    evidence: str = "", affected_component: str = "", remediation: str = "",
-                    cve: str = "", attack_technique: str = "", references: List[str] = None) -> Dict[str, Any]:
+    @tool(name="finding_add")
+    def finding_add(
+        self,
+        title: str,
+        severity: str = "medium",
+        description: str = "",
+        evidence: str = "",
+        affected_component: str = "",
+        remediation: str = "",
+        cve: str = "",
+        attack_technique: str = "",
+        references: List[str] = None,
+    ) -> Dict[str, Any]:
         """
         Add a security finding to the report.
 
@@ -146,7 +191,10 @@ class ReportToolSet:
         """
         valid_severities = ["critical", "high", "medium", "low", "info"]
         if severity.lower() not in valid_severities:
-            return {"status": "error", "message": f"Invalid severity '{severity}'. Choose from: {', '.join(valid_severities)}"}
+            return {
+                "status": "error",
+                "message": f"Invalid severity '{severity}'. Choose from: {', '.join(valid_severities)}",
+            }
 
         findings = self._load_findings()
 
@@ -169,7 +217,9 @@ class ReportToolSet:
             tech = self.TECHNIQUE_MAP[attack_technique]
             finding["attack_technique_name"] = tech["name"]
             finding["attack_tactic_id"] = tech["tactic"]
-            finding["attack_tactic_name"] = self.ATTACK_TACTICS.get(tech["tactic"], {}).get("name", "Unknown")
+            finding["attack_tactic_name"] = self.ATTACK_TACTICS.get(
+                tech["tactic"], {}
+            ).get("name", "Unknown")
 
         findings.append(finding)
         self._save_findings()
@@ -197,7 +247,7 @@ class ReportToolSet:
             "data": {"finding_id": finding["id"], "finding": finding},
         }
 
-    @tool(name='attack_map')
+    @tool(name="attack_map")
     def attack_map(self, techniques: List[str] = None) -> Dict[str, Any]:
         """
         Map findings and techniques to the MITRE ATT&CK framework.
@@ -225,7 +275,9 @@ class ReportToolSet:
             if tech_id in self.TECHNIQUE_MAP:
                 tech = self.TECHNIQUE_MAP[tech_id]
                 tactic_id = tech["tactic"]
-                tactic_info = self.ATTACK_TACTICS.get(tactic_id, {"name": "Unknown", "description": ""})
+                tactic_info = self.ATTACK_TACTICS.get(
+                    tactic_id, {"name": "Unknown", "description": ""}
+                )
 
                 if tactic_id not in tactic_mapping:
                     tactic_mapping[tactic_id] = {
@@ -244,8 +296,12 @@ class ReportToolSet:
                 technique_entry = {
                     "id": tech_id,
                     "name": tech["name"],
-                    "related_finding": related_finding.get("id") if related_finding else None,
-                    "severity": related_finding.get("severity") if related_finding else "info",
+                    "related_finding": (
+                        related_finding.get("id") if related_finding else None
+                    ),
+                    "severity": (
+                        related_finding.get("severity") if related_finding else "info"
+                    ),
                 }
 
                 if technique_entry not in tactic_mapping[tactic_id]["techniques"]:
@@ -258,7 +314,9 @@ class ReportToolSet:
             output += "Add findings with `attack_technique` parameter or specify techniques directly.\n\n"
             output += "**Available techniques for mapping:**\n\n"
             for tech_id, tech in sorted(self.TECHNIQUE_MAP.items()):
-                tactic_name = self.ATTACK_TACTICS.get(tech["tactic"], {}).get("name", "Unknown")
+                tactic_name = self.ATTACK_TACTICS.get(tech["tactic"], {}).get(
+                    "name", "Unknown"
+                )
                 output += f"- `{tech_id}`: {tech['name']} ({tactic_name})\n"
 
             return {
@@ -292,13 +350,17 @@ class ReportToolSet:
             "data": {
                 "tactics": {k: v for k, v in ordered_tactics},
                 "technique_count": total_techniques,
-            }
+            },
         }
 
-    @tool(name='summary_generate')
-    def summary_generate(self, title: str = "Security Assessment Report",
-                         target: str = "", scope: str = "",
-                         assessor: str = "") -> Dict[str, Any]:
+    @tool(name="summary_generate")
+    def summary_generate(
+        self,
+        title: str = "Security Assessment Report",
+        target: str = "",
+        scope: str = "",
+        assessor: str = "",
+    ) -> Dict[str, Any]:
         """
         Generate an executive summary from all recorded findings.
 
@@ -320,8 +382,12 @@ class ReportToolSet:
             severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
         total = sum(severity_counts.values())
-        risk_score = (severity_counts["critical"] * 10 + severity_counts["high"] * 5 +
-                      severity_counts["medium"] * 2 + severity_counts["low"] * 1)
+        risk_score = (
+            severity_counts["critical"] * 10
+            + severity_counts["high"] * 5
+            + severity_counts["medium"] * 2
+            + severity_counts["low"] * 1
+        )
 
         # Risk rating
         if risk_score >= 30:
@@ -344,7 +410,9 @@ class ReportToolSet:
             output += f"## Scope\n\n{scope}\n\n"
 
         output += f"## Executive Summary\n\n"
-        output += f"A security assessment was conducted against the target environment. "
+        output += (
+            f"A security assessment was conducted against the target environment. "
+        )
         output += f"The assessment identified **{total}** findings across {len(set(f.get('affected_component', '') for f in findings))} components.\n\n"
 
         output += f"### Risk Score: {risk_rating} ({risk_score})\n\n"
@@ -361,7 +429,9 @@ class ReportToolSet:
         output += f"| **Total** | **{total}** | |\n\n"
 
         # Top critical/high findings
-        critical_high = [f for f in findings if f.get("severity") in ("critical", "high")]
+        critical_high = [
+            f for f in findings if f.get("severity") in ("critical", "high")
+        ]
         if critical_high:
             output += f"### Critical & High Severity Findings\n\n"
             for f in critical_high[:10]:
@@ -380,12 +450,18 @@ class ReportToolSet:
         output += f"### Key Recommendations\n\n"
         recommendations = []
         for f in findings:
-            if f.get("remediation") and f.get("severity") in ("critical", "high", "medium"):
-                recommendations.append({
-                    "title": f["title"],
-                    "severity": f["severity"],
-                    "remediation": f["remediation"],
-                })
+            if f.get("remediation") and f.get("severity") in (
+                "critical",
+                "high",
+                "medium",
+            ):
+                recommendations.append(
+                    {
+                        "title": f["title"],
+                        "severity": f["severity"],
+                        "remediation": f["remediation"],
+                    }
+                )
 
         # Sort by severity
         sev_order = {"critical": 0, "high": 1, "medium": 2}
@@ -409,11 +485,13 @@ class ReportToolSet:
                 "risk_score": risk_score,
                 "risk_rating": risk_rating,
                 "summary_text": output,
-            }
+            },
         }
 
-    @tool(name='generate_report')
-    def generate_report(self, format: str = "markdown", output_file: str = "") -> Dict[str, Any]:
+    @tool(name="generate_report")
+    def generate_report(
+        self, format: str = "markdown", output_file: str = ""
+    ) -> Dict[str, Any]:
         """
         Generate a comprehensive security assessment report.
 
@@ -431,7 +509,9 @@ class ReportToolSet:
         if not output_file:
             timestamp = self._utc_now().strftime("%Y%m%d_%H%M%S")
             ext = "md" if format == "markdown" else "json"
-            output_file = os.path.join(self._workspace_root, f"security_report_{timestamp}.{ext}")
+            output_file = os.path.join(
+                self._workspace_root, f"security_report_{timestamp}.{ext}"
+            )
 
         if format == "json":
             report_data = {
@@ -446,7 +526,9 @@ class ReportToolSet:
 
             for f in findings:
                 sev = f.get("severity", "info")
-                report_data["summary"]["by_severity"][sev] = report_data["summary"]["by_severity"].get(sev, 0) + 1
+                report_data["summary"]["by_severity"][sev] = (
+                    report_data["summary"]["by_severity"].get(sev, 0) + 1
+                )
 
             with open(output_file, "w") as f:
                 json.dump(report_data, f, indent=2, default=str)
@@ -478,13 +560,17 @@ class ReportToolSet:
         # Findings by Severity
         report += "## Findings by Severity\n\n"
         sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-        sorted_findings = sorted(findings, key=lambda f: sev_order.get(f.get("severity", "info"), 5))
+        sorted_findings = sorted(
+            findings, key=lambda f: sev_order.get(f.get("severity", "info"), 5)
+        )
 
         for sev in ["critical", "high", "medium", "low", "info"]:
             sev_findings = [f for f in sorted_findings if f.get("severity") == sev]
             if sev_findings:
                 sev_info = self._severity_to_cvss(sev)
-                report += f"### {sev_info['color']} {sev.upper()} ({len(sev_findings)})\n\n"
+                report += (
+                    f"### {sev_info['color']} {sev.upper()} ({len(sev_findings)})\n\n"
+                )
                 for f in sev_findings:
                     report += f"- **{f['id']}: {f['title']}**"
                     if f.get("affected_component"):
@@ -525,14 +611,20 @@ class ReportToolSet:
 
         # ATT&CK Mapping
         report += "## MITRE ATT&CK Mapping\n\n"
-        techniques_found = [f["attack_technique"] for f in findings if f.get("attack_technique")]
+        techniques_found = [
+            f["attack_technique"] for f in findings if f.get("attack_technique")
+        ]
         if techniques_found:
             by_tactic = {}
             for tech_id in techniques_found:
                 if tech_id in self.TECHNIQUE_MAP:
                     tech = self.TECHNIQUE_MAP[tech_id]
-                    tactic_name = self.ATTACK_TACTICS.get(tech["tactic"], {}).get("name", "Unknown")
-                    by_tactic.setdefault(tactic_name, []).append(f"{tech_id}: {tech['name']}")
+                    tactic_name = self.ATTACK_TACTICS.get(tech["tactic"], {}).get(
+                        "name", "Unknown"
+                    )
+                    by_tactic.setdefault(tactic_name, []).append(
+                        f"{tech_id}: {tech['name']}"
+                    )
 
             for tactic, techs in by_tactic.items():
                 report += f"**{tactic}:**\n"
@@ -558,11 +650,13 @@ class ReportToolSet:
             "data": {
                 "output_file": output_file,
                 "finding_count": len(findings),
-            }
+            },
         }
 
-    @tool(name='finding_export')
-    def finding_export(self, format: str = "json", output_file: str = "") -> Dict[str, Any]:
+    @tool(name="finding_export")
+    def finding_export(
+        self, format: str = "json", output_file: str = ""
+    ) -> Dict[str, Any]:
         """
         Export all findings in various formats.
 
@@ -580,26 +674,48 @@ class ReportToolSet:
         findings = self._load_findings()
 
         if not findings:
-            return {"status": "error", "message": "No findings to export. Add findings first using finding_add."}
+            return {
+                "status": "error",
+                "message": "No findings to export. Add findings first using finding_add.",
+            }
 
         if not output_file:
             timestamp = self._utc_now().strftime("%Y%m%d_%H%M%S")
-            ext_map = {"json": "json", "csv": "csv", "sarif": "sarif.json", "summary": "txt"}
+            ext_map = {
+                "json": "json",
+                "csv": "csv",
+                "sarif": "sarif.json",
+                "summary": "txt",
+            }
             ext = ext_map.get(format, "txt")
-            output_file = os.path.join(self._workspace_root, f"findings_export_{timestamp}.{ext}")
+            output_file = os.path.join(
+                self._workspace_root, f"findings_export_{timestamp}.{ext}"
+            )
 
         if format == "json":
             with open(output_file, "w") as f:
                 json.dump(findings, f, indent=2, default=str)
 
         elif format == "csv":
-            headers = ["id", "title", "severity", "affected_component", "cve", "attack_technique", "remediation"]
+            headers = [
+                "id",
+                "title",
+                "severity",
+                "affected_component",
+                "cve",
+                "attack_technique",
+                "remediation",
+            ]
             with open(output_file, "w") as f:
                 f.write(",".join(headers) + "\n")
                 for finding in findings:
                     values = []
                     for h in headers:
-                        val = str(finding.get(h, "")).replace('"', '""').replace('\n', ' ')
+                        val = (
+                            str(finding.get(h, ""))
+                            .replace('"', '""')
+                            .replace("\n", " ")
+                        )
                         values.append(f'"{val}"')
                     f.write(",".join(values) + "\n")
 
@@ -607,17 +723,32 @@ class ReportToolSet:
             sarif = {
                 "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
                 "version": "2.1.0",
-                "runs": [{
-                    "tool": {"driver": {"name": "Security Assessment", "version": "1.0.0"}},
-                    "results": [],
-                }],
+                "runs": [
+                    {
+                        "tool": {
+                            "driver": {
+                                "name": "Security Assessment",
+                                "version": "1.0.0",
+                            }
+                        },
+                        "results": [],
+                    }
+                ],
             }
-            severity_map = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}
+            severity_map = {
+                "critical": "error",
+                "high": "error",
+                "medium": "warning",
+                "low": "note",
+                "info": "note",
+            }
             for finding in findings:
                 result = {
                     "ruleId": finding["id"],
                     "level": severity_map.get(finding.get("severity", "info"), "note"),
-                    "message": {"text": finding.get("description", finding.get("title", ""))},
+                    "message": {
+                        "text": finding.get("description", finding.get("title", ""))
+                    },
                     "properties": {
                         "title": finding.get("title", ""),
                         "severity": finding.get("severity", "info"),
@@ -633,7 +764,16 @@ class ReportToolSet:
 
         elif format == "summary":
             lines = []
-            for f in sorted(findings, key=lambda x: {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}.get(x.get("severity", "info"), 5)):
+            for f in sorted(
+                findings,
+                key=lambda x: {
+                    "critical": 0,
+                    "high": 1,
+                    "medium": 2,
+                    "low": 3,
+                    "info": 4,
+                }.get(x.get("severity", "info"), 5),
+            ):
                 lines.append(f"[{f['severity'].upper()}] {f['id']}: {f['title']}")
                 if f.get("affected_component"):
                     lines.append(f"  Component: {f['affected_component']}")
@@ -647,7 +787,10 @@ class ReportToolSet:
                 f.write("\n".join(lines))
 
         else:
-            return {"status": "error", "message": f"Unsupported format '{format}'. Choose from: json, csv, sarif, summary"}
+            return {
+                "status": "error",
+                "message": f"Unsupported format '{format}'. Choose from: json, csv, sarif, summary",
+            }
 
         output = f"### 📤 Findings Exported\n\n"
         output += f"**Format:** {format.upper()}\n"
@@ -662,7 +805,7 @@ class ReportToolSet:
                 "output_file": output_file,
                 "format": format,
                 "finding_count": len(findings),
-            }
+            },
         }
 
 

@@ -70,9 +70,15 @@ class ThinkingToolSet:
         :param needs_more_thoughts: Whether the current total should be expanded.
         """
         if thought_number < 1:
-            return {"status": "error", "message": "thought_number must be a positive integer"}
+            return {
+                "status": "error",
+                "message": "thought_number must be a positive integer",
+            }
         if total_thoughts < 1:
-            return {"status": "error", "message": "total_thoughts must be a positive integer"}
+            return {
+                "status": "error",
+                "message": "total_thoughts must be a positive integer",
+            }
         if thought_number > total_thoughts:
             total_thoughts = thought_number
 
@@ -87,7 +93,9 @@ class ThinkingToolSet:
                 }
 
         if branch_from_thought is not None:
-            if branch_from_thought < 1 or branch_from_thought > len(self.thought_history):
+            if branch_from_thought < 1 or branch_from_thought > len(
+                self.thought_history
+            ):
                 return {
                     "status": "error",
                     "message": (
@@ -152,7 +160,10 @@ class ThinkingToolSet:
         return {
             "status": "success",
             "history": [asdict(item) for item in self.thought_history],
-            "branches": {bid: [asdict(item) for item in items] for bid, items in self.branches.items()},
+            "branches": {
+                bid: [asdict(item) for item in items]
+                for bid, items in self.branches.items()
+            },
             "history_count": len(self.thought_history),
             "branch_count": len(self.branches),
         }

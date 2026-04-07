@@ -36,7 +36,9 @@ def test_parser_and_critic_impls():
     d2 = ReActTextParser().parse("Thought: done now\nFinal Answer: done")
     assert d2.mode == "final"
     assert d2.rationale == "done now"
-    d2b = ReActTextParser().parse("Thought: x\nAction: {'name': 'add', 'args': {'a': 2, 'b': 3}}")
+    d2b = ReActTextParser().parse(
+        "Thought: x\nAction: {'name': 'add', 'args': {'a': 2, 'b': 3}}"
+    )
     assert d2b.mode == "act"
     assert d2b.actions[0]["name"] == "add"
     assert d2b.rationale == "x"
@@ -59,12 +61,56 @@ def test_parser_and_critic_impls():
     assert out["action"] == "continue"
 
 
+def test_built_in_parsers_return_structured_diagnostics_for_recoverable_failures():
+    react = ReActTextParser().parse("Thought: I should inspect more closely.")
+    assert react.mode == "wait"
+    assert react.meta["parser_error"] is True
+    assert react.meta["parser_diagnostics"]["code"] == "missing_action_or_final"
+    assert "Action:" in react.meta["parser_feedback"]
+
+    js = JsonDecisionParser().parse("not valid json")
+    assert js.mode == "wait"
+    assert js.meta["parser_error"] is True
+    assert js.meta["parser_diagnostics"]["code"] == "invalid_json"
+    assert "Return valid JSON" in js.meta["parser_feedback"]
+
+    xml = XmlDecisionParser().parse("<decision><think>x</think>")
+    assert xml.mode == "wait"
+    assert xml.meta["parser_error"] is True
+    assert xml.meta["parser_diagnostics"]["code"] in {
+        "invalid_xml",
+        "missing_action_or_final",
+    }
+    assert (
+        "Return XML" in xml.meta["parser_feedback"]
+        or "Return well-formed XML" in xml.meta["parser_feedback"]
+    )
+
+
+def test_json_decision_parser_salvages_wrapped_json_like_blocks():
+    raw = """Here is the decision block:
+
+```json
+{'thought': 'use search', 'action': {'name': 'web_search', 'args': {'query': 'vim modeline security'}}}
+```
+
+No additional notes.
+"""
+    decision = JsonDecisionParser().parse(raw)
+    assert decision.mode == "act"
+    assert decision.actions[0]["name"] == "web_search"
+    assert decision.meta["parser_diagnostics"]["extraction_mode"] == "python_literal"
+    assert decision.meta["parser_diagnostics"]["salvage_applied"] is True
+
+
 def test_func_parser_handles_nested_and_truncated_calls():
     s = "a=1, payload={'x':[1,2,3], 'y':'k,v'}, html='<div>(x)</div>', flag=true"
     parts = split_args_robust(s)
     assert len(parts) == 4
 
-    parsed = parse_first_action_invocation("Thought: x\nAction: tool(a=1, b='x,y', c={'k':[1,2]})")
+    parsed = parse_first_action_invocation(
+        "Thought: x\nAction: tool(a=1, b='x,y', c={'k':[1,2]})"
+    )
     assert parsed is not None
     assert parsed["name"] == "tool"
     assert parsed["args"]["a"] == 1
@@ -72,7 +118,9 @@ def test_func_parser_handles_nested_and_truncated_calls():
     assert parsed["args"]["c"]["k"] == [1, 2]
 
     # truncated tail: still recover partial kwargs
-    parsed2 = parse_first_action_invocation("Action: extract_web_text(html='<html><body>abc', max_chars=5000")
+    parsed2 = parse_first_action_invocation(
+        "Action: extract_web_text(html='<html><body>abc', max_chars=5000"
+    )
     assert parsed2 is not None
     assert parsed2["name"] == "extract_web_text"
     assert parsed2["args"]["max_chars"] == 5000
@@ -98,7 +146,11 @@ def test_parser_custom_keywords_and_reflection():
     assert d2.actions[0]["name"] == "run_command"
 
     js = '{"thinking":"ponder", "reflection":"double check", "action":"write_file(filename=\\"x.md\\", content=\\"ok\\")"}'
-    d3 = JsonDecisionParser(thought_keys=("thinking",), reflection_keys=("reflection",), action_keys=("action",)).parse(js)
+    d3 = JsonDecisionParser(
+        thought_keys=("thinking",),
+        reflection_keys=("reflection",),
+        action_keys=("action",),
+    ).parse(js)
     assert d3.mode == "act"
     assert d3.rationale == "ponder"
     assert d3.meta.get("reflection") == "double check"

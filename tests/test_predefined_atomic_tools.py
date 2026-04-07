@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
-import warnings
 from pathlib import Path
 
 from qitos.core.tool_registry import ToolRegistry
 from qitos.kit.tool.advanced import AdvancedCodingToolSet
-from qitos.kit.tool.experimental.security_research import SecurityAuditToolSet, security_audit_tools, security_research_tools
+from qitos.kit.tool.experimental.security_research import (
+    SecurityAuditToolSet,
+    security_audit_tools,
+    security_research_tools,
+)
 from qitos.kit.tool import (
-    CodebaseToolSet,
     CodingToolSet,
     NotebookToolSet,
     ReportToolSet,
@@ -27,28 +29,36 @@ from qitos.kit.tool.tools import advanced_coding_tools
 def test_codebase_toolset_glob_grep_read_append(tmp_path):
     root = tmp_path
     (root / "src").mkdir()
-    (root / "src" / "a.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    (root / "src" / "a.py").write_text(
+        "def add(a, b):\n    return a + b\n", encoding="utf-8"
+    )
     (root / "src" / "b.md").write_text("hello world\nhello qitos\n", encoding="utf-8")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        toolset = CodebaseToolSet(workspace_root=str(root))
+    toolset = CodingToolSet(
+        workspace_root=str(root),
+        include_notebook=False,
+        enable_lsp=False,
+        enable_tasks=False,
+        enable_web=False,
+        expose_modern_names=False,
+        profile="codebase",
+    )
 
-    glob_out = toolset.glob_files.run(pattern="*.py")
+    glob_out = toolset.glob_files(pattern="*.py")
     assert glob_out["status"] == "success"
     assert glob_out["files"] == ["src/a.py"]
 
-    grep_out = toolset.grep_files.run(pattern="hello", glob="*.md", regex=False)
+    grep_out = toolset.grep_files(pattern="hello", glob="*.md", regex=False)
     assert grep_out["status"] == "success"
     assert grep_out["num_matches"] == 2
     assert grep_out["matches"][0]["path"] == "src/b.md"
 
-    read_out = toolset.read_file_range.run(filename="src/a.py", offset=1, limit=1)
+    read_out = toolset.read_file_range(filename="src/a.py", offset=1, limit=1)
     assert read_out["status"] == "success"
     assert read_out["lines"][0]["line"] == 2
     assert "return a + b" in read_out["content"]
 
-    append_out = toolset.append_file.run(filename="src/b.md", content="extra\n")
+    append_out = toolset.append_file(filename="src/b.md", content="extra\n")
     assert append_out["status"] == "success"
     assert (root / "src" / "b.md").read_text(encoding="utf-8").endswith("extra\n")
 
@@ -57,7 +67,13 @@ def test_notebook_toolset_read_replace_insert(tmp_path):
     nb = {
         "cells": [
             {"cell_type": "markdown", "metadata": {}, "source": ["# Title\n"]},
-            {"cell_type": "code", "metadata": {}, "source": ["print('hi')\n"], "outputs": [], "execution_count": None},
+            {
+                "cell_type": "code",
+                "metadata": {},
+                "source": ["print('hi')\n"],
+                "outputs": [],
+                "execution_count": None,
+            },
         ],
         "metadata": {},
         "nbformat": 4,
@@ -71,10 +87,14 @@ def test_notebook_toolset_read_replace_insert(tmp_path):
     assert read_out["status"] == "success"
     assert read_out["cells"][0]["cell_type"] == "markdown"
 
-    replace_out = toolset.replace_notebook_cell.run(path="demo.ipynb", cell_index=1, source="print('bye')\n")
+    replace_out = toolset.replace_notebook_cell.run(
+        path="demo.ipynb", cell_index=1, source="print('bye')\n"
+    )
     assert replace_out["status"] == "success"
 
-    insert_out = toolset.insert_notebook_cell.run(path="demo.ipynb", cell_type="markdown", source="## Next\n", index=1)
+    insert_out = toolset.insert_notebook_cell.run(
+        path="demo.ipynb", cell_type="markdown", source="## Next\n", index=1
+    )
     assert insert_out["status"] == "success"
 
     updated = json.loads(path.read_text(encoding="utf-8"))
@@ -84,9 +104,18 @@ def test_notebook_toolset_read_replace_insert(tmp_path):
 
 
 def test_web_fetch_extracts_text(monkeypatch):
-    toolset = CodingToolSet(include_notebook=False, enable_lsp=False, enable_tasks=False, enable_web=True)
+    toolset = CodingToolSet(
+        include_notebook=False, enable_lsp=False, enable_tasks=False, enable_web=True
+    )
 
-    def _fake_get(url: str, params=None, headers=None, timeout=None, verify_tls=True, allow_redirects=True):
+    def _fake_get(
+        url: str,
+        params=None,
+        headers=None,
+        timeout=None,
+        verify_tls=True,
+        allow_redirects=True,
+    ):
         _ = params
         _ = headers
         _ = timeout
@@ -144,17 +173,32 @@ def test_predefined_registry_builders_expose_atomic_tools(tmp_path):
     assert "audit_hotspots" in audit_registry.list_tools()
 
     reg = ToolRegistry()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        reg.register_toolset(CodebaseToolSet(workspace_root=str(tmp_path)))
-    assert reg.describe_tool("codebase.read_file_range")["origin"]["source"] == "toolset"
+    reg.register_toolset(
+        CodingToolSet(
+            workspace_root=str(tmp_path),
+            include_notebook=False,
+            enable_lsp=False,
+            enable_tasks=False,
+            enable_web=False,
+            expose_modern_names=False,
+            profile="codebase",
+        ),
+        namespace="codebase",
+    )
+    assert (
+        reg.describe_tool("codebase.read_file_range")["origin"]["source"] == "toolset"
+    )
 
 
 def test_coding_toolset_collects_editor_shell_and_codebase(tmp_path):
     toolset = CodingToolSet(workspace_root=str(tmp_path))
     names = []
     for item in toolset.tools():
-        names.append(getattr(item, "name", getattr(getattr(item, "__func__", None), "__name__", "")))
+        names.append(
+            getattr(
+                item, "name", getattr(getattr(item, "__func__", None), "__name__", "")
+            )
+        )
     assert "run_command" in names
     assert "view" in names
     assert "glob_files" in names
@@ -176,7 +220,11 @@ def test_tool_descriptions_come_from_docstrings():
     assert ":param filename:" in write_file["description"]
 
     registry = web_tools()
-    spec = next(item for item in registry.get_all_specs() if item["function"]["name"] == "extract_web_text")
+    spec = next(
+        item
+        for item in registry.get_all_specs()
+        if item["function"]["name"] == "extract_web_text"
+    )
     assert "Extract readable text from raw HTML." in spec["function"]["description"]
     assert ":param html:" in spec["function"]["description"]
 
@@ -185,18 +233,21 @@ def test_tool_descriptions_come_from_docstrings():
     assert ":param a:" in math_spec["description"]
 
 
-def test_legacy_tool_adapters_emit_deprecation_warnings(tmp_path):
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        _ = CodebaseToolSet(workspace_root=str(tmp_path))
-    messages = [str(item.message) for item in caught]
-    assert any("CodebaseToolSet is deprecated" in message for message in messages)
+def test_tool_package_only_exposes_canonical_toolsets():
+    exported = set(__import__("qitos.kit.tool", fromlist=["__all__"]).__all__)
+    assert "CodingToolSet" in exported
+    assert "CodebaseToolSet" not in exported
+    assert "EditorToolSet" not in exported
+    assert "RunCommand" not in exported
+    assert "WriteFile" not in exported
 
 
 def test_task_toolset_persists_board_updates(tmp_path):
     toolset = TaskToolSet(workspace_root=str(tmp_path))
 
-    create = toolset.task_create.run(subject="Implement planner", description="Break the work into phases")
+    create = toolset.task_create.run(
+        subject="Implement planner", description="Break the work into phases"
+    )
     assert create["status"] == "success"
     task_id = create["task"]["id"]
 
@@ -211,7 +262,9 @@ def test_task_toolset_persists_board_updates(tmp_path):
     assert update["task"]["blocks"] == ["child-a"]
     assert update["task"]["metadata"]["priority"] == "high"
 
-    note = toolset.task_append_note.run(task_id=task_id, text="Initial decomposition finished", kind="progress")
+    note = toolset.task_append_note.run(
+        task_id=task_id, text="Initial decomposition finished", kind="progress"
+    )
     assert note["status"] == "success"
 
     fetched = toolset.task_get.run(task_id=task_id)

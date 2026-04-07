@@ -45,7 +45,9 @@ class ToTState(StateSchema):
 class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.register_toolset(EpubToolSet(workspace_root=workspace_root), namespace="epub")
+        registry.register_toolset(
+            EpubToolSet(workspace_root=workspace_root), namespace="epub"
+        )
         super().__init__(tool_registry=registry, llm=llm)
 
     def init_state(self, task: str, **kwargs: Any) -> ToTState:
@@ -58,7 +60,10 @@ class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
 
     def decide(self, state: ToTState, observation: dict[str, Any]):
         if state.current_step == 0:
-            return Decision.act([Action(name="epub.list_chapters", args={"path": state.epub_path})], rationale="bootstrap_catalog")
+            return Decision.act(
+                [Action(name="epub.list_chapters", args={"path": state.epub_path})],
+                rationale="bootstrap_catalog",
+            )
 
         raw = self.llm(
             [
@@ -76,11 +81,24 @@ class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
         parsed = self._parse_json(str(raw))
         if not parsed:
             return Decision.act(
-                [Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})],
+                [
+                    Action(
+                        name="epub.search",
+                        args={
+                            "path": state.epub_path,
+                            "query": state.question,
+                            "top_k": 3,
+                        },
+                    )
+                ],
                 rationale="fallback_search",
             )
 
-        if bool(parsed.get("can_answer")) and str(parsed.get("answer", "")).strip() and len(state.evidence) >= 2:
+        if (
+            bool(parsed.get("can_answer"))
+            and str(parsed.get("answer", "")).strip()
+            and len(state.evidence) >= 2
+        ):
             return Decision.final(answer=str(parsed["answer"]))
 
         candidates: list[Decision[Action]] = []
@@ -104,13 +122,28 @@ class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
 
         if not candidates:
             return Decision.act(
-                [Action(name="epub.search", args={"path": state.epub_path, "query": state.question, "top_k": 3})],
+                [
+                    Action(
+                        name="epub.search",
+                        args={
+                            "path": state.epub_path,
+                            "query": state.question,
+                            "top_k": 3,
+                        },
+                    )
+                ],
                 rationale="fallback_search",
             )
         return Decision.branch(candidates=candidates, rationale="tot_branch")
 
-    def reduce(self, state: ToTState, observation: dict[str, Any], decision: Decision[Action]) -> ToTState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self, state: ToTState, observation: dict[str, Any], decision: Decision[Action]
+    ) -> ToTState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -154,7 +187,9 @@ class ToTAgent(AgentModule[ToTState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

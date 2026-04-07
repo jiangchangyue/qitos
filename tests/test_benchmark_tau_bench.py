@@ -19,7 +19,9 @@ def test_tau_adapter_to_tasks_from_records():
         },
     ]
 
-    adapter = TauBenchAdapter(env_name="retail", task_split="test", include_raw_record=False)
+    adapter = TauBenchAdapter(
+        env_name="retail", task_split="test", include_raw_record=False
+    )
     tasks = adapter.to_tasks(records, split="test")
 
     assert len(tasks) == 2

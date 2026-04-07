@@ -81,9 +81,17 @@ class StepRecord:
     phase_events: List[RuntimeEvent] = field(default_factory=list)
     observation: Any = None
     decision: Any = None
+    model_response: Dict[str, Any] = field(default_factory=dict)
     actions: List[Any] = field(default_factory=list)
     action_results: List[Any] = field(default_factory=list)
     tool_invocations: List[Any] = field(default_factory=list)
     critic_outputs: List[Any] = field(default_factory=list)
     state_diff: Dict[str, Any] = field(default_factory=dict)
     context: Dict[str, Any] = field(default_factory=dict)
+    protocol_id: Optional[str] = None
+    parser_selected: Optional[str] = None
+    parser_fallback_used: bool = False
+    parser_attempts: List[Dict[str, Any]] = field(default_factory=list)
+    parser_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    parser_contract: Optional[str] = None
+    parser_salvage_applied: bool = False

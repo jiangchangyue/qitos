@@ -40,7 +40,9 @@ def test_metric_registry_basic_and_pass_at_k():
         MetricInput(task_id="b", trial=0, success=True, reward=1.0),
         MetricInput(task_id="b", trial=1, success=True, reward=1.0),
     ]
-    registry = MetricRegistry([SuccessRateMetric(), AverageRewardMetric(), PassAtKMetric(k=1)])
+    registry = MetricRegistry(
+        [SuccessRateMetric(), AverageRewardMetric(), PassAtKMetric(k=1)]
+    )
     reports = {r.name: r for r in registry.compute_all(rows)}
 
     assert "success_rate" in reports

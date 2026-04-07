@@ -249,6 +249,14 @@ Rules:
 - If the task is complete, emit `<task_complete>true</task_complete>`.
 """
 
+MINIMAX_TOOL_CALL_SYSTEM_PROMPT = """You are an AI assistant that uses MiniMax-style native tool calls.
+
+You may call tools with <minimax:tool_call> and <invoke> blocks.
+When the task is complete, emit a completion response instead of additional tool calls.
+
+Do not emit markdown fences or commentary outside the required protocol format.
+"""
+
 TERMINUS_TIMEOUT_PROMPT = """Previous command:
 {command}
 
@@ -274,4 +282,5 @@ __all__ = [
     "TERMINUS_JSON_SYSTEM_PROMPT",
     "TERMINUS_XML_SYSTEM_PROMPT",
     "TERMINUS_TIMEOUT_PROMPT",
+    "MINIMAX_TOOL_CALL_SYSTEM_PROMPT",
 ]

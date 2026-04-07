@@ -15,7 +15,14 @@ from qitos.core.env import Env, EnvObservation, EnvStepResult, TerminalCapabilit
 class TmuxTerminalCapability(TerminalCapability):
     """Interactive terminal ops backed by a local tmux session."""
 
-    def __init__(self, session_name: str, cwd: str = ".", *, auto_start: bool = True, auto_kill: bool = True):
+    def __init__(
+        self,
+        session_name: str,
+        cwd: str = ".",
+        *,
+        auto_start: bool = True,
+        auto_kill: bool = True,
+    ):
         self.session_name = session_name
         self.cwd = str(Path(cwd).resolve())
         self.auto_start = bool(auto_start)
@@ -56,7 +63,12 @@ class TmuxTerminalCapability(TerminalCapability):
         if not self.is_session_alive():
             return
         if self.auto_kill and self._started_here:
-            subprocess.run(["tmux", "kill-session", "-t", self.session_name], capture_output=True, text=True, check=False)
+            subprocess.run(
+                ["tmux", "kill-session", "-t", self.session_name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
     def send_keys(
         self,
@@ -77,7 +89,9 @@ class TmuxTerminalCapability(TerminalCapability):
             if result.returncode != 0:
                 return {
                     "status": "error",
-                    "error": (result.stderr or result.stdout or "tmux send-keys failed").strip(),
+                    "error": (
+                        result.stderr or result.stdout or "tmux send-keys failed"
+                    ).strip(),
                     "session_name": self.session_name,
                 }
         wait_seconds = float(min_timeout_sec or 0.0)
@@ -136,7 +150,9 @@ class TmuxTerminalCapability(TerminalCapability):
             check=False,
         )
         if result.returncode != 0:
-            raise RuntimeError((result.stderr or result.stdout or "tmux capture-pane failed").strip())
+            raise RuntimeError(
+                (result.stderr or result.stdout or "tmux capture-pane failed").strip()
+            )
         return result.stdout
 
     def _normalize_keys(self, keys: str | list[str]) -> list[str]:
@@ -194,7 +210,9 @@ class TmuxEnv(Env):
         auto_kill: bool = True,
     ):
         self.workspace_root = str(Path(workspace_root).resolve())
-        self.session_name = session_name or f"qitos_{Path(self.workspace_root).name or 'terminal'}"
+        self.session_name = (
+            session_name or f"qitos_{Path(self.workspace_root).name or 'terminal'}"
+        )
         self.auto_kill = bool(auto_kill)
         self.terminal = terminal or TmuxTerminalCapability(
             session_name=self.session_name,
@@ -204,7 +222,9 @@ class TmuxEnv(Env):
         )
         self._last_error: Optional[str] = None
 
-    def setup(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> None:
+    def setup(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> None:
         if workspace:
             self.workspace_root = str(Path(workspace).resolve())
         Path(self.workspace_root).mkdir(parents=True, exist_ok=True)
@@ -212,7 +232,9 @@ class TmuxEnv(Env):
         if callable(reset):
             reset(cwd=self.workspace_root)
 
-    def reset(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> EnvObservation:
+    def reset(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> EnvObservation:
         self.setup(task=task, workspace=workspace, **kwargs)
         self._last_error = None
         return self.observe(state=None)
@@ -242,7 +264,9 @@ class TmuxEnv(Env):
         obs = self.observe(state=state)
         terminal = obs.data.get("terminal", {}) if isinstance(obs.data, dict) else {}
         alive = bool(terminal.get("session_alive", False))
-        error = self._last_error or (None if alive else f"terminal session is not alive: {self.session_name}")
+        error = self._last_error or (
+            None if alive else f"terminal session is not alive: {self.session_name}"
+        )
         return EnvStepResult(
             observation=obs,
             done=not alive,
@@ -253,8 +277,15 @@ class TmuxEnv(Env):
 
     def health_check(self) -> Dict[str, Any]:
         if shutil.which("tmux") is None:
-            return {"ok": False, "message": "tmux is not installed or not available on PATH"}
-        return {"ok": True, "workspace_root": self.workspace_root, "session_name": self.session_name}
+            return {
+                "ok": False,
+                "message": "tmux is not installed or not available on PATH",
+            }
+        return {
+            "ok": True,
+            "workspace_root": self.workspace_root,
+            "session_name": self.session_name,
+        }
 
     def get_ops(self, group: str) -> Any:
         if group == "terminal":

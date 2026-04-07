@@ -21,6 +21,7 @@ class HookContext:
     env_view: Optional[Dict[str, Any]] = None
     observation: Any = None
     decision: Any = None
+    model_response: Optional[Dict[str, Any]] = None
     action_results: List[Any] = field(default_factory=list)
     record: Optional[StepRecord] = None
     payload: Dict[str, Any] = field(default_factory=dict)
@@ -96,7 +97,9 @@ class EngineHook:
     ) -> None:
         pass
 
-    def on_step_end(self, record: StepRecord, state: StateSchema, engine: "Engine") -> None:
+    def on_step_end(
+        self, record: StepRecord, state: StateSchema, engine: "Engine"
+    ) -> None:
         pass
 
 

@@ -25,7 +25,7 @@ QitOS gives you a clean `AgentModule + Engine` kernel, benchmark-ready workflows
 From the repository root:
 
 ```bash
-pip install qitos
+pip install -r requirements.txt
 export OPENAI_API_KEY="<your_api_key>"
 python examples/quickstart/minimal_agent.py
 qita board --logdir runs
@@ -164,13 +164,13 @@ QitOS is currently **Alpha**.
 
 - Supported Python version: **3.9+**
 - User install: `pip install qitos`
-- Repo quickstart: run examples from a clone of this repository
-- Source install: `pip install -e ".[dev,models,benchmarks]"`
+- Repo quickstart: `pip install -r requirements.txt`
+- Full contributor install: `pip install -r requirements-dev.txt`
 - Installation guide: [Installation](https://qitor.github.io/qitos/getting-started/installation/)
 
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, docs workflow, and PR expectations.
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for the PR process, [DEVELOPMENT.md](DEVELOPMENT.md) for the local workflow, [ARCHITECTURE.md](ARCHITECTURE.md) for system design, [SECURITY.md](SECURITY.md) for disclosure guidance, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
 
 ## License
 

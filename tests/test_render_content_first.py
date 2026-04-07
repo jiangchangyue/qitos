@@ -24,7 +24,11 @@ def test_content_first_renderer_core_blocks() -> None:
         channel="action",
         node="planned_actions",
         step_id=0,
-        payload={"actions": [{"name": "web_search", "args": {"query": "finding nemo fish species"}}]},
+        payload={
+            "actions": [
+                {"name": "web_search", "args": {"query": "finding nemo fish species"}}
+            ]
+        },
     )
     action = renderer.action_summary(action_evt)
     assert isinstance(action, dict)
@@ -39,7 +43,10 @@ def test_content_first_renderer_core_blocks() -> None:
             "action_results": [
                 {
                     "results": [
-                        {"title": "All fishes in Finding Nemo", "url": "https://example.com/nemo/fishes"},
+                        {
+                            "title": "All fishes in Finding Nemo",
+                            "url": "https://example.com/nemo/fishes",
+                        },
                     ]
                 }
             ]
@@ -55,15 +62,27 @@ def test_claude_style_hook_shows_context_state_without_dumping_messages() -> Non
     hook.console = Console(record=True, width=120)
 
     hook.on_render_event(
-        RenderEvent(channel="lifecycle", node="run_start", step_id=0, payload={"task": "demo task", "max_steps": 3})
+        RenderEvent(
+            channel="lifecycle",
+            node="run_start",
+            step_id=0,
+            payload={"task": "demo task", "max_steps": 3},
+        )
     )
-    hook.on_render_event(RenderEvent(channel="lifecycle", node="step_start", step_id=0, payload={}))
+    hook.on_render_event(
+        RenderEvent(channel="lifecycle", node="step_start", step_id=0, payload={})
+    )
     hook.on_render_event(
         RenderEvent(
             channel="observation",
             node="observation",
             step_id=0,
-            payload={"observation": {"scratchpad": ["a", "b"], "memory": {"records": [1, 2, 3]}}},
+            payload={
+                "observation": {
+                    "scratchpad": ["a", "b"],
+                    "memory": {"records": [1, 2, 3]},
+                }
+            },
         )
     )
     hook.on_render_event(
@@ -73,7 +92,12 @@ def test_claude_style_hook_shows_context_state_without_dumping_messages() -> Non
             step_id=0,
             payload={
                 "messages": [{"role": "user", "content": "very long history"}],
-                "context": {"input_tokens_total": 512, "occupancy_ratio": 0.42, "history_tokens": 320, "output_tokens": 0},
+                "context": {
+                    "input_tokens_total": 512,
+                    "occupancy_ratio": 0.42,
+                    "history_tokens": 320,
+                    "output_tokens": 0,
+                },
             },
         )
     )
@@ -93,6 +117,104 @@ def test_claude_style_hook_shows_context_state_without_dumping_messages() -> Non
     assert "⦿" in text
     assert "web_search first" in text
     assert "very long history" not in text
+
+
+def test_content_first_renderer_extracts_parser_diagnostics() -> None:
+    renderer = ContentFirstRenderer(max_preview_chars=200)
+    evt = RenderEvent(
+        channel="parser",
+        node="parser_diagnostics",
+        step_id=0,
+        payload={
+            "diagnostics": {
+                "parser": "TerminusJsonParser",
+                "contract": "terminus_json_v1",
+                "severity": "error",
+                "code": "missing_required_field",
+                "summary": "Missing required field: tools",
+                "details": "Expected one of commands, tools, or task_complete=true.",
+                "extraction_mode": "extracted",
+                "repair_instruction": "Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.",
+                "raw_output_preview": '{"analysis":"x","plan":"y"}',
+            }
+        },
+    )
+    diag = renderer.parser_diagnostic_summary(evt)
+    assert isinstance(diag, dict)
+    assert diag.get("code") == "missing_required_field"
+    assert diag.get("extraction_mode") == "extracted"
+    assert "Return valid JSON" in str(diag.get("repair_instruction"))
+
+
+def test_claude_style_hook_renders_parser_diagnostics() -> None:
+    hook = ClaudeStyleHook(max_preview_chars=200)
+    hook.console = Console(record=True, width=120)
+    hook.on_render_event(
+        RenderEvent(
+            channel="parser",
+            node="parser_diagnostics",
+            step_id=0,
+            payload={
+                "diagnostics": {
+                    "parser": "TerminusJsonParser",
+                    "contract": "terminus_json_v1",
+                    "severity": "error",
+                    "code": "missing_required_field",
+                    "summary": "Missing required field: tools",
+                    "details": "Expected one of commands, tools, or task_complete=true.",
+                    "extraction_mode": "extracted",
+                    "repair_instruction": "Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.",
+                    "raw_output_preview": '{"analysis":"x","plan":"y"}',
+                }
+            },
+        )
+    )
+    text = hook.console.export_text()
+    assert "PARSER ERROR" in text
+    assert "missing_required_field" in text
+    assert "Missing required field: tools" in text
+    assert "Extraction:" in text
+    assert "extracted" in text
+
+
+def test_claude_style_hook_hides_salvaged_parser_warnings_by_default() -> None:
+    hook = ClaudeStyleHook(max_preview_chars=200)
+    hook.console = Console(record=True, width=120)
+    hook.on_render_event(
+        RenderEvent(
+            channel="parser",
+            node="parser_result",
+            step_id=0,
+            payload={
+                "has_diagnostics": True,
+                "severity": "warning",
+                "salvage_applied": True,
+            },
+        )
+    )
+    hook.on_render_event(
+        RenderEvent(
+            channel="parser",
+            node="parser_diagnostics",
+            step_id=0,
+            payload={
+                "diagnostics": {
+                    "parser": "TerminusJsonParser",
+                    "contract": "terminus_json_v1",
+                    "severity": "warning",
+                    "code": "salvaged_json_payload",
+                    "summary": "Parser warnings were recorded while reading Terminus JSON output.",
+                    "details": "AUTO-CORRECTED: extracted a JSON-like object from surrounding text.",
+                    "extraction_mode": "extracted",
+                    "salvage_applied": True,
+                    "salvage_summary": "AUTO-CORRECTED: extracted a JSON-like object from surrounding text.",
+                }
+            },
+        )
+    )
+    text = hook.console.export_text()
+    assert "PARSER WARNING" not in text
+    assert "repairing output contract" not in text.lower()
 
 
 def test_claude_style_hook_prints_agent_composition() -> None:

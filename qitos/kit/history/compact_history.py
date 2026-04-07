@@ -54,7 +54,9 @@ class MessageGrouper:
             groups.append(current)
         return groups
 
-    def _group_by_assistant_boundary(self, items: List[HistoryMessage]) -> List[List[HistoryMessage]]:
+    def _group_by_assistant_boundary(
+        self, items: List[HistoryMessage]
+    ) -> List[List[HistoryMessage]]:
         groups: List[List[HistoryMessage]] = []
         current: List[HistoryMessage] = []
         seen_assistant = False
@@ -110,15 +112,26 @@ class MicroCompactor:
                 "original_lines": newline_count + 1,
             }
         )
-        return HistoryMessage(role=message.role, content=compacted, step_id=message.step_id, metadata=metadata)
+        return HistoryMessage(
+            role=message.role,
+            content=compacted,
+            step_id=message.step_id,
+            metadata=metadata,
+        )
 
     def _infer_blob_kind(self, message: HistoryMessage, text: str) -> str:
         source = str(message.metadata.get("source", "")).strip().lower()
         role = str(message.role).strip().lower() or "message"
         lowered = text.lower()
-        if any(token in lowered for token in ("traceback", "stderr", "stdout", "returncode")):
+        if any(
+            token in lowered
+            for token in ("traceback", "stderr", "stdout", "returncode")
+        ):
             return "tool output"
-        if any(token in lowered for token in ("http", "<html", "```html", "response headers")):
+        if any(
+            token in lowered
+            for token in ("http", "<html", "```html", "response headers")
+        ):
             return "web/file result"
         if source:
             return f"{source} {role} message"
@@ -196,7 +209,9 @@ class SummaryCompactor:
             if len(assistant_notes) > 1:
                 lines.append(f"- Prior attempt: {assistant_notes[-2]}")
         last = messages[-1]
-        lines.append(f"- Pending: Continue from step {last.step_id} with the latest trajectory in mind.")
+        lines.append(
+            f"- Pending: Continue from step {last.step_id} with the latest trajectory in mind."
+        )
         return "\n".join(lines)[: int(self.config.summary_max_chars)]
 
 
@@ -226,7 +241,9 @@ class CompactionController:
         auto_compact: bool,
     ) -> tuple[List[HistoryMessage], List[Dict[str, Any]], List[Dict[str, Any]]]:
         events: List[Dict[str, Any]] = []
-        before_tokens = self._estimate_tokens(items) + self._estimate_text_tokens(pending_content)
+        before_tokens = self._estimate_tokens(items) + self._estimate_text_tokens(
+            pending_content
+        )
         warning_threshold = max(1, int(budget * float(self.config.warning_ratio)))
         metadata = [self._metadata_for_message(m) for m in items]
 
@@ -261,7 +278,9 @@ class CompactionController:
                             "after_tokens": before_tokens,
                             "saved_tokens": 0,
                             "budget": budget,
-                            "pending_tokens": self._estimate_text_tokens(pending_content),
+                            "pending_tokens": self._estimate_text_tokens(
+                                pending_content
+                            ),
                             "messages_before": len(items),
                             "messages_after": len(items),
                             "strategy": "compact_history",
@@ -283,7 +302,9 @@ class CompactionController:
                             "after_tokens": before_tokens,
                             "saved_tokens": 0,
                             "budget": budget,
-                            "pending_tokens": self._estimate_text_tokens(pending_content),
+                            "pending_tokens": self._estimate_text_tokens(
+                                pending_content
+                            ),
                             "messages_before": len(items),
                             "messages_after": len(items),
                             "strategy": "compact_history",
@@ -304,7 +325,9 @@ class CompactionController:
         if older:
             compacted_older = self.micro.compact(older)
             micro_candidate = [*compacted_older, *preserved]
-            after_micro_tokens = self._estimate_tokens(micro_candidate) + self._estimate_text_tokens(pending_content)
+            after_micro_tokens = self._estimate_tokens(
+                micro_candidate
+            ) + self._estimate_text_tokens(pending_content)
             if after_micro_tokens < before_tokens:
                 events.append(
                     {
@@ -315,21 +338,31 @@ class CompactionController:
                             "after_tokens": after_micro_tokens,
                             "saved_tokens": max(0, before_tokens - after_micro_tokens),
                             "budget": budget,
-                            "pending_tokens": self._estimate_text_tokens(pending_content),
+                            "pending_tokens": self._estimate_text_tokens(
+                                pending_content
+                            ),
                             "messages_before": len(items),
                             "messages_after": len(micro_candidate),
                             "strategy": "compact_history",
                             "warning_ratio": float(self.config.warning_ratio),
                             "messages_compacted": sum(
-                                1 for msg in compacted_older if msg.metadata.get("compaction_mode") == "micro"
+                                1
+                                for msg in compacted_older
+                                if msg.metadata.get("compaction_mode") == "micro"
                             ),
                         },
                     }
                 )
             if after_micro_tokens <= budget:
-                return micro_candidate, events, [self._metadata_for_message(m) for m in micro_candidate]
+                return (
+                    micro_candidate,
+                    events,
+                    [self._metadata_for_message(m) for m in micro_candidate],
+                )
 
-            summary_input = older if self._estimate_tokens(older) <= budget else compacted_older
+            summary_input = (
+                older if self._estimate_tokens(older) <= budget else compacted_older
+            )
             summary_text = self.summary.summarize(summary_input)
             summary_message = HistoryMessage(
                 role="system",
@@ -343,7 +376,9 @@ class CompactionController:
                 },
             )
             summary_candidate = [summary_message, *preserved]
-            after_summary_tokens = self._estimate_tokens(summary_candidate) + self._estimate_text_tokens(pending_content)
+            after_summary_tokens = self._estimate_tokens(
+                summary_candidate
+            ) + self._estimate_text_tokens(pending_content)
             events.append(
                 {
                     "stage": "context_history",
@@ -363,11 +398,19 @@ class CompactionController:
                     },
                 }
             )
-            trimmed_candidate = self._trim_to_budget(summary_candidate, budget=budget, pending_content=pending_content)
-            return trimmed_candidate, events, [self._metadata_for_message(m) for m in trimmed_candidate]
+            trimmed_candidate = self._trim_to_budget(
+                summary_candidate, budget=budget, pending_content=pending_content
+            )
+            return (
+                trimmed_candidate,
+                events,
+                [self._metadata_for_message(m) for m in trimmed_candidate],
+            )
 
         compacted = self.micro.compact(items)
-        after_tokens = self._estimate_tokens(compacted) + self._estimate_text_tokens(pending_content)
+        after_tokens = self._estimate_tokens(compacted) + self._estimate_text_tokens(
+            pending_content
+        )
         if after_tokens < before_tokens:
             events.append(
                 {
@@ -384,14 +427,20 @@ class CompactionController:
                         "strategy": "compact_history",
                         "warning_ratio": float(self.config.warning_ratio),
                         "messages_compacted": sum(
-                            1 for msg in compacted if msg.metadata.get("compaction_mode") == "micro"
+                            1
+                            for msg in compacted
+                            if msg.metadata.get("compaction_mode") == "micro"
                         ),
                     },
                 }
             )
-            return self._trim_to_budget(compacted, budget=budget, pending_content=pending_content), events, [
-                self._metadata_for_message(m) for m in compacted
-            ]
+            return (
+                self._trim_to_budget(
+                    compacted, budget=budget, pending_content=pending_content
+                ),
+                events,
+                [self._metadata_for_message(m) for m in compacted],
+            )
 
         if self.config.emit_skipped_events:
             events.append(
@@ -412,9 +461,15 @@ class CompactionController:
                     },
                 }
             )
-        return self._trim_to_budget(items, budget=budget, pending_content=pending_content), events, metadata
+        return (
+            self._trim_to_budget(items, budget=budget, pending_content=pending_content),
+            events,
+            metadata,
+        )
 
-    def _trim_to_budget(self, items: List[HistoryMessage], *, budget: int, pending_content: str) -> List[HistoryMessage]:
+    def _trim_to_budget(
+        self, items: List[HistoryMessage], *, budget: int, pending_content: str
+    ) -> List[HistoryMessage]:
         trimmed = list(items)
         summary_head: List[HistoryMessage] = []
         if trimmed and trimmed[0].metadata.get("summary"):
@@ -424,7 +479,12 @@ class CompactionController:
         if len(trimmed) > keep_tail:
             trimmed = trimmed[-keep_tail:]
         candidate = [*summary_head, *trimmed]
-        while len(trimmed) > 1 and self._estimate_tokens(candidate) + self._estimate_text_tokens(pending_content) > budget:
+        while (
+            len(trimmed) > 1
+            and self._estimate_tokens(candidate)
+            + self._estimate_text_tokens(pending_content)
+            > budget
+        ):
             trimmed.pop(0)
             candidate = [*summary_head, *trimmed]
         return [*summary_head, *trimmed]
@@ -491,7 +551,9 @@ class CompactHistory(History):
     ) -> List[HistoryMessage]:
         query = query or {}
         items = self._filter_messages(query)
-        max_items = int(query.get("max_items", len(items) if items else self.config.hard_window))
+        max_items = int(
+            query.get("max_items", len(items) if items else self.config.hard_window)
+        )
         if max_items > 0:
             items = items[-max_items:]
 

@@ -9,8 +9,7 @@ from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
 from qitos.kit.parser import ReActTextParser
 from qitos.kit.planning import append_log, format_action
 from qitos.kit.prompts import SWE_AGENT_SYSTEM_PROMPT, render_prompt
-from qitos.kit.tool.editor import EditorToolSet
-from qitos.kit.tool.shell import RunCommand
+from qitos.kit.tool import CodingToolSet
 from qitos.models import Model
 
 
@@ -27,9 +26,19 @@ class SWEState(StateSchema):
 class SWEAgentMini(AgentModule[SWEState, Dict[str, Any], Action]):
     def __init__(self, llm: Model, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> SWEState:
         return SWEState(
@@ -58,7 +67,11 @@ class SWEAgentMini(AgentModule[SWEState, Dict[str, Any], Action]):
         return None
 
     def build_system_prompt(self, state: SWEState) -> str | None:
-        tool_schema = self.tool_registry.get_tool_descriptions() if self.tool_registry is not None else ""
+        tool_schema = (
+            self.tool_registry.get_tool_descriptions()
+            if self.tool_registry is not None
+            else ""
+        )
         return render_prompt(SWE_AGENT_SYSTEM_PROMPT, {"tool_schema": tool_schema})
 
     def prepare(self, state: SWEState, observation: Dict[str, Any]) -> str:
@@ -86,11 +99,23 @@ class SWEAgentMini(AgentModule[SWEState, Dict[str, Any], Action]):
         action_results: List[Any],
     ) -> SWEState:
         if decision.rationale:
-            append_log(state, "scratchpad", f"Thought: {decision.rationale}", max_items=24)
+            append_log(
+                state, "scratchpad", f"Thought: {decision.rationale}", max_items=24
+            )
         if decision.actions:
-            append_log(state, "scratchpad", f"Action: {format_action(decision.actions[0])}", max_items=24)
+            append_log(
+                state,
+                "scratchpad",
+                f"Action: {format_action(decision.actions[0])}",
+                max_items=24,
+            )
         if action_results:
-            append_log(state, "scratchpad", f"Observation: {action_results[0]}", max_items=24)
-            if isinstance(action_results[0], dict) and "returncode" in action_results[0]:
+            append_log(
+                state, "scratchpad", f"Observation: {action_results[0]}", max_items=24
+            )
+            if (
+                isinstance(action_results[0], dict)
+                and "returncode" in action_results[0]
+            ):
                 state.last_test = action_results[0]
         return state

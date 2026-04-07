@@ -144,14 +144,10 @@ flowchart TB
 
 Use these as off-the-shelf components, similar to using `torch.nn` blocks.
 
-- Editor bundle:
-  - `EditorToolSet` (`view`, `create`, `str_replace`, `insert`, `search`, `list_tree`, `replace_lines`)
+- Canonical coding bundle:
+  - `CodingToolSet` (`view`, `create`, `str_replace`, `insert`, `search`, `list_tree`, `replace_lines`, `read_file`, `write_file`, `list_files`, `run_command`)
 - EPUB bundle:
   - `EpubToolSet` (`list_chapters`, `read_chapter`, `search`)
-- File tools:
-  - `WriteFile`, `ReadFile`, `ListFiles`
-- Process tool:
-  - `RunCommand`
 - HTTP/Web tools:
   - `HTTPRequest`, `HTTPGet`, `HTTPPost`, `HTMLExtractText`
 - Text-browser tools:
@@ -171,7 +167,7 @@ Use these as off-the-shelf components, similar to using `torch.nn` blocks.
 Import pattern:
 
 ```python
-from qitos.kit.tool import EditorToolSet, RunCommand, HTTPGet, ThinkingToolSet
+from qitos.kit.tool import CodingToolSet, HTTPGet, ThinkingToolSet
 ```
 
 ## Source Index

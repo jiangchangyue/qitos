@@ -25,8 +25,15 @@ class NumberedPlanBuilder:
     def __init__(self, system_prompt: str = "Return a numbered plan only."):
         self.system_prompt = system_prompt
 
-    def build(self, llm: Any, prompt: str, extra_messages: Optional[List[Dict[str, str]]] = None) -> List[str]:
-        messages: List[Dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+    def build(
+        self,
+        llm: Any,
+        prompt: str,
+        extra_messages: Optional[List[Dict[str, str]]] = None,
+    ) -> List[str]:
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": self.system_prompt}
+        ]
         if extra_messages:
             messages.extend(extra_messages)
         messages.append({"role": "user", "content": prompt})

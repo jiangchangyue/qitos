@@ -7,13 +7,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, HistoryPolicy, StateSchema, ToolRegistry
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    HistoryPolicy,
+    StateSchema,
+    ToolRegistry,
+)
 from qitos.kit import (
     CompactHistory,
-    EditorToolSet,
+    CodingToolSet,
     REACT_SYSTEM_PROMPT,
     ReActTextParser,
-    RunCommand,
     format_action,
     render_prompt,
 )
@@ -30,14 +36,24 @@ MAX_STEPS = 8
 class CompactReactState(StateSchema):
     scratchpad: list[str] = field(default_factory=list)
     target_file: str = "buggy_module.py"
-    test_command: str = 'python -c "import buggy_module; assert buggy_module.add(20, 22) == 42"'
+    test_command: str = (
+        'python -c "import buggy_module; assert buggy_module.add(20, 22) == 42"'
+    )
 
 
 class CompactReactAgent(AgentModule[CompactReactState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
         super().__init__(
             tool_registry=registry,
             llm=llm,
@@ -52,10 +68,15 @@ class CompactReactAgent(AgentModule[CompactReactState, dict[str, Any], Action]):
         )
 
     def init_state(self, task: str, **kwargs: Any) -> CompactReactState:
-        return CompactReactState(task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS)))
+        return CompactReactState(
+            task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS))
+        )
 
     def build_system_prompt(self, state: CompactReactState) -> str | None:
-        return render_prompt(REACT_SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            REACT_SYSTEM_PROMPT,
+            {"tool_schema": self.tool_registry.get_tool_descriptions()},
+        )
 
     def prepare(self, state: CompactReactState) -> str:
         lines = [
@@ -69,8 +90,17 @@ class CompactReactAgent(AgentModule[CompactReactState, dict[str, Any], Action]):
             lines.extend(state.scratchpad[-10:])
         return "\n".join(lines)
 
-    def reduce(self, state: CompactReactState, observation: dict[str, Any], decision: Decision[Action]) -> CompactReactState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: CompactReactState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> CompactReactState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -87,7 +117,9 @@ class CompactReactAgent(AgentModule[CompactReactState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

@@ -21,7 +21,9 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
     def __init__(self, engine: Any):
         self.engine = engine
 
-    def build_env_view(self, state: StateT, step_id: int, started_at: float) -> Dict[str, Any]:
+    def build_env_view(
+        self, state: StateT, step_id: int, started_at: float
+    ) -> Dict[str, Any]:
         engine = self.engine
         elapsed = time.monotonic() - started_at
         env_payload = self.env_payload()
@@ -36,10 +38,16 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             },
             "metadata": state.metadata,
             "env": env_payload,
-            "task": engine._active_task_obj.to_dict() if engine._active_task_obj is not None else {"objective": engine._active_task},
+            "task": (
+                engine._active_task_obj.to_dict()
+                if engine._active_task_obj is not None
+                else {"objective": engine._active_task}
+            ),
         }
 
-    def build_initial_observation(self, state: StateT, step_id: int, started_at: float) -> ObservationT:
+    def build_initial_observation(
+        self, state: StateT, step_id: int, started_at: float
+    ) -> ObservationT:
         env_view = self.build_env_view(state, step_id, started_at)
         obs = {
             "task": self.engine._active_task,
@@ -63,7 +71,9 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             "task": self.engine._active_task,
             "step": step_id,
             "state": state.to_dict(),
-            "decision": decision.to_dict() if hasattr(decision, "to_dict") else decision,
+            "decision": (
+                decision.to_dict() if hasattr(decision, "to_dict") else decision
+            ),
             "action_results": list(action_results),
             "env": env_view.get("env", {}),
         }
@@ -97,7 +107,9 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 "message": "Env is missing required ops groups",
                 "field": "env",
                 "details": {
-                    "env_name": getattr(engine.env, "name", engine.env.__class__.__name__),
+                    "env_name": getattr(
+                        engine.env, "name", engine.env.__class__.__name__
+                    ),
                     "missing_ops": missing,
                     "required_ops": sorted(required),
                 },
@@ -107,11 +119,17 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
     def collect_required_ops(self) -> set[str]:
         engine = self.engine
         required: set[str] = set()
-        if engine.tool_registry is None or not hasattr(engine.tool_registry, "list_tools"):
+        if engine.tool_registry is None or not hasattr(
+            engine.tool_registry, "list_tools"
+        ):
             return required
         try:
             for tool_name in engine.tool_registry.list_tools():
-                tool = engine.tool_registry.get(tool_name) if hasattr(engine.tool_registry, "get") else None
+                tool = (
+                    engine.tool_registry.get(tool_name)
+                    if hasattr(engine.tool_registry, "get")
+                    else None
+                )
                 spec = getattr(tool, "spec", None)
                 groups = getattr(spec, "required_ops", None)
                 if isinstance(groups, list):
@@ -131,7 +149,11 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 "code": "ENV_HEALTH_CHECK_EXCEPTION",
                 "message": f"Env health_check raised exception: {exc}",
                 "field": "env",
-                "details": {"env_name": getattr(engine.env, "name", engine.env.__class__.__name__)},
+                "details": {
+                    "env_name": getattr(
+                        engine.env, "name", engine.env.__class__.__name__
+                    )
+                },
             }
         if not isinstance(probe, dict):
             return None
@@ -144,27 +166,47 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             "details": probe,
         }
 
-    def setup_env(self, task_obj: Optional[Task], state: StateT, kwargs: Dict[str, Any]) -> None:
+    def setup_env(
+        self, task_obj: Optional[Task], state: StateT, kwargs: Dict[str, Any]
+    ) -> None:
         engine = self.engine
-        if engine.env is None and task_obj is not None and task_obj.env_spec is not None:
-            engine.env = self.build_env_from_spec(task_obj.env_spec, fallback_workspace=kwargs.get("workspace"))
+        if (
+            engine.env is None
+            and task_obj is not None
+            and task_obj.env_spec is not None
+        ):
+            engine.env = self.build_env_from_spec(
+                task_obj.env_spec, fallback_workspace=kwargs.get("workspace")
+            )
         if engine.env is None:
             return
         workspace = kwargs.get("workspace")
         reset_task: Any = task_obj if task_obj is not None else engine._active_task
-        resources = task_obj.resolve_resources(workspace=str(workspace) if workspace else None) if task_obj is not None else []
+        resources = (
+            task_obj.resolve_resources(workspace=str(workspace) if workspace else None)
+            if task_obj is not None
+            else []
+        )
         try:
             engine.env.setup(task=reset_task, workspace=workspace, resources=resources)
-            first = engine.env.reset(task=reset_task, workspace=workspace, resources=resources)
+            first = engine.env.reset(
+                task=reset_task, workspace=workspace, resources=resources
+            )
             if not isinstance(first, EnvObservation):
                 first = EnvObservation(data={"value": first})
             engine._last_env_observation = first
-            engine._last_env_result = EnvStepResult(observation=first, done=False, info={"source": "reset"})
+            engine._last_env_result = EnvStepResult(
+                observation=first, done=False, info={"source": "reset"}
+            )
         except Exception as exc:
             engine._last_env_observation = EnvObservation(data={"error": str(exc)})
-            engine._last_env_result = EnvStepResult(observation=engine._last_env_observation, done=False, error=str(exc))
+            engine._last_env_result = EnvStepResult(
+                observation=engine._last_env_observation, done=False, error=str(exc)
+            )
 
-    def build_env_from_spec(self, env_spec: EnvSpec, fallback_workspace: Any = None) -> Optional[Env]:
+    def build_env_from_spec(
+        self, env_spec: EnvSpec, fallback_workspace: Any = None
+    ) -> Optional[Env]:
         env_type = str(getattr(env_spec, "type", "")).strip().lower()
         config = getattr(env_spec, "config", {})
         if not isinstance(config, dict):
@@ -191,8 +233,12 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 container = str(config.get("container", "")).strip()
                 if not container:
                     return None
-                container_workspace = str(config.get("container_workspace") or workspace_root or "/workspace")
-                return DockerEnv(container=container, workspace_root=container_workspace)
+                container_workspace = str(
+                    config.get("container_workspace") or workspace_root or "/workspace"
+                )
+                return DockerEnv(
+                    container=container, workspace_root=container_workspace
+                )
             except Exception:
                 return None
         if env_type in {"tmux", "terminal"}:
@@ -201,7 +247,11 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
 
                 session_name = str(config.get("session_name") or "").strip() or None
                 auto_kill = bool(config.get("auto_kill", True))
-                return TmuxEnv(workspace_root=workspace_root, session_name=session_name, auto_kill=auto_kill)
+                return TmuxEnv(
+                    workspace_root=workspace_root,
+                    session_name=session_name,
+                    auto_kill=auto_kill,
+                )
             except Exception:
                 return None
         return None
@@ -215,7 +265,9 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
         except Exception:
             pass
 
-    def run_env_step(self, decision: Decision[ActionT], action_results: List[Any]) -> Optional[EnvStepResult]:
+    def run_env_step(
+        self, decision: Decision[ActionT], action_results: List[Any]
+    ) -> Optional[EnvStepResult]:
         engine = self.engine
         if engine.env is None:
             return None
@@ -230,21 +282,38 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 state=engine._active_state,
             )
             if not isinstance(result, EnvStepResult):
-                result = EnvStepResult(observation=EnvObservation(data={"value": result}))
+                result = EnvStepResult(
+                    observation=EnvObservation(data={"value": result})
+                )
             engine._last_env_result = result
             engine._last_env_observation = result.observation
             engine._emit(
-                engine._active_state.current_step if engine._active_state is not None else 0,
+                (
+                    engine._active_state.current_step
+                    if engine._active_state is not None
+                    else 0
+                ),
                 RuntimePhase.ACT,
-                payload={"stage": "env_step", "env_result": self.env_step_result_to_dict(result)},
+                payload={
+                    "stage": "env_step",
+                    "env_result": self.env_step_result_to_dict(result),
+                },
             )
             return result
         except Exception as exc:
-            err = EnvStepResult(observation=EnvObservation(data={"error": str(exc)}), done=False, error=str(exc))
+            err = EnvStepResult(
+                observation=EnvObservation(data={"error": str(exc)}),
+                done=False,
+                error=str(exc),
+            )
             engine._last_env_result = err
             engine._last_env_observation = err.observation
             engine._emit(
-                engine._active_state.current_step if engine._active_state is not None else 0,
+                (
+                    engine._active_state.current_step
+                    if engine._active_state is not None
+                    else 0
+                ),
                 RuntimePhase.ACT,
                 ok=False,
                 payload={"stage": "env_step_error"},
@@ -262,7 +331,11 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             "name": ident["name"],
             "version": ident["version"],
             "observation": self.env_observation_to_dict(engine._last_env_observation),
-            "last_result": self.env_step_result_to_dict(engine._last_env_result) if engine._last_env_result is not None else None,
+            "last_result": (
+                self.env_step_result_to_dict(engine._last_env_result)
+                if engine._last_env_result is not None
+                else None
+            ),
         }
 
     def env_identity(self) -> Dict[str, Any]:
@@ -275,12 +348,16 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             "version": getattr(engine.env, "version", "0"),
         }
 
-    def env_observation_to_dict(self, observation: Optional[EnvObservation]) -> Optional[Dict[str, Any]]:
+    def env_observation_to_dict(
+        self, observation: Optional[EnvObservation]
+    ) -> Optional[Dict[str, Any]]:
         if observation is None:
             return None
         return {"data": observation.data, "metadata": observation.metadata}
 
-    def env_step_result_to_dict(self, result: Optional[EnvStepResult]) -> Optional[Dict[str, Any]]:
+    def env_step_result_to_dict(
+        self, result: Optional[EnvStepResult]
+    ) -> Optional[Dict[str, Any]]:
         if result is None:
             return None
         return {

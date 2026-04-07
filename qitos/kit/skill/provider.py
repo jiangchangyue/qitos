@@ -50,17 +50,13 @@ class SkillProvider(Protocol):
 
     name: str
 
-    def search(self, query: str, limit: int = 10) -> List[SkillSearchResult]:
-        ...
+    def search(self, query: str, limit: int = 10) -> List[SkillSearchResult]: ...
 
-    def resolve(self, ref: str) -> Optional[SkillSearchResult]:
-        ...
+    def resolve(self, ref: str) -> Optional[SkillSearchResult]: ...
 
-    def describe(self, ref: str) -> Optional[SkillSearchResult]:
-        ...
+    def describe(self, ref: str) -> Optional[SkillSearchResult]: ...
 
-    def download(self, ref: str, cache_dir: str | Path) -> SkillDownload:
-        ...
+    def download(self, ref: str, cache_dir: str | Path) -> SkillDownload: ...
 
 
 class SkillHubProvider:
@@ -96,7 +92,14 @@ class SkillHubProvider:
         query_lower = query.lower()
         scored: List[tuple[int, SkillSearchResult]] = []
         for result in self._catalog().values():
-            hay = " ".join([result.slug, result.name, result.description, " ".join(result.categories)]).lower()
+            hay = " ".join(
+                [
+                    result.slug,
+                    result.name,
+                    result.description,
+                    " ".join(result.categories),
+                ]
+            ).lower()
             score = 0
             if query_lower in hay:
                 score += 10
@@ -114,7 +117,9 @@ class SkillHubProvider:
         result = self.resolve(ref)
         if result is not None:
             return result
-        matches = self._search_remote(query=_normalize_ref(ref, default_provider=self.name)[1], limit=10)
+        matches = self._search_remote(
+            query=_normalize_ref(ref, default_provider=self.name)[1], limit=10
+        )
         slug = _normalize_ref(ref, default_provider=self.name)[1]
         for match in matches:
             if match.slug == slug:
@@ -123,7 +128,11 @@ class SkillHubProvider:
 
     def download(self, ref: str, cache_dir: str | Path) -> SkillDownload:
         result = self.describe(ref)
-        slug = result.slug if result is not None else _normalize_ref(ref, default_provider=self.name)[1]
+        slug = (
+            result.slug
+            if result is not None
+            else _normalize_ref(ref, default_provider=self.name)[1]
+        )
         version = (result.version if result is not None else "") or "latest"
         cache_root = Path(cache_dir).expanduser().resolve()
         cache_root.mkdir(parents=True, exist_ok=True)
@@ -136,7 +145,11 @@ class SkillHubProvider:
         return SkillDownload(
             provider=self.name,
             slug=slug,
-            source=result.source if result is not None else self.download_url_template.replace("{slug}", slug),
+            source=(
+                result.source
+                if result is not None
+                else self.download_url_template.replace("{slug}", slug)
+            ),
             path=archive_path,
             is_archive=True,
             checksum=_sha256_file(archive_path),
@@ -167,8 +180,12 @@ class SkillHubProvider:
                 SkillSearchResult(
                     provider=self.name,
                     slug=slug,
-                    name=str(item.get("displayName") or item.get("name") or slug).strip(),
-                    description=str(item.get("summary") or item.get("description") or "").strip(),
+                    name=str(
+                        item.get("displayName") or item.get("name") or slug
+                    ).strip(),
+                    description=str(
+                        item.get("summary") or item.get("description") or ""
+                    ).strip(),
                     version=str(item.get("version") or "").strip(),
                     source=self.search_url,
                     metadata=item,
@@ -196,9 +213,17 @@ class SkillHubProvider:
                 description=str(item.get("description") or "").strip(),
                 version=str(item.get("version") or "").strip(),
                 homepage=str(item.get("homepage") or "").strip() or None,
-                categories=[str(cat) for cat in item.get("categories", []) if str(cat).strip()],
-                downloads=int(item.get("downloads")) if str(item.get("downloads", "")).isdigit() else None,
-                score=float(item.get("score")) if item.get("score") is not None else None,
+                categories=[
+                    str(cat) for cat in item.get("categories", []) if str(cat).strip()
+                ],
+                downloads=(
+                    int(item.get("downloads"))
+                    if str(item.get("downloads", "")).isdigit()
+                    else None
+                ),
+                score=(
+                    float(item.get("score")) if item.get("score") is not None else None
+                ),
                 source=self.catalog_url,
                 metadata=item,
             )
@@ -250,9 +275,13 @@ class LocalSkillProvider:
 
         if source.startswith(("http://", "https://")):
             if "github.com" in source and "/blob/" in source:
-                source = source.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+                source = source.replace(
+                    "github.com", "raw.githubusercontent.com"
+                ).replace("/blob/", "/")
             if source.endswith(".md") or source.endswith("SKILL.md"):
-                target_dir = Path(tempfile.mkdtemp(prefix="qitos-skill-", dir=str(cache_root)))
+                target_dir = Path(
+                    tempfile.mkdtemp(prefix="qitos-skill-", dir=str(cache_root))
+                )
                 response = self._session.get(source, timeout=self.timeout)
                 response.raise_for_status()
                 (target_dir / "SKILL.md").write_text(response.text, encoding="utf-8")
@@ -266,7 +295,10 @@ class LocalSkillProvider:
             response = self._session.get(source, timeout=self.timeout)
             response.raise_for_status()
             suffix = ".zip" if source.endswith(".zip") else ".bin"
-            archive_path = cache_root / f"{hashlib.sha256(source.encode('utf-8')).hexdigest()}{suffix}"
+            archive_path = (
+                cache_root
+                / f"{hashlib.sha256(source.encode('utf-8')).hexdigest()}{suffix}"
+            )
             archive_path.write_bytes(response.content)
             return SkillDownload(
                 provider=self.name,
@@ -279,11 +311,25 @@ class LocalSkillProvider:
 
         path = Path(source).expanduser().resolve()
         if path.is_dir():
-            return SkillDownload(provider=self.name, slug=path.name, source=str(path), path=path, is_archive=False)
+            return SkillDownload(
+                provider=self.name,
+                slug=path.name,
+                source=str(path),
+                path=path,
+                is_archive=False,
+            )
         if path.name == "SKILL.md":
-            target_dir = Path(tempfile.mkdtemp(prefix="qitos-skill-", dir=str(cache_root)))
+            target_dir = Path(
+                tempfile.mkdtemp(prefix="qitos-skill-", dir=str(cache_root))
+            )
             shutil.copy2(path, target_dir / "SKILL.md")
-            return SkillDownload(provider=self.name, slug=path.parent.name, source=str(path), path=target_dir, is_archive=False)
+            return SkillDownload(
+                provider=self.name,
+                slug=path.parent.name,
+                source=str(path),
+                path=target_dir,
+                is_archive=False,
+            )
         return SkillDownload(
             provider=self.name,
             slug=path.stem,
@@ -294,11 +340,17 @@ class LocalSkillProvider:
         )
 
     def _load_manifest(self, source: str) -> tuple[SkillManifest, str]:
-        if "/" in source and not source.startswith(("http://", "https://")) and not Path(source).exists():
+        if (
+            "/" in source
+            and not source.startswith(("http://", "https://"))
+            and not Path(source).exists()
+        ):
             source = _github_to_raw(source)
         if source.startswith(("http://", "https://")):
             if "github.com" in source and "/blob/" in source:
-                source = source.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+                source = source.replace(
+                    "github.com", "raw.githubusercontent.com"
+                ).replace("/blob/", "/")
             if not source.endswith(".md"):
                 source = source.rstrip("/") + "/SKILL.md"
             response = self._session.get(source, timeout=self.timeout)

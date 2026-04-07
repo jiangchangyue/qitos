@@ -27,7 +27,9 @@ class NetworkToolSet:
     All targets must be within authorized scope.
     """
 
-    def __init__(self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."):
+    def __init__(
+        self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."
+    ):
         """
         Initialize network toolset.
 
@@ -52,15 +54,29 @@ class NetworkToolSet:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
             )
-            return {"stdout": result.stdout, "stderr": result.stderr, "return_code": result.returncode}
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+            }
         except subprocess.TimeoutExpired:
             return {"stdout": "", "stderr": "Command timed out", "return_code": -1}
         except FileNotFoundError:
-            return {"stdout": "", "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.",
+                "return_code": -1,
+            }
         except Exception as e:
-            return {"stdout": "", "stderr": f"Error executing command: {str(e)}", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Error executing command: {str(e)}",
+                "return_code": -1,
+            }
 
-    def _parse_tcpdump_output(self, text: str, max_lines: int = 100) -> List[Dict[str, Any]]:
+    def _parse_tcpdump_output(
+        self, text: str, max_lines: int = 100
+    ) -> List[Dict[str, Any]]:
         """
         Parse tcpdump verbose output into structured packet summaries.
 
@@ -74,27 +90,36 @@ class NetworkToolSet:
         packets = []
         # tcpdump -nn -vv format:
         # timestamp IP proto src_port > dst_port: flags, length
-        pattern = r'(\d{2}:\d{2}:\d{2}\.\d+)\s+IP\s+(\S+)\.(\d+)\s+>\s+(\S+)\.(\d+):\s+(Flags\s+\[([^\]]+)\].*?,\s+(\d+))?'
+        pattern = r"(\d{2}:\d{2}:\d{2}\.\d+)\s+IP\s+(\S+)\.(\d+)\s+>\s+(\S+)\.(\d+):\s+(Flags\s+\[([^\]]+)\].*?,\s+(\d+))?"
 
         for line in text.split("\n")[:max_lines]:
             match = re.search(pattern, line)
             if match:
-                packets.append({
-                    "time": match.group(1),
-                    "src_ip": match.group(2),
-                    "src_port": match.group(3),
-                    "dst_ip": match.group(4),
-                    "dst_port": match.group(5),
-                    "flags": match.group(7) or "",
-                    "length": match.group(8) or "",
-                })
+                packets.append(
+                    {
+                        "time": match.group(1),
+                        "src_ip": match.group(2),
+                        "src_port": match.group(3),
+                        "dst_ip": match.group(4),
+                        "dst_port": match.group(5),
+                        "flags": match.group(7) or "",
+                        "length": match.group(8) or "",
+                    }
+                )
 
         return packets
 
-    @tool(name='packet_capture')
-    def packet_capture(self, interface: str = "", target: str = "", capture_filter: str = "",
-                       duration: int = 30, count: int = 0, output_file: str = "",
-                       verbose: bool = True) -> Dict[str, Any]:
+    @tool(name="packet_capture")
+    def packet_capture(
+        self,
+        interface: str = "",
+        target: str = "",
+        capture_filter: str = "",
+        duration: int = 30,
+        count: int = 0,
+        output_file: str = "",
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
         """
         Capture network packets using tcpdump.
 
@@ -111,11 +136,16 @@ class NetworkToolSet:
         :return: Capture summary with packet count, protocol distribution, and key observations.
         """
         if target and not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         if not output_file:
             timestamp = int(time.time())
-            output_file = os.path.join(self._workspace_root, f"capture_{timestamp}.pcap")
+            output_file = os.path.join(
+                self._workspace_root, f"capture_{timestamp}.pcap"
+            )
 
         cmd = ["tcpdump", "-nn"]
 
@@ -143,7 +173,10 @@ class NetworkToolSet:
             full_cmd = f"timeout {duration} {cmd_str}"
             result = self._run_command(["bash", "-c", full_cmd], timeout=duration + 10)
         else:
-            return {"status": "error", "message": "Non-timed captures require manual execution. Set duration > 0."}
+            return {
+                "status": "error",
+                "message": "Non-timed captures require manual execution. Set duration > 0.",
+            }
 
         output = f"### 📡 Packet Capture\n\n"
         output += f"**Interface:** {interface or 'auto'}\n"
@@ -170,7 +203,9 @@ class NetworkToolSet:
 
         if stats:
             output += "#### Capture Statistics\n\n"
-            output += f"- **Packets captured:** {stats.get('packets_captured', 'N/A')}\n"
+            output += (
+                f"- **Packets captured:** {stats.get('packets_captured', 'N/A')}\n"
+            )
             output += f"- **Packets received by filter:** {stats.get('packets_received', 'N/A')}\n"
             output += f"- **Packets dropped by kernel:** {stats.get('packets_dropped', 'N/A')}\n\n"
         else:
@@ -194,12 +229,17 @@ class NetworkToolSet:
                 "output_file": output_file,
                 "stats": stats,
                 "target": target,
-            }
+            },
         }
 
-    @tool(name='traffic_analyze')
-    def traffic_analyze(self, pcap_file: str, display_filter: str = "",
-                        protocol: str = "", count: int = 50) -> Dict[str, Any]:
+    @tool(name="traffic_analyze")
+    def traffic_analyze(
+        self,
+        pcap_file: str,
+        display_filter: str = "",
+        protocol: str = "",
+        count: int = 50,
+    ) -> Dict[str, Any]:
         """
         Analyze captured PCAP file using tshark.
 
@@ -238,9 +278,27 @@ class NetworkToolSet:
 
         # Apply display filter if specified
         if display_filter:
-            filter_cmd = ["tshark", "-r", pcap_file, "-Y", display_filter, "-c", str(count), "-T", "fields",
-                          "-e", "frame.time", "-e", "ip.src", "-e", "ip.dst",
-                          "-e", "_ws.col.Protocol", "-e", "frame.len"]
+            filter_cmd = [
+                "tshark",
+                "-r",
+                pcap_file,
+                "-Y",
+                display_filter,
+                "-c",
+                str(count),
+                "-T",
+                "fields",
+                "-e",
+                "frame.time",
+                "-e",
+                "ip.src",
+                "-e",
+                "ip.dst",
+                "-e",
+                "_ws.col.Protocol",
+                "-e",
+                "frame.len",
+            ]
             filter_result = self._run_command(filter_cmd, timeout=120)
 
             if filter_result["stdout"]:
@@ -260,11 +318,13 @@ class NetworkToolSet:
             "data": {
                 "pcap_file": pcap_file,
                 "display_filter": display_filter,
-            }
+            },
         }
 
-    @tool(name='dns_sniff')
-    def dns_sniff(self, interface: str = "", duration: int = 30, output_file: str = "") -> Dict[str, Any]:
+    @tool(name="dns_sniff")
+    def dns_sniff(
+        self, interface: str = "", duration: int = 30, output_file: str = ""
+    ) -> Dict[str, Any]:
         """
         Capture and analyze DNS queries on the network.
 
@@ -278,7 +338,9 @@ class NetworkToolSet:
         """
         if not output_file:
             timestamp = int(time.time())
-            output_file = os.path.join(self._workspace_root, f"dns_capture_{timestamp}.pcap")
+            output_file = os.path.join(
+                self._workspace_root, f"dns_capture_{timestamp}.pcap"
+            )
 
         # Capture DNS traffic (port 53)
         capture_filter = "port 53"
@@ -290,11 +352,27 @@ class NetworkToolSet:
 
         # Now analyze the captured DNS traffic
         tshark_cmd = [
-            "tshark", "-r", output_file, "-Y", "dns",
-            "-T", "fields",
-            "-e", "frame.time", "-e", "ip.src", "-e", "ip.dst",
-            "-e", "dns.qry.name", "-e", "dns.qry.type", "-e", "dns.flags.response",
-            "-e", "dns.a",
+            "tshark",
+            "-r",
+            output_file,
+            "-Y",
+            "dns",
+            "-T",
+            "fields",
+            "-e",
+            "frame.time",
+            "-e",
+            "ip.src",
+            "-e",
+            "ip.dst",
+            "-e",
+            "dns.qry.name",
+            "-e",
+            "dns.qry.type",
+            "-e",
+            "dns.flags.response",
+            "-e",
+            "dns.a",
         ]
         tshark_result = self._run_command(tshark_cmd, timeout=60)
 
@@ -303,15 +381,17 @@ class NetworkToolSet:
             fields = line.split("\t")
             if len(fields) >= 5:
                 is_response = fields[4] == "1"
-                queries.append({
-                    "time": fields[0],
-                    "src": fields[1],
-                    "dst": fields[2],
-                    "domain": fields[3] or "",
-                    "query_type": fields[4] if not is_response else "",
-                    "is_response": is_response,
-                    "answer": fields[5] if len(fields) > 5 else "",
-                })
+                queries.append(
+                    {
+                        "time": fields[0],
+                        "src": fields[1],
+                        "dst": fields[2],
+                        "domain": fields[3] or "",
+                        "query_type": fields[4] if not is_response else "",
+                        "is_response": is_response,
+                        "answer": fields[5] if len(fields) > 5 else "",
+                    }
+                )
 
         output = f"### 🌐 DNS Sniff: {duration}s\n\n"
         output += f"**Interface:** {interface or 'any'}\n"
@@ -340,10 +420,10 @@ class NetworkToolSet:
                 "queries": queries,
                 "unique_domains": list(domains),
                 "query_count": len(queries),
-            }
+            },
         }
 
-    @tool(name='arp_scan')
+    @tool(name="arp_scan")
     def arp_scan(self, target: str, interface: str = "") -> Dict[str, Any]:
         """
         Perform ARP scan to discover hosts on a local network.
@@ -356,7 +436,10 @@ class NetworkToolSet:
         :return: List of discovered hosts with IP and MAC addresses.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         cmd = ["arp-scan", "--interface=" + interface if interface else "", target]
         cmd = [c for c in cmd if c]
@@ -364,18 +447,25 @@ class NetworkToolSet:
         result = self._run_command(cmd, timeout=120)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"ARP scan failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"ARP scan failed: {result['stderr']}",
+            }
 
         hosts = []
         for line in result["stdout"].split("\n"):
             # arp-scan format: IP	MAC	Hardware/Manufacturer
-            match = re.match(r'^(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F:]+)\s+(.+)', line.strip())
+            match = re.match(
+                r"^(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F:]+)\s+(.+)", line.strip()
+            )
             if match:
-                hosts.append({
-                    "ip": match.group(1),
-                    "mac": match.group(2),
-                    "manufacturer": match.group(3).strip(),
-                })
+                hosts.append(
+                    {
+                        "ip": match.group(1),
+                        "mac": match.group(2),
+                        "manufacturer": match.group(3).strip(),
+                    }
+                )
 
         output = f"### 📡 ARP Scan: {target}\n\n"
         output += f"Found **{len(hosts)}** host(s)\n\n"
@@ -395,11 +485,13 @@ class NetworkToolSet:
                 "target": target,
                 "hosts": hosts,
                 "host_count": len(hosts),
-            }
+            },
         }
 
-    @tool(name='traceroute')
-    def traceroute(self, target: str, max_hops: int = 30, method: str = "udp") -> Dict[str, Any]:
+    @tool(name="traceroute")
+    def traceroute(
+        self, target: str, max_hops: int = 30, method: str = "udp"
+    ) -> Dict[str, Any]:
         """
         Trace the network path to a target host.
 
@@ -415,7 +507,10 @@ class NetworkToolSet:
         :return: Traceroute output with hop-by-hop details including latency.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         if method == "tcp":
             cmd = ["traceroute", "-T", "-m", str(max_hops), target]
@@ -427,7 +522,10 @@ class NetworkToolSet:
         result = self._run_command(cmd, timeout=120)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"Traceroute failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Traceroute failed: {result['stderr']}",
+            }
 
         output = f"### 🗺️ Traceroute: {target} (method: {method})\n\n"
         output += "```\n"
@@ -436,12 +534,14 @@ class NetworkToolSet:
 
         hops = []
         for line in result["stdout"].split("\n"):
-            match = re.match(r'^\s*(\d+)\s+(\S+)', line)
+            match = re.match(r"^\s*(\d+)\s+(\S+)", line)
             if match:
-                hops.append({
-                    "hop": int(match.group(1)),
-                    "address": match.group(2),
-                })
+                hops.append(
+                    {
+                        "hop": int(match.group(1)),
+                        "address": match.group(2),
+                    }
+                )
 
         if hops:
             output += f"**Total hops:** {len(hops)}\n"
@@ -454,12 +554,19 @@ class NetworkToolSet:
                 "method": method,
                 "hops": hops,
                 "hop_count": len(hops),
-            }
+            },
         }
 
-    @tool(name='http_request')
-    def http_request(self, url: str, method: str = "GET", headers: Dict[str, str] = None,
-                     data: str = "", follow_redirects: bool = True, timeout_sec: int = 15) -> Dict[str, Any]:
+    @tool(name="http_request")
+    def http_request(
+        self,
+        url: str,
+        method: str = "GET",
+        headers: Dict[str, str] = None,
+        data: str = "",
+        follow_redirects: bool = True,
+        timeout_sec: int = 15,
+    ) -> Dict[str, Any]:
         """
         Send an HTTP request and display the full response.
 
@@ -509,7 +616,7 @@ class NetworkToolSet:
 
         # Status code
         status_code = 0
-        status_match = re.search(r'HTTP/\d\.\d\s+(\d+)', status_line)
+        status_match = re.search(r"HTTP/\d\.\d\s+(\d+)", status_line)
         if status_match:
             status_code = int(status_match.group(1))
 
@@ -527,7 +634,9 @@ class NetworkToolSet:
         if body:
             max_body = 5000
             if len(body) > max_body:
-                output += f"**Response Body** (truncated, {len(body)} chars total):\n```\n"
+                output += (
+                    f"**Response Body** (truncated, {len(body)} chars total):\n```\n"
+                )
                 output += body[:max_body]
                 output += f"\n... ({len(body) - max_body} more characters)\n```\n\n"
             else:
@@ -546,26 +655,26 @@ class NetworkToolSet:
                 "headers": response_headers,
                 "body": body[:10000],
                 "body_length": len(body),
-            }
+            },
         }
 
-    @tool(name='scapy_craft')
+    @tool(name="scapy_craft")
     def scapy_craft(self, script: str) -> Dict[str, Any]:
         """
-    Execute a Scapy packet crafting script.
+        Execute a Scapy packet crafting script.
 
-    Scapy is a powerful Python-based packet manipulation tool. This function
-    allows execution of pre-written Scapy scripts for custom packet crafting,
-    protocol testing, and network reconnaissance tasks.
+        Scapy is a powerful Python-based packet manipulation tool. This function
+        allows execution of pre-written Scapy scripts for custom packet crafting,
+        protocol testing, and network reconnaissance tasks.
 
-    :param script: Python code using Scapy. The script has access to the `scapy` module
-        (imported as `sc`). Common operations:
-        - Create packets: `sc.IP(dst='target')/sc.TCP(dport=80, flags='S')`
-        - Send packets: `sc.send(packet)`, `sc.sr1(packet)` (send and receive)
-        - Sniff packets: `sc.sniff(filter='port 80', count=10)`
-        - ARP requests: `sc.arping('192.168.1.0/24')`
-    :return: Script execution result with output and any captured responses.
-    """
+        :param script: Python code using Scapy. The script has access to the `scapy` module
+            (imported as `sc`). Common operations:
+            - Create packets: `sc.IP(dst='target')/sc.TCP(dport=80, flags='S')`
+            - Send packets: `sc.send(packet)`, `sc.sr1(packet)` (send and receive)
+            - Sniff packets: `sc.sniff(filter='port 80', count=10)`
+            - ARP requests: `sc.arping('192.168.1.0/24')`
+        :return: Script execution result with output and any captured responses.
+        """
         # Build a safe execution environment
         exec_script = f"""
 import sys
@@ -633,5 +742,5 @@ print("\\n".join(output))
                 "script": script,
                 "output": output_text,
                 "errors": result.get("stderr", ""),
-            }
+            },
         }

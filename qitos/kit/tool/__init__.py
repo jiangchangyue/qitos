@@ -22,20 +22,30 @@ from .advanced import (
     ToolSearchTool,
     WebFetchV2,
 )
-from .codebase import CodebaseToolSet, GlobFiles, GrepFiles, ReadFileRange, AppendFile, MakeDirectory
 from .coding import CodingToolSet
-from .editor import EditorToolSet
 from .epub import EpubToolSet
-from .file import WriteFile, ReadFile, ListFiles
-from .notebook import NotebookToolSet, ReadNotebook, ReplaceNotebookCell, InsertNotebookCell
+from .notebook import (
+    NotebookToolSet,
+    ReadNotebook,
+    ReplaceNotebookCell,
+    InsertNotebookCell,
+)
 from .report_toolset import ReportToolSet
-from .shell import RunCommand
+from .security_audit import SecurityAuditToolSet, security_audit_tools
 from .terminal import SendTerminalKeys
 from .taskboard import TaskToolSet, TaskBoardStore, TaskRecord, TaskNote
 from .cybench import SubmitAnswer
 from .thinking import ThinkingToolSet, ThoughtData
-from .web import HTTPRequest, HTTPGet, HTTPPost, HTMLExtractText, WebFetch
-from .text_web_browser import WebSearch, VisitURL, PageDown, PageUp, FindInPage, FindNext, ArchiveSearch
+from .web import HTTPRequest, HTTPGet, HTTPPost, HTMLExtractText
+from .text_web_browser import (
+    WebSearch,
+    VisitURL,
+    PageDown,
+    PageUp,
+    FindInPage,
+    FindNext,
+    ArchiveSearch,
+)
 from .library import InMemoryToolLibrary, ToolArtifact, BaseToolLibrary
 from .skill_tools import SkillToolSet
 from .tools import (
@@ -53,19 +63,12 @@ __all__ = [
     "AgentSpawnTool",
     "AskUserChoiceTool",
     "BashV2",
-    "CodebaseToolSet",
     "CodingToolSet",
     "CronCreateTool",
     "CronDeleteTool",
     "CronListTool",
-    "GlobFiles",
-    "GrepFiles",
     "GlobV2",
     "GrepV2",
-    "ReadFileRange",
-    "AppendFile",
-    "MakeDirectory",
-    "EditorToolSet",
     "EnterPlanModeTool",
     "EnterWorktreeTool",
     "EpubToolSet",
@@ -73,9 +76,6 @@ __all__ = [
     "ExitWorktreeTool",
     "FileEditV2",
     "FileReadV2",
-    "WriteFile",
-    "ReadFile",
-    "ListFiles",
     "LSPQueryTool",
     "MCPListResourcesTool",
     "MCPReadResourceTool",
@@ -84,11 +84,11 @@ __all__ = [
     "ReplaceNotebookCell",
     "InsertNotebookCell",
     "ReportToolSet",
+    "SecurityAuditToolSet",
     "TaskToolSet",
     "TaskBoardStore",
     "TaskRecord",
     "TaskNote",
-    "RunCommand",
     "SendTerminalKeys",
     "SubmitAnswer",
     "ThinkingToolSet",
@@ -97,7 +97,6 @@ __all__ = [
     "HTTPGet",
     "HTTPPost",
     "HTMLExtractText",
-    "WebFetch",
     "WebSearch",
     "VisitURL",
     "PageDown",
@@ -120,4 +119,5 @@ __all__ = [
     "coding_tools",
     "task_tools",
     "report_tools",
+    "security_audit_tools",
 ]

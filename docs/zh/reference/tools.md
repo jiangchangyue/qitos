@@ -142,14 +142,10 @@ flowchart TB
 
 这些组件可以直接组合使用，类似 `torch.nn` 的现成模块。
 
-- 编辑器工具包：
-  - `EditorToolSet`（`view`、`create`、`str_replace`、`insert`、`search`、`list_tree`、`replace_lines`）
+- Canonical coding 工具包：
+  - `CodingToolSet`（`view`、`create`、`str_replace`、`insert`、`search`、`list_tree`、`replace_lines`、`read_file`、`write_file`、`list_files`、`run_command`）
 - EPUB 工具包：
   - `EpubToolSet`（`list_chapters`、`read_chapter`、`search`）
-- 文件工具：
-  - `WriteFile`、`ReadFile`、`ListFiles`
-- 进程工具：
-  - `RunCommand`
 - HTTP/Web 工具：
   - `HTTPRequest`、`HTTPGet`、`HTTPPost`、`HTMLExtractText`
 - 文本浏览器工具：
@@ -169,7 +165,7 @@ flowchart TB
 导入示例：
 
 ```python
-from qitos.kit.tool import EditorToolSet, RunCommand, HTTPGet, ThinkingToolSet
+from qitos.kit.tool import CodingToolSet, HTTPGet, ThinkingToolSet
 ```
 
 ## Source Index

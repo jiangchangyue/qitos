@@ -34,7 +34,12 @@ class _PageState:
 class TextWebBrowserOps:
     """Stateful web browser operations for text-first navigation."""
 
-    def __init__(self, timeout: int = 40, page_window_lines: int = 40, user_agent: str = "QitOS-TextWeb/1.0"):
+    def __init__(
+        self,
+        timeout: int = 40,
+        page_window_lines: int = 40,
+        user_agent: str = "QitOS-TextWeb/1.0",
+    ):
         self.timeout = int(timeout)
         self.page_window_lines = max(10, int(page_window_lines))
         self.user_agent = user_agent
@@ -51,7 +56,9 @@ class TextWebBrowserOps:
         max_results = max(1, min(int(max_results), 20))
         url = f"https://duckduckgo.com/html/?q={quote_plus(query.strip())}"
         try:
-            r = requests.get(url, headers={"User-Agent": self.user_agent}, timeout=self.timeout)
+            r = requests.get(
+                url, headers={"User-Agent": self.user_agent}, timeout=self.timeout
+            )
             html = r.text
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
@@ -67,13 +74,22 @@ class TextWebBrowserOps:
                 rows.append({"title": title, "url": href})
             if len(rows) >= max_results:
                 break
-        return {"status": "success", "query": query, "count": len(rows), "results": rows}
+        return {
+            "status": "success",
+            "query": query,
+            "count": len(rows),
+            "results": rows,
+        }
 
-    def visit(self, url: str, max_chars: int = 30000, keep_links: bool = True) -> Dict[str, Any]:
+    def visit(
+        self, url: str, max_chars: int = 30000, keep_links: bool = True
+    ) -> Dict[str, Any]:
         if requests is None:
             return {"status": "error", "message": "requests is not available"}
         try:
-            r = requests.get(url, headers={"User-Agent": self.user_agent}, timeout=self.timeout)
+            r = requests.get(
+                url, headers={"User-Agent": self.user_agent}, timeout=self.timeout
+            )
             text, title = self._html_to_text(r.text, keep_links=keep_links)
         except Exception as exc:
             return {"status": "error", "message": str(exc)}
@@ -99,7 +115,10 @@ class TextWebBrowserOps:
 
     def find(self, keyword: str) -> Dict[str, Any]:
         if not self.state.lines:
-            return {"status": "error", "message": "no active page; call visit_url first"}
+            return {
+                "status": "error",
+                "message": "no active page; call visit_url first",
+            }
         key = (keyword or "").strip().lower()
         if not key:
             return {"status": "error", "message": "keyword cannot be empty"}
@@ -119,7 +138,10 @@ class TextWebBrowserOps:
     def find_next(self) -> Dict[str, Any]:
         key = (self.state.last_find or "").strip().lower()
         if not key:
-            return {"status": "error", "message": "no active keyword; call find_in_page first"}
+            return {
+                "status": "error",
+                "message": "no active keyword; call find_in_page first",
+            }
         start = max(self.state.last_match + 1, 0)
         for idx in range(start, len(self.state.lines)):
             if key in self.state.lines[idx].lower():
@@ -128,14 +150,22 @@ class TextWebBrowserOps:
                 out = self.window(cursor=idx, lines=self.page_window_lines)
                 out["matched_line"] = idx
                 return out
-        return {"status": "error", "message": f"no further match for '{self.state.last_find}'"}
+        return {
+            "status": "error",
+            "message": f"no further match for '{self.state.last_find}'",
+        }
 
     def archive_search(self, query: str, max_results: int = 8) -> Dict[str, Any]:
         return self.search(f"site:web.archive.org {query}", max_results=max_results)
 
-    def window(self, cursor: int | None = None, lines: int | None = None) -> Dict[str, Any]:
+    def window(
+        self, cursor: int | None = None, lines: int | None = None
+    ) -> Dict[str, Any]:
         if not self.state.lines:
-            return {"status": "error", "message": "no active page; call visit_url first"}
+            return {
+                "status": "error",
+                "message": "no active page; call visit_url first",
+            }
         c = self.state.cursor if cursor is None else max(0, int(cursor))
         n = self.page_window_lines if lines is None else max(5, int(lines))
         start = min(c, max(0, len(self.state.lines) - 1))
@@ -162,7 +192,9 @@ class TextWebBrowserOps:
             "last_match": self.state.last_match,
         }
 
-    def _html_to_text(self, html: str, keep_links: bool = True) -> tuple[str, Optional[str]]:
+    def _html_to_text(
+        self, html: str, keep_links: bool = True
+    ) -> tuple[str, Optional[str]]:
         if BeautifulSoup is not None:
             soup = BeautifulSoup(html, "lxml")
             for tag in soup(["script", "style", "noscript", "svg", "canvas"]):
@@ -172,7 +204,11 @@ class TextWebBrowserOps:
                     href = a.get("href")
                     if href:
                         a.append(f" ({href})")
-            title = str(soup.title.string).strip() if soup.title and soup.title.string else None
+            title = (
+                str(soup.title.string).strip()
+                if soup.title and soup.title.string
+                else None
+            )
             text = soup.get_text(separator="\n", strip=True)
             text = re.sub(r"\n{3,}", "\n\n", text)
             return text.strip(), title
@@ -194,11 +230,17 @@ class TextWebEnv(HostEnv):
     name = "text_web_env"
     version = "1.0"
 
-    def __init__(self, workspace_root: str = ".", timeout: int = 40, page_window_lines: int = 40):
+    def __init__(
+        self, workspace_root: str = ".", timeout: int = 40, page_window_lines: int = 40
+    ):
         super().__init__(workspace_root=workspace_root)
-        self.web_browser = TextWebBrowserOps(timeout=timeout, page_window_lines=page_window_lines)
+        self.web_browser = TextWebBrowserOps(
+            timeout=timeout, page_window_lines=page_window_lines
+        )
 
-    def reset(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> EnvObservation:
+    def reset(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> EnvObservation:
         obs = super().reset(task=task, workspace=workspace, **kwargs)
         self.web_browser.reset()
         obs.data["web"] = self.web_browser.summary()
@@ -216,4 +258,3 @@ class TextWebEnv(HostEnv):
 
 
 __all__ = ["TextWebBrowserOps", "TextWebEnv"]
-

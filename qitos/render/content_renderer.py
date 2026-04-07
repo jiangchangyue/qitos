@@ -13,8 +13,18 @@ from rich.table import Table
 
 from .events import RenderEvent
 
-_THOUGHT_RE = re.compile(r"Thought\s*:\s*(.*?)(?:\n[A-Za-z_ ]+\s*:|\Z)", re.IGNORECASE | re.DOTALL)
-_NOISE_KEYS = {"latency_ms", "run_id", "error_category", "ts", "step_id", "phase", "hook"}
+_THOUGHT_RE = re.compile(
+    r"Thought\s*:\s*(.*?)(?:\n[A-Za-z_ ]+\s*:|\Z)", re.IGNORECASE | re.DOTALL
+)
+_NOISE_KEYS = {
+    "latency_ms",
+    "run_id",
+    "error_category",
+    "ts",
+    "step_id",
+    "phase",
+    "hook",
+}
 
 
 class ContentFirstRenderer:
@@ -45,6 +55,34 @@ class ContentFirstRenderer:
             return self._truncate(raw.strip(), self.max_preview_chars)
         return None
 
+    def model_response_summary(self, event: RenderEvent) -> Optional[str]:
+        payload = event.payload or {}
+        response = payload.get("model_response")
+        if not isinstance(response, dict):
+            return None
+        parts: List[str] = []
+        if response.get("provider"):
+            parts.append(f"provider={response.get('provider')}")
+        if response.get("model_name"):
+            parts.append(f"model={response.get('model_name')}")
+        if response.get("finish_reason"):
+            parts.append(f"finish={response.get('finish_reason')}")
+        tool_calls = response.get("tool_calls")
+        if isinstance(tool_calls, list) and tool_calls:
+            parts.append(f"tool_calls={len(tool_calls)}")
+        usage = response.get("usage")
+        if isinstance(usage, dict):
+            total = usage.get("total_tokens")
+            prompt = usage.get("prompt_tokens")
+            completion = usage.get("completion_tokens")
+            if total is not None:
+                parts.append(f"tokens={total}")
+            elif prompt is not None or completion is not None:
+                parts.append(f"usage={prompt or 0}/{completion or 0}")
+        if not parts:
+            return None
+        return self._truncate(" · ".join(parts), self.max_preview_chars)
+
     def action_summary(self, event: RenderEvent) -> Optional[Dict[str, str]]:
         payload = event.payload or {}
         if event.node == "planned_actions":
@@ -69,7 +107,11 @@ class ContentFirstRenderer:
 
     def observation_summary(self, event: RenderEvent) -> Optional[Dict[str, Any]]:
         payload = event.payload or {}
-        data = payload.get("observation") if event.node == "observation" else payload.get("action_results")
+        data = (
+            payload.get("observation")
+            if event.node == "observation"
+            else payload.get("action_results")
+        )
         if data is None:
             return None
         if isinstance(data, list) and data:
@@ -77,12 +119,18 @@ class ContentFirstRenderer:
         else:
             item = data
         if not isinstance(item, dict):
-            return {"status": "neutral", "title": "Observation", "body": self._truncate(self._to_text(item), 220)}
+            return {
+                "status": "neutral",
+                "title": "Observation",
+                "body": self._truncate(self._to_text(item), 220),
+            }
 
         cleaned = self._strip_noise(item)
         rows = self._extract_search_rows(cleaned)
         if rows:
-            table = Table(show_header=True, header_style="bold", box=box.SIMPLE, show_edge=False)
+            table = Table(
+                show_header=True, header_style="bold", box=box.SIMPLE, show_edge=False
+            )
             table.add_column("Title")
             table.add_column("URL")
             for title, short_url in rows[:6]:
@@ -93,8 +141,18 @@ class ContentFirstRenderer:
         if syntax is not None:
             return {"status": "success", "title": "Structured Output", "syntax": syntax}
 
-        title = str(cleaned.get("title") or cleaned.get("name") or cleaned.get("status") or "Observation")
-        url = str(cleaned.get("url") or cleaned.get("source_url") or cleaned.get("target_url") or "")
+        title = str(
+            cleaned.get("title")
+            or cleaned.get("name")
+            or cleaned.get("status")
+            or "Observation"
+        )
+        url = str(
+            cleaned.get("url")
+            or cleaned.get("source_url")
+            or cleaned.get("target_url")
+            or ""
+        )
         err = cleaned.get("error")
         if err:
             return {
@@ -117,7 +175,11 @@ class ContentFirstRenderer:
         if event.node == "model_input":
             payload = event.payload or {}
             stats = dict(payload.get("state_stats") or {})
-            ctx = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+            ctx = (
+                payload.get("context")
+                if isinstance(payload.get("context"), dict)
+                else {}
+            )
             if ctx:
                 stats.setdefault("input_tokens_total", ctx.get("input_tokens_total"))
                 stats.setdefault("history_tokens", ctx.get("history_tokens"))
@@ -179,21 +241,29 @@ class ContentFirstRenderer:
                 ratio = f" ({occupancy * 100:.1f}%)"
             return {
                 "color": "yellow",
-                "text": f"Context warning · {before:,} / {budget:,}{ratio}" if isinstance(before, int) and isinstance(budget, int) else "Context warning",
+                "text": (
+                    f"Context warning · {before:,} / {budget:,}{ratio}"
+                    if isinstance(before, int) and isinstance(budget, int)
+                    else "Context warning"
+                ),
             }
         if stage == "microcompact_applied":
             return {
                 "color": "blue",
-                "text": f"Compacted history · {before:,} -> {after:,} · saved {saved:,}"
-                if all(isinstance(x, int) for x in (before, after, saved))
-                else "Compacted history",
+                "text": (
+                    f"Compacted history · {before:,} -> {after:,} · saved {saved:,}"
+                    if all(isinstance(x, int) for x in (before, after, saved))
+                    else "Compacted history"
+                ),
             }
         if stage == "summary_compact_applied":
             return {
                 "color": "cyan",
-                "text": f"Summarized earlier rounds · {before:,} -> {after:,} · saved {saved:,}"
-                if all(isinstance(x, int) for x in (before, after, saved))
-                else "Summarized earlier rounds",
+                "text": (
+                    f"Summarized earlier rounds · {before:,} -> {after:,} · saved {saved:,}"
+                    if all(isinstance(x, int) for x in (before, after, saved))
+                    else "Summarized earlier rounds"
+                ),
             }
         if stage == "compact_skipped":
             reason = str(ctx.get("reason") or "skipped")
@@ -202,11 +272,49 @@ class ContentFirstRenderer:
             return None
         return {"color": "gray50", "text": stage}
 
+    def parser_diagnostic_summary(self, event: RenderEvent) -> Optional[Dict[str, Any]]:
+        payload = event.payload or {}
+        diagnostics = payload.get("diagnostics")
+        if not isinstance(diagnostics, dict):
+            return None
+        severity = str(diagnostics.get("severity") or "error").lower()
+        return {
+            "color": "red" if severity == "error" else "yellow",
+            "severity": severity,
+            "summary": self._truncate(
+                str(diagnostics.get("summary") or "Parser diagnostic").strip(), 220
+            ),
+            "details": self._truncate(
+                str(diagnostics.get("details") or "").strip(), 280
+            ),
+            "extraction_mode": str(diagnostics.get("extraction_mode") or "").strip(),
+            "protocol": str(diagnostics.get("protocol") or "").strip(),
+            "selected_parser": str(diagnostics.get("selected_parser") or "").strip(),
+            "fallback_used": bool(diagnostics.get("fallback_used")),
+            "expected_shape": self._truncate(
+                str(diagnostics.get("expected_shape") or "").strip(), 240
+            ),
+            "repair_instruction": self._truncate(
+                str(diagnostics.get("repair_instruction") or "").strip(), 240
+            ),
+            "raw_output_preview": self._truncate(
+                str(diagnostics.get("raw_output_preview") or "").strip(), 320
+            ),
+            "salvage_summary": self._truncate(
+                str(diagnostics.get("salvage_summary") or "").strip(), 220
+            ),
+            "code": str(diagnostics.get("code") or "").strip(),
+            "parser": str(diagnostics.get("parser") or "").strip(),
+            "contract": str(diagnostics.get("contract") or "").strip(),
+        }
+
     def memory_summary(self, event: RenderEvent) -> Optional[str]:
         if event.node != "memory_context":
             return None
         payload = event.payload or {}
-        records = payload.get("records") if isinstance(payload.get("records"), list) else []
+        records = (
+            payload.get("records") if isinstance(payload.get("records"), list) else []
+        )
         summary = str(payload.get("summary", "")).strip()
         if summary:
             return f"records={len(records)} · {self._truncate(summary, 180)}"
@@ -217,8 +325,14 @@ class ContentFirstRenderer:
 
     def _action_from_dict(self, action: Any) -> Dict[str, str]:
         if not isinstance(action, dict):
-            return {"label": "ACTION", "detail": self._truncate(self._to_text(action), 120), "status": "neutral"}
-        name = str(action.get("name") or action.get("tool") or action.get("action") or "action")
+            return {
+                "label": "ACTION",
+                "detail": self._truncate(self._to_text(action), 120),
+                "status": "neutral",
+            }
+        name = str(
+            action.get("name") or action.get("tool") or action.get("action") or "action"
+        )
         args = action.get("args") if isinstance(action.get("args"), dict) else {}
         detail = ""
         if args:
@@ -262,7 +376,9 @@ class ContentFirstRenderer:
                 continue
             if "\n" not in value or len(value) < 40:
                 continue
-            return Syntax(self._truncate(value, 2000), self._guess_language(data), word_wrap=True)
+            return Syntax(
+                self._truncate(value, 2000), self._guess_language(data), word_wrap=True
+            )
         return None
 
     def _best_body(self, data: Dict[str, Any]) -> str:

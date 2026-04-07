@@ -7,8 +7,19 @@ import zipfile
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from .manifest import InstalledSkill, SkillManifest, SkillPackage, parse_skill_package_dir
-from .provider import LocalSkillProvider, SkillDownload, SkillProvider, SkillSearchResult, SkillHubProvider
+from .manifest import (
+    InstalledSkill,
+    SkillManifest,
+    SkillPackage,
+    parse_skill_package_dir,
+)
+from .provider import (
+    LocalSkillProvider,
+    SkillDownload,
+    SkillProvider,
+    SkillSearchResult,
+    SkillHubProvider,
+)
 from .registry import SkillRegistry
 
 
@@ -23,16 +34,26 @@ class SkillManager:
         default_provider: str = "skillhub",
         registry: Optional[SkillRegistry] = None,
     ):
-        self.workspace_root = str(Path(workspace_root).expanduser().resolve()) if workspace_root else None
+        self.workspace_root = (
+            str(Path(workspace_root).expanduser().resolve()) if workspace_root else None
+        )
         self.default_provider = default_provider
-        self.cache_dir = str(Path(cache_dir or "~/.qitos/skill-cache").expanduser().resolve())
+        self.cache_dir = str(
+            Path(cache_dir or "~/.qitos/skill-cache").expanduser().resolve()
+        )
         self.registry = registry or SkillRegistry(workspace_root=self.workspace_root)
         provider_list = list(providers or [SkillHubProvider(), LocalSkillProvider()])
-        self.providers: Dict[str, SkillProvider] = {provider.name: provider for provider in provider_list}
+        self.providers: Dict[str, SkillProvider] = {
+            provider.name: provider for provider in provider_list
+        }
         if self.default_provider not in self.providers:
-            raise ValueError(f"Default provider '{self.default_provider}' is not configured")
+            raise ValueError(
+                f"Default provider '{self.default_provider}' is not configured"
+            )
 
-    def search(self, query: str, provider: Optional[str] = None, limit: int = 10) -> List[SkillSearchResult]:
+    def search(
+        self, query: str, provider: Optional[str] = None, limit: int = 10
+    ) -> List[SkillSearchResult]:
         target = self._provider(provider or self.default_provider)
         return target.search(query=query, limit=limit)
 
@@ -59,9 +80,13 @@ class SkillManager:
             source_dir=source_dir,
             describe_result=provider.describe(slug_or_source),
         )
-        return self.registry.install_package(package, source_dir=source_dir, activate=activate)
+        return self.registry.install_package(
+            package, source_dir=source_dir, activate=activate
+        )
 
-    def ensure(self, refs: Iterable[str], *, activate: bool = False) -> List[InstalledSkill]:
+    def ensure(
+        self, refs: Iterable[str], *, activate: bool = False
+    ) -> List[InstalledSkill]:
         return [self.install(ref, activate=activate) for ref in refs]
 
     def activate(self, ref: str) -> bool:
@@ -114,12 +139,18 @@ class SkillManager:
             slug=describe_result.slug if describe_result is not None else slug,
             source=download.source,
             checksum=download.checksum,
-            metadata=describe_result.metadata if describe_result is not None else download.metadata,
+            metadata=(
+                describe_result.metadata
+                if describe_result is not None
+                else download.metadata
+            ),
         )
         if describe_result is not None:
             package.homepage = describe_result.homepage or package.homepage
             package.tags = _merge_unique(package.tags, describe_result.tags)
-            package.categories = _merge_unique(package.categories, describe_result.categories)
+            package.categories = _merge_unique(
+                package.categories, describe_result.categories
+            )
         package.manifest.tags = list(package.tags)
         package.manifest.categories = list(package.categories)
         package.manifest.slug = package.slug
@@ -137,7 +168,9 @@ class SkillManager:
                 for member in archive.infolist():
                     member_path = Path(member.filename)
                     if member_path.is_absolute() or ".." in member_path.parts:
-                        raise ValueError(f"Unsafe zip path entry detected: {member.filename}")
+                        raise ValueError(
+                            f"Unsafe zip path entry detected: {member.filename}"
+                        )
                 archive.extractall(target)
             return target
 
@@ -148,7 +181,11 @@ class SkillManager:
             provider_name, remainder = ref.split(":", 1)
             if provider_name in self.providers and remainder:
                 return provider_name, remainder
-        if ref.startswith(("http://", "https://")) or Path(ref).expanduser().exists() or _looks_like_github_shorthand(ref):
+        if (
+            ref.startswith(("http://", "https://"))
+            or Path(ref).expanduser().exists()
+            or _looks_like_github_shorthand(ref)
+        ):
             return "local", ref
         return self.default_provider, ref
 
@@ -170,4 +207,8 @@ def _merge_unique(*groups: List[str]) -> List[str]:
 
 def _looks_like_github_shorthand(ref: str) -> bool:
     parts = ref.split("/")
-    return len(parts) >= 2 and all(part.strip() for part in parts[:2]) and not ref.startswith(".")
+    return (
+        len(parts) >= 2
+        and all(part.strip() for part in parts[:2])
+        and not ref.startswith(".")
+    )

@@ -33,7 +33,13 @@ Clone the repository and install in editable mode:
 ```bash
 git clone https://github.com/Qitor/qitos.git
 cd qitos
-pip install -e ".[dev,models,benchmarks]"
+pip install -r requirements.txt
+```
+
+For the full contributor toolchain:
+
+```bash
+pip install -r requirements-dev.txt
 ```
 
 Run the supported test suite from the repo root:
@@ -53,4 +59,5 @@ mkdocs serve
 
 - [setup.py](https://github.com/Qitor/qitos/blob/main/setup.py)
 - [requirements.txt](https://github.com/Qitor/qitos/blob/main/requirements.txt)
+- [requirements-dev.txt](https://github.com/Qitor/qitos/blob/main/requirements-dev.txt)
 - [docs/requirements.txt](https://github.com/Qitor/qitos/blob/main/docs/requirements.txt)

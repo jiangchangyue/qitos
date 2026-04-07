@@ -15,7 +15,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from qitos import Action, AgentModule, Decision, StateSchema, Task, TaskBudget, ToolRegistry
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    StateSchema,
+    Task,
+    TaskBudget,
+    ToolRegistry,
+)
 from qitos.benchmark import TauBenchAdapter
 from qitos.benchmark.tau_bench.port.types import Action as TauAction
 from qitos.evaluate import EvaluationContext, EvaluationSuite
@@ -74,7 +82,14 @@ class TauState(StateSchema):
 
 
 class TauActionTool:
-    def __init__(self, name: str, description: str, parameters: Dict[str, Any], required: List[str], runner: Any):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        parameters: Dict[str, Any],
+        required: List[str],
+        runner: Any,
+    ):
         from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
 
         class _Impl(BaseTool):
@@ -89,7 +104,9 @@ class TauActionTool:
                     )
                 )
 
-            def run(self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+            def run(
+                self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
+            ) -> Dict[str, Any]:
                 return runner(name, kwargs)
 
         self.impl = _Impl()
@@ -121,23 +138,35 @@ class TauBenchAgent(AgentModule[TauState, Dict[str, Any], Action]):
             )
             registry.register(wrapper.impl)
 
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> TauState:
         task_index = int(kwargs.get("task_index", 0))
         reset = self.tau_env.reset(task_index=task_index)
         obs = str(getattr(reset, "observation", ""))
-        return TauState(task=task, max_steps=int(kwargs.get("max_steps", 30)), current_observation=obs)
+        return TauState(
+            task=task,
+            max_steps=int(kwargs.get("max_steps", 30)),
+            current_observation=obs,
+        )
 
     def build_system_prompt(self, state: TauState) -> str | None:
         wiki = str(getattr(self.tau_env, "wiki", ""))
-        rules = "\n".join(f"- {r}" for r in list(getattr(self.tau_env, "rules", []) or []))
+        rules = "\n".join(
+            f"- {r}" for r in list(getattr(self.tau_env, "rules", []) or [])
+        )
         return render_prompt(
             SYSTEM_PROMPT,
             {
                 "wiki": wiki,
                 "rules": rules,
-                "tool_schema": self.tool_registry.get_tool_descriptions() if self.tool_registry else "",
+                "tool_schema": (
+                    self.tool_registry.get_tool_descriptions()
+                    if self.tool_registry
+                    else ""
+                ),
             },
         )
 
@@ -153,16 +182,28 @@ class TauBenchAgent(AgentModule[TauState, Dict[str, Any], Action]):
             lines.extend(state.scratchpad[-8:])
         return "\n".join(lines)
 
-    def reduce(self, state: TauState, observation: Dict[str, Any], decision: Decision[Action]) -> TauState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self, state: TauState, observation: Dict[str, Any], decision: Decision[Action]
+    ) -> TauState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
             state.scratchpad.append(f"Action: {format_action(decision.actions[0])}")
         if action_results:
-            first = action_results[0] if isinstance(action_results[0], dict) else {"observation": str(action_results[0])}
+            first = (
+                action_results[0]
+                if isinstance(action_results[0], dict)
+                else {"observation": str(action_results[0])}
+            )
             state.scratchpad.append(f"Observation: {first.get('observation', first)}")
-            state.current_observation = str(first.get("observation", state.current_observation))
+            state.current_observation = str(
+                first.get("observation", state.current_observation)
+            )
             state.reward = float(first.get("reward", state.reward or 0.0))
             state.done = bool(first.get("done", False))
             if state.done:
@@ -174,7 +215,11 @@ class TauBenchAgent(AgentModule[TauState, Dict[str, Any], Action]):
 
     def _step_tool(self, action_name: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         response = self.tau_env.step(TauAction(name=action_name, kwargs=kwargs))
-        info = response.info.model_dump() if hasattr(response.info, "model_dump") else dict(getattr(response, "info", {}) or {})
+        info = (
+            response.info.model_dump()
+            if hasattr(response.info, "model_dump")
+            else dict(getattr(response, "info", {}) or {})
+        )
         return {
             "status": "success",
             "action": action_name,
@@ -188,9 +233,13 @@ class TauBenchAgent(AgentModule[TauState, Dict[str, Any], Action]):
 
 def _add_common_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--workspace", default="./qitos_tau_workspace")
-    ap.add_argument("--model-base-url", default=os.getenv("OPENAI_BASE_URL", DEFAULT_MODEL_BASE_URL))
+    ap.add_argument(
+        "--model-base-url", default=os.getenv("OPENAI_BASE_URL", DEFAULT_MODEL_BASE_URL)
+    )
     ap.add_argument("--api-key", default="")
-    ap.add_argument("--model-name", default=os.getenv("QITOS_MODEL", DEFAULT_MODEL_NAME))
+    ap.add_argument(
+        "--model-name", default=os.getenv("QITOS_MODEL", DEFAULT_MODEL_NAME)
+    )
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--theme", default=DEFAULT_THEME)
@@ -201,9 +250,15 @@ def _add_common_args(ap: argparse.ArgumentParser) -> None:
 
 
 def _build_model(args: argparse.Namespace) -> OpenAICompatibleModel:
-    api_key = str(args.api_key).strip() or os.getenv("OPENAI_API_KEY", "").strip() or os.getenv("QITOS_API_KEY", "").strip()
+    api_key = (
+        str(args.api_key).strip()
+        or os.getenv("OPENAI_API_KEY", "").strip()
+        or os.getenv("QITOS_API_KEY", "").strip()
+    )
     if not api_key:
-        raise ValueError("Missing API key. Set --api-key or OPENAI_API_KEY/QITOS_API_KEY.")
+        raise ValueError(
+            "Missing API key. Set --api-key or OPENAI_API_KEY/QITOS_API_KEY."
+        )
     return OpenAICompatibleModel(
         model=str(args.model_name),
         api_key=api_key,
@@ -213,7 +268,9 @@ def _build_model(args: argparse.Namespace) -> OpenAICompatibleModel:
     )
 
 
-def _setup_workspace(path: str) -> tuple[Path, Optional[tempfile.TemporaryDirectory[str]]]:
+def _setup_workspace(
+    path: str,
+) -> tuple[Path, Optional[tempfile.TemporaryDirectory[str]]]:
     if path:
         root = Path(path).expanduser().resolve()
         root.mkdir(parents=True, exist_ok=True)
@@ -265,10 +322,14 @@ def _read_done(path: Path) -> set[str]:
 def _build_tau_env(args: argparse.Namespace, task_index: int | None = None) -> Any:
     from qitos.benchmark.tau_bench.runtime import get_tau_runtime_env
 
-    return get_tau_runtime_env(env_name=args.tau_env, task_split=args.tau_split, task_index=task_index)
+    return get_tau_runtime_env(
+        env_name=args.tau_env, task_split=args.tau_split, task_index=task_index
+    )
 
 
-def _evaluate_one(task: Task, result: Any, include_model_judge: bool = False, llm: Any = None) -> Dict[str, Any]:
+def _evaluate_one(
+    task: Task, result: Any, include_model_judge: bool = False, llm: Any = None
+) -> Dict[str, Any]:
     manifest = {
         "summary": {
             "stop_reason": result.state.stop_reason,
@@ -289,18 +350,32 @@ def _evaluate_one(task: Task, result: Any, include_model_judge: bool = False, ll
         evaluators.append(ModelBasedEvaluator(name="tau_model_judge", llm=llm))
 
     suite = EvaluationSuite(evaluators=evaluators, mode="all")
-    suite_res = suite.evaluate(EvaluationContext(task=task, run=result, manifest=manifest, extras=extras))
+    suite_res = suite.evaluate(
+        EvaluationContext(task=task, run=result, manifest=manifest, extras=extras)
+    )
     return {
         "success": suite_res.success,
         "score": suite_res.score,
         "results": [
-            {"name": r.name, "success": r.success, "score": r.score, "reasons": r.reasons}
+            {
+                "name": r.name,
+                "success": r.success,
+                "score": r.score,
+                "reasons": r.reasons,
+            }
             for r in suite_res.results
         ],
     }
 
 
-def _run_one_task(args: argparse.Namespace, adapter: TauBenchAdapter, idx: int, record: Dict[str, Any], root: Path, trial: int = 0) -> Dict[str, Any]:
+def _run_one_task(
+    args: argparse.Namespace,
+    adapter: TauBenchAdapter,
+    idx: int,
+    record: Dict[str, Any],
+    root: Path,
+    trial: int = 0,
+) -> Dict[str, Any]:
     started = time.time()
     task = adapter.to_task(record, split=args.tau_split, idx=idx)
     task.budget = TaskBudget(max_steps=int(args.max_steps))
@@ -309,10 +384,16 @@ def _run_one_task(args: argparse.Namespace, adapter: TauBenchAdapter, idx: int, 
     model = _build_model(args)
     agent = TauBenchAgent(llm=model, tau_env=tau_env)
 
-    trace_writer = _make_trace_writer(args, f"tau_{args.tau_env}_{idx:05d}_trial{trial}")
-    render = None if args.disable_render else ClaudeStyleHook(
-        output_jsonl=str(root / f"render_events_{idx:05d}_trial{trial}.jsonl"),
-        theme=args.theme,
+    trace_writer = _make_trace_writer(
+        args, f"tau_{args.tau_env}_{idx:05d}_trial{trial}"
+    )
+    render = (
+        None
+        if args.disable_render
+        else ClaudeStyleHook(
+            output_jsonl=str(root / f"render_events_{idx:05d}_trial{trial}.jsonl"),
+            theme=args.theme,
+        )
     )
 
     error_msg = None
@@ -325,7 +406,12 @@ def _run_one_task(args: argparse.Namespace, adapter: TauBenchAdapter, idx: int, 
             trace=trace_writer,
             render=render,
         )
-        eval_out = _evaluate_one(task=task, result=result, include_model_judge=bool(args.enable_model_judge), llm=model)
+        eval_out = _evaluate_one(
+            task=task,
+            result=result,
+            include_model_judge=bool(args.enable_model_judge),
+            llm=model,
+        )
         reward = float(result.state.metadata.get("tau_reward", 0.0))
         stop_reason = result.state.stop_reason
         steps = result.step_count
@@ -381,10 +467,14 @@ def _print_metrics(rows: List[Dict[str, Any]]) -> None:
         ]
     )
     reports = {r.name: r for r in registry.compute_all(metric_inputs)}
-    pass_hat_ks = reports["reward_pass_hat"].value if "reward_pass_hat" in reports else {}
+    pass_hat_ks = (
+        reports["reward_pass_hat"].value if "reward_pass_hat" in reports else {}
+    )
 
     print("[Tau-Bench] Metrics (aligned with tau-bench run.py)")
-    print(f"- avg_reward: {reports['avg_reward'].value if 'avg_reward' in reports else 0.0}")
+    print(
+        f"- avg_reward: {reports['avg_reward'].value if 'avg_reward' in reports else 0.0}"
+    )
     print("- pass^k:")
     for k in sorted(pass_hat_ks.keys()):
         print(f"  - k={k}: {pass_hat_ks[k]}")
@@ -392,9 +482,18 @@ def _print_metrics(rows: List[Dict[str, Any]]) -> None:
         print(f"- {rep.name}: {rep.value}")
 
 
-def _run_full(args: argparse.Namespace, adapter: TauBenchAdapter, records: List[Dict[str, Any]], root: Path) -> None:
+def _run_full(
+    args: argparse.Namespace,
+    adapter: TauBenchAdapter,
+    records: List[Dict[str, Any]],
+    root: Path,
+) -> None:
     start_idx = max(0, int(args.start_index))
-    end_idx = len(records) if int(args.end_index) < 0 else min(len(records), int(args.end_index))
+    end_idx = (
+        len(records)
+        if int(args.end_index) < 0
+        else min(len(records), int(args.end_index))
+    )
     indices = list(range(start_idx, end_idx))
     if int(args.limit) > 0:
         indices = indices[: int(args.limit)]
@@ -409,28 +508,53 @@ def _run_full(args: argparse.Namespace, adapter: TauBenchAdapter, records: List[
             all_jobs.append((trial, idx))
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    out_path = Path(args.output_jsonl).expanduser().resolve() if args.output_jsonl else (root / f"tau_bench_{args.tau_env}_{args.tau_split}_{stamp}.jsonl")
+    out_path = (
+        Path(args.output_jsonl).expanduser().resolve()
+        if args.output_jsonl
+        else (root / f"tau_bench_{args.tau_env}_{args.tau_split}_{stamp}.jsonl")
+    )
 
     done = _read_done(out_path) if args.resume else set()
     jobs = [(t, i) for (t, i) in all_jobs if f"{t}:{i}" not in done]
-    print(f"[Tau-Bench] env={args.tau_env} split={args.tau_split} total_jobs={len(all_jobs)} pending={len(jobs)}")
+    print(
+        f"[Tau-Bench] env={args.tau_env} split={args.tau_split} total_jobs={len(all_jobs)} pending={len(jobs)}"
+    )
 
     rows: List[Dict[str, Any]] = []
     if int(args.concurrency) <= 1:
         for n, (trial, idx) in enumerate(jobs, start=1):
-            row = _run_one_task(args=args, adapter=adapter, idx=idx, record=records[idx], root=root, trial=trial)
+            row = _run_one_task(
+                args=args,
+                adapter=adapter,
+                idx=idx,
+                record=records[idx],
+                root=root,
+                trial=trial,
+            )
             _append_jsonl(out_path, {**row, "_job_key": f"{trial}:{idx}"})
             rows.append(row)
-            print(f"[Tau-Bench] {n}/{len(jobs)} trial={trial} idx={idx} reward={row['reward']} success={row['success']}")
+            print(
+                f"[Tau-Bench] {n}/{len(jobs)} trial={trial} idx={idx} reward={row['reward']} success={row['success']}"
+            )
     else:
         with ThreadPoolExecutor(max_workers=int(args.concurrency)) as ex:
             futs = [
-                ex.submit(_run_one_task, args=args, adapter=adapter, idx=idx, record=records[idx], root=root, trial=trial)
+                ex.submit(
+                    _run_one_task,
+                    args=args,
+                    adapter=adapter,
+                    idx=idx,
+                    record=records[idx],
+                    root=root,
+                    trial=trial,
+                )
                 for (trial, idx) in jobs
             ]
             for n, fut in enumerate(as_completed(futs), start=1):
                 row = fut.result()
-                _append_jsonl(out_path, {**row, "_job_key": f"{row['trial']}:{row['idx']}"})
+                _append_jsonl(
+                    out_path, {**row, "_job_key": f"{row['trial']}:{row['idx']}"}
+                )
                 rows.append(row)
                 print(
                     f"[Tau-Bench] {n}/{len(jobs)} trial={row['trial']} idx={row['idx']} "
@@ -474,7 +598,9 @@ def main() -> None:
         _run_full(args=args, adapter=adapter, records=records, root=root)
     else:
         idx = max(0, min(int(args.task_index), len(records) - 1))
-        row = _run_one_task(args=args, adapter=adapter, idx=idx, record=records[idx], root=root, trial=0)
+        row = _run_one_task(
+            args=args, adapter=adapter, idx=idx, record=records[idx], root=root, trial=0
+        )
         print("workspace:", root)
         print("task_id:", row["task_id"])
         print("reward:", row["reward"])

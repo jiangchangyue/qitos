@@ -10,7 +10,9 @@ from ..core.decision import Decision
 
 class Critic(ABC):
     @abstractmethod
-    def evaluate(self, state: Any, decision: Decision[Any], results: list[Any]) -> Dict[str, Any]:
+    def evaluate(
+        self, state: Any, decision: Decision[Any], results: list[Any]
+    ) -> Dict[str, Any]:
         """Return a structured critic decision dict.
 
         Supported keys (by convention):

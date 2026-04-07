@@ -43,8 +43,14 @@ def test_anthropic_native_messages_adapter(monkeypatch) -> None:
         captured["timeout"] = timeout
         return _FakeHTTPResponse(
             {
-                "content": [{"type": "text", "text": "Final Answer: native anthropic works"}],
-                "usage": {"input_tokens": 100, "cache_read_input_tokens": 3, "output_tokens": 22},
+                "content": [
+                    {"type": "text", "text": "Final Answer: native anthropic works"}
+                ],
+                "usage": {
+                    "input_tokens": 100,
+                    "cache_read_input_tokens": 3,
+                    "output_tokens": 22,
+                },
             }
         )
 
@@ -62,7 +68,11 @@ def test_anthropic_native_messages_adapter(monkeypatch) -> None:
     assert captured["headers"]["x-api-key"] == "anthropic-test"
     assert captured["json"]["system"] == "You are helpful."
     assert captured["json"]["messages"] == [{"role": "user", "content": "Say hello."}]
-    assert llm.extract_usage() == {"prompt_tokens": 103, "completion_tokens": 22, "total_tokens": 125}
+    assert llm.extract_usage() == {
+        "prompt_tokens": 103,
+        "completion_tokens": 22,
+        "total_tokens": 125,
+    }
 
 
 def test_gemini_native_adapter(monkeypatch) -> None:
@@ -78,7 +88,7 @@ def test_gemini_native_adapter(monkeypatch) -> None:
                     {
                         "content": {
                             "parts": [
-                                {"text": "Action: search(query=\"gemini\")"},
+                                {"text": 'Action: search(query="gemini")'},
                             ]
                         }
                     }
@@ -103,10 +113,16 @@ def test_gemini_native_adapter(monkeypatch) -> None:
 
     assert out == 'Action: search(query="gemini")'
     assert captured["params"] == {"key": "gemini-test"}
-    assert captured["json"]["systemInstruction"]["parts"][0]["text"] == "Follow protocol."
+    assert (
+        captured["json"]["systemInstruction"]["parts"][0]["text"] == "Follow protocol."
+    )
     assert captured["json"]["contents"][0]["role"] == "user"
     assert captured["json"]["contents"][1]["role"] == "model"
-    assert llm.extract_usage() == {"prompt_tokens": 18, "completion_tokens": 7, "total_tokens": 25}
+    assert llm.extract_usage() == {
+        "prompt_tokens": 18,
+        "completion_tokens": 7,
+        "total_tokens": 25,
+    }
 
 
 def test_litellm_adapter_and_usage(monkeypatch) -> None:
@@ -119,14 +135,20 @@ def test_litellm_adapter_and_usage(monkeypatch) -> None:
             "usage": {"prompt_tokens": 13, "completion_tokens": 5, "total_tokens": 18},
         }
 
-    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(completion=fake_completion))
+    monkeypatch.setitem(
+        sys.modules, "litellm", SimpleNamespace(completion=fake_completion)
+    )
     llm = LiteLLMModel(model="anthropic/claude-3-5-sonnet-latest", api_key="lite-key")
     out = llm([{"role": "user", "content": "Say hi"}])
 
     assert out == "Final Answer: litellm works"
     assert captured["model"] == "anthropic/claude-3-5-sonnet-latest"
     assert captured["api_key"] == "lite-key"
-    assert llm.extract_usage() == {"prompt_tokens": 13, "completion_tokens": 5, "total_tokens": 18}
+    assert llm.extract_usage() == {
+        "prompt_tokens": 13,
+        "completion_tokens": 5,
+        "total_tokens": 18,
+    }
 
 
 def test_model_factory_from_env_supports_new_providers(monkeypatch) -> None:
@@ -173,7 +195,7 @@ def test_local_openai_compatible_like_parsing_supports_tool_calls() -> None:
                             {
                                 "function": {
                                     "name": "search",
-                                    "arguments": "{\"query\": \"lmstudio\"}",
+                                    "arguments": '{"query": "lmstudio"}',
                                 }
                             }
                         ]

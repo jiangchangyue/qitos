@@ -62,7 +62,9 @@ class ClaudeCodeState(StateSchema):
 class ClaudeCodeAgent(AgentModule[ClaudeCodeState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         super().__init__(
-            tool_registry=coding_tools(workspace_root=workspace_root, shell_timeout=30, include_notebook=True),
+            tool_registry=coding_tools(
+                workspace_root=workspace_root, shell_timeout=30, include_notebook=True
+            ),
             llm=llm,
             model_parser=ReActTextParser(),
         )
@@ -77,7 +79,9 @@ class ClaudeCodeAgent(AgentModule[ClaudeCodeState, dict[str, Any], Action]):
         )
 
     def build_system_prompt(self, state: ClaudeCodeState) -> str | None:
-        return render_prompt(SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()}
+        )
 
     def prepare(self, state: ClaudeCodeState) -> str:
         lines = [
@@ -92,14 +96,25 @@ class ClaudeCodeAgent(AgentModule[ClaudeCodeState, dict[str, Any], Action]):
         if state.todos:
             lines.append("Current todos:")
             for item in state.todos:
-                lines.append(f"- {item.get('content', '')} [{item.get('status', 'pending')}]")
+                lines.append(
+                    f"- {item.get('content', '')} [{item.get('status', 'pending')}]"
+                )
         if state.scratchpad:
             lines.append("Recent trajectory:")
             lines.extend(state.scratchpad[-10:])
         return "\n".join(lines)
 
-    def reduce(self, state: ClaudeCodeState, observation: dict[str, Any], decision: Decision[Action]) -> ClaudeCodeState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: ClaudeCodeState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> ClaudeCodeState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -113,7 +128,9 @@ class ClaudeCodeAgent(AgentModule[ClaudeCodeState, dict[str, Any], Action]):
                 if first.get("current_mode"):
                     state.mode = str(first.get("current_mode"))
                 if int(first.get("returncode", 1)) == 0:
-                    state.final_result = "Verification passed with the canonical coding toolset."
+                    state.final_result = (
+                        "Verification passed with the canonical coding toolset."
+                    )
             if state.metadata.get("todos"):
                 state.todos = list(state.metadata.get("todos") or [])
             if state.metadata.get("mode"):
@@ -125,7 +142,9 @@ class ClaudeCodeAgent(AgentModule[ClaudeCodeState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

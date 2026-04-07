@@ -57,13 +57,12 @@ class ReactState(StateSchema):
 
 ```python
 from qitos import Action, AgentModule, ToolRegistry
-from qitos.kit import EditorToolSet, ReActTextParser, RunCommand
+from qitos.kit import CodingToolSet, ReActTextParser
 
 class ReactAgent(AgentModule[ReactState, dict, Action]):
     def __init__(self, llm, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
+        registry.include(CodingToolSet(workspace_root=workspace_root, include_notebook=False, enable_lsp=False, enable_tasks=False, enable_web=False, expose_modern_names=False))
         super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
 ```
 

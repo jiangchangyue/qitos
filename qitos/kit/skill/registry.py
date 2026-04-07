@@ -9,7 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional
 
-from .manifest import InstalledSkill, SkillManifest, SkillPackage, parse_skill_package_dir
+from .manifest import (
+    InstalledSkill,
+    SkillManifest,
+    SkillPackage,
+    parse_skill_package_dir,
+)
 
 
 @dataclass
@@ -32,13 +37,20 @@ class SkillRegistry:
     DEFAULT_GLOBAL_REGISTRY_PATH = "~/.qitos/skills"
     WORKSPACE_REGISTRY_DIR = ".qitos/skills"
 
-    def __init__(self, registry_path: Optional[str] = None, workspace_root: Optional[str] = None):
+    def __init__(
+        self, registry_path: Optional[str] = None, workspace_root: Optional[str] = None
+    ):
         if registry_path is not None:
             self.registry_path = Path(registry_path).expanduser().resolve()
         elif workspace_root:
-            self.registry_path = Path(workspace_root).expanduser().resolve() / self.WORKSPACE_REGISTRY_DIR
+            self.registry_path = (
+                Path(workspace_root).expanduser().resolve()
+                / self.WORKSPACE_REGISTRY_DIR
+            )
         else:
-            self.registry_path = Path(self.DEFAULT_GLOBAL_REGISTRY_PATH).expanduser().resolve()
+            self.registry_path = (
+                Path(self.DEFAULT_GLOBAL_REGISTRY_PATH).expanduser().resolve()
+            )
         self.registry_path.mkdir(parents=True, exist_ok=True)
         self._index_path = self.registry_path / "registry.json"
         self._skills: Dict[str, InstalledSkill] = {}
@@ -62,7 +74,11 @@ class SkillRegistry:
                     slug=str(entry_data.get("slug") or "").strip() or None,
                     source=str(entry_data.get("source_url") or install_path),
                     checksum=str(entry_data.get("checksum") or "").strip() or None,
-                    metadata=entry_data.get("metadata") if isinstance(entry_data.get("metadata"), dict) else {},
+                    metadata=(
+                        entry_data.get("metadata")
+                        if isinstance(entry_data.get("metadata"), dict)
+                        else {}
+                    ),
                 )
             except Exception:
                 continue
@@ -90,9 +106,13 @@ class SkillRegistry:
                 for key, installed in self._skills.items()
             }
         }
-        self._index_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        self._index_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
-    def install_package(self, package: SkillPackage, source_dir: str | Path, activate: bool = False) -> InstalledSkill:
+    def install_package(
+        self, package: SkillPackage, source_dir: str | Path, activate: bool = False
+    ) -> InstalledSkill:
         install_dir = self.registry_path / _safe_package_dir(package.key)
         if install_dir.exists():
             shutil.rmtree(install_dir)
@@ -173,7 +193,9 @@ class SkillRegistry:
     def list_active_skills(self) -> List[SkillManifest]:
         return [installed.manifest for installed in self.list_active()]
 
-    def find_for_task(self, task: str, filepath: Optional[str] = None, active_only: bool = False) -> List[SkillManifest]:
+    def find_for_task(
+        self, task: str, filepath: Optional[str] = None, active_only: bool = False
+    ) -> List[SkillManifest]:
         candidates = self.list_active() if active_only else self.list_installed()
         scored: List[tuple[int, InstalledSkill]] = []
         task_lower = task.lower()

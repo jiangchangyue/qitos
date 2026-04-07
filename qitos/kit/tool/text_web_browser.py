@@ -31,14 +31,19 @@ class WebSearch(_WebBrowserTool):
             ToolSpec(
                 name="web_search",
                 description="Search the web and return top text results",
-                parameters={"query": {"type": "string"}, "max_results": {"type": "integer"}},
+                parameters={
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"},
+                },
                 required=["query"],
                 permissions=ToolPermission(network=True),
                 required_ops=self.required_ops,
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Search the web and return top readable results through the browser env.
 
@@ -65,14 +70,19 @@ class VisitURL(_WebBrowserTool):
             ToolSpec(
                 name="visit_url",
                 description="Visit URL and load readable text into browser state",
-                parameters={"url": {"type": "string"}, "max_chars": {"type": "integer"}},
+                parameters={
+                    "url": {"type": "string"},
+                    "max_chars": {"type": "integer"},
+                },
                 required=["url"],
                 permissions=ToolPermission(network=True),
                 required_ops=self.required_ops,
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Visit a URL and load its readable text into the browser state.
 
@@ -102,7 +112,9 @@ class PageDown(_WebBrowserTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Scroll the current text page downward.
 
@@ -128,7 +140,9 @@ class PageUp(_WebBrowserTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Scroll the current text page upward.
 
@@ -154,7 +168,9 @@ class FindInPage(_WebBrowserTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Find a keyword in the current page and jump to its first occurrence.
 
@@ -180,7 +196,9 @@ class FindNext(_WebBrowserTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Jump to the next occurrence of the most recent page search.
 
@@ -198,14 +216,19 @@ class ArchiveSearch(_WebBrowserTool):
             ToolSpec(
                 name="archive_search",
                 description="Search the web archive for historical pages",
-                parameters={"query": {"type": "string"}, "max_results": {"type": "integer"}},
+                parameters={
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"},
+                },
                 required=["query"],
                 permissions=ToolPermission(network=True),
                 required_ops=self.required_ops,
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Search archived web snapshots through the browser env.
 
@@ -215,7 +238,9 @@ class ArchiveSearch(_WebBrowserTool):
         """
         query = str(args.get("query", ""))
         max_results = int(args.get("max_results", 8))
-        return self._ops(runtime_context).archive_search(query=query, max_results=max_results)
+        return self._ops(runtime_context).archive_search(
+            query=query, max_results=max_results
+        )
 
 
 __all__ = [

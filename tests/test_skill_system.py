@@ -25,7 +25,9 @@ def _write_skill_dir(
         f"---\nname: {name}\ndescription: {description}\nversion: 1.0.0\ntags: {tag_line}\n---\n\n{instructions}\n",
         encoding="utf-8",
     )
-    (path / "_meta.json").write_text(json.dumps({"slug": name, "version": "1.0.0"}), encoding="utf-8")
+    (path / "_meta.json").write_text(
+        json.dumps({"slug": name, "version": "1.0.0"}), encoding="utf-8"
+    )
     return path
 
 
@@ -51,16 +53,40 @@ class _FakeResponse:
 
 
 def test_skillhub_provider_search_and_download(tmp_path: Path):
-    skill_dir = _write_skill_dir(tmp_path / "github", name="github", description="GitHub CLI workflow.")
+    skill_dir = _write_skill_dir(
+        tmp_path / "github", name="github", description="GitHub CLI workflow."
+    )
     archive = _zip_skill_dir(skill_dir)
     provider = SkillHubProvider()
 
     def fake_get(url: str, params: dict[str, Any] | None = None, timeout: int = 20):
         _ = timeout
         if "api/v1/search" in url:
-            return _FakeResponse(json_data={"results": [{"slug": "github", "displayName": "Github", "summary": "GitHub CLI workflow.", "version": "1.0.0"}]})
+            return _FakeResponse(
+                json_data={
+                    "results": [
+                        {
+                            "slug": "github",
+                            "displayName": "Github",
+                            "summary": "GitHub CLI workflow.",
+                            "version": "1.0.0",
+                        }
+                    ]
+                }
+            )
         if url.endswith("skills.json"):
-            return _FakeResponse(json_data={"skills": [{"slug": "github", "name": "Github", "description": "GitHub CLI workflow.", "version": "1.0.0"}]})
+            return _FakeResponse(
+                json_data={
+                    "skills": [
+                        {
+                            "slug": "github",
+                            "name": "Github",
+                            "description": "GitHub CLI workflow.",
+                            "version": "1.0.0",
+                        }
+                    ]
+                }
+            )
         if url.endswith("github.zip"):
             return _FakeResponse(content=archive.read_bytes())
         raise AssertionError(f"unexpected url: {url} params={params}")
@@ -76,7 +102,9 @@ def test_skillhub_provider_search_and_download(tmp_path: Path):
 
 
 def test_skill_manager_installs_workspace_scoped_and_activates(tmp_path: Path):
-    skill_dir = _write_skill_dir(tmp_path / "local-skill", name="github", description="GitHub CLI workflow.")
+    skill_dir = _write_skill_dir(
+        tmp_path / "local-skill", name="github", description="GitHub CLI workflow."
+    )
     archive = _zip_skill_dir(skill_dir)
 
     manager = SkillManager(workspace_root=str(tmp_path / "workspace"))
@@ -92,8 +120,18 @@ def test_skill_manager_installs_workspace_scoped_and_activates(tmp_path: Path):
 def test_prompt_selection_prefers_matching_skill(tmp_path: Path):
     workspace = tmp_path / "workspace"
     manager = SkillManager(workspace_root=str(workspace))
-    github_dir = _write_skill_dir(tmp_path / "github", name="github", description="Interact with GitHub PRs.", instructions="Use gh pr checks.")
-    weather_dir = _write_skill_dir(tmp_path / "weather", name="weather", description="Get forecasts.", instructions="Use weather APIs.")
+    github_dir = _write_skill_dir(
+        tmp_path / "github",
+        name="github",
+        description="Interact with GitHub PRs.",
+        instructions="Use gh pr checks.",
+    )
+    weather_dir = _write_skill_dir(
+        tmp_path / "weather",
+        name="weather",
+        description="Get forecasts.",
+        instructions="Use weather APIs.",
+    )
 
     manager.install(str(_zip_skill_dir(github_dir)), activate=True)
     manager.install(str(_zip_skill_dir(weather_dir)), activate=False)
@@ -101,7 +139,11 @@ def test_prompt_selection_prefers_matching_skill(tmp_path: Path):
     registry = SkillRegistry(workspace_root=str(workspace))
     from qitos.kit.skill.injector import SkillPromptBuilder
 
-    prompt = SkillPromptBuilder(registry).with_skills_for_task("Investigate failed GitHub PR checks").build("BASE")
+    prompt = (
+        SkillPromptBuilder(registry)
+        .with_skills_for_task("Investigate failed GitHub PR checks")
+        .build("BASE")
+    )
     assert "github" in prompt.lower()
     assert "gh pr checks" in prompt
     assert "weather APIs" not in prompt
@@ -115,7 +157,9 @@ class _SkillState:
 
 
 class _BootstrapAgent(SkilledAgent[_SkillState, dict[str, Any], Action]):
-    def __init__(self, workspace_root: str, skill_sources: list[str], active_skills: list[str]):
+    def __init__(
+        self, workspace_root: str, skill_sources: list[str], active_skills: list[str]
+    ):
         registry = ToolRegistry()
         super().__init__(
             tool_registry=registry,
@@ -127,18 +171,27 @@ class _BootstrapAgent(SkilledAgent[_SkillState, dict[str, Any], Action]):
     def init_state(self, task: str, **kwargs: Any) -> _SkillState:
         return _SkillState(task=task, max_steps=int(kwargs.get("max_steps", 2)))
 
-    def decide(self, state: _SkillState, observation: dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: _SkillState, observation: dict[str, Any]
+    ) -> Decision[Action]:
         _ = observation
         return Decision.final(state.task)
 
-    def reduce(self, state: _SkillState, observation: dict[str, Any], decision: Decision[Action]) -> _SkillState:
+    def reduce(
+        self,
+        state: _SkillState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> _SkillState:
         _ = observation
         _ = decision
         return state
 
 
 def test_skilled_agent_bootstraps_code_configured_skills(tmp_path: Path):
-    skill_dir = _write_skill_dir(tmp_path / "github", name="github", description="GitHub CLI workflow.")
+    skill_dir = _write_skill_dir(
+        tmp_path / "github", name="github", description="GitHub CLI workflow."
+    )
     archive = _zip_skill_dir(skill_dir)
     agent = _BootstrapAgent(
         workspace_root=str(tmp_path / "workspace"),
@@ -146,13 +199,17 @@ def test_skilled_agent_bootstraps_code_configured_skills(tmp_path: Path):
         active_skills=["github"],
     )
     assert agent.get_skill("github") is not None
-    prompt = agent.build_prompt_with_skills("BASE", task="Check GitHub PRs", auto_select=True)
+    prompt = agent.build_prompt_with_skills(
+        "BASE", task="Check GitHub PRs", auto_select=True
+    )
     assert "ACTIVE SKILLS" in prompt
     assert "github" in prompt.lower()
 
 
 def test_skill_toolset_and_qit_cli(tmp_path: Path, capsys):
-    skill_dir = _write_skill_dir(tmp_path / "github", name="github", description="GitHub CLI workflow.")
+    skill_dir = _write_skill_dir(
+        tmp_path / "github", name="github", description="GitHub CLI workflow."
+    )
     archive = _zip_skill_dir(skill_dir)
     manager = SkillManager(workspace_root=str(tmp_path / "workspace"))
     toolset = SkillToolSet(manager=manager, workspace_root=str(tmp_path / "workspace"))

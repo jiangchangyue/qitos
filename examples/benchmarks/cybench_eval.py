@@ -15,7 +15,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from qitos import Action, AgentModule, Decision, StateSchema, Task, TaskBudget, ToolRegistry
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    StateSchema,
+    Task,
+    TaskBudget,
+    ToolRegistry,
+)
 from qitos.benchmark import CyBenchAdapter, CyBenchRuntime, score_cybench_submission
 from qitos.evaluate import EvaluationContext, EvaluationSuite
 from qitos.kit import HostEnv, ReActTextParser, format_action, render_prompt
@@ -29,7 +37,7 @@ from qitos.kit.metric import (
     MeanStepsMetric,
     StopReasonDistributionMetric,
 )
-from qitos.kit.tool import ListFiles, ReadFile, RunCommand, SubmitAnswer, WriteFile
+from qitos.kit.tool import CodingToolSet, SubmitAnswer
 from qitos.metric import MetricInput, MetricRegistry
 from qitos.models import OpenAICompatibleModel
 from qitos.render import ClaudeStyleHook
@@ -74,12 +82,21 @@ class CyBenchState(StateSchema):
 class CyBenchReactAgent(AgentModule[CyBenchState, Dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.register(ListFiles(root_dir=workspace_root))
-        registry.register(ReadFile(root_dir=workspace_root))
-        registry.register(WriteFile(root_dir=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root, timeout=90))
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                shell_timeout=90,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
         registry.register(SubmitAnswer())
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> CyBenchState:
         return CyBenchState(
@@ -89,7 +106,9 @@ class CyBenchReactAgent(AgentModule[CyBenchState, Dict[str, Any], Action]):
         )
 
     def build_system_prompt(self, state: CyBenchState) -> str | None:
-        return render_prompt(SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()}
+        )
 
     def prepare(self, state: CyBenchState) -> str:
         lines = [
@@ -105,8 +124,17 @@ class CyBenchReactAgent(AgentModule[CyBenchState, Dict[str, Any], Action]):
             lines.extend(state.scratchpad[-10:])
         return "\n".join(lines)
 
-    def reduce(self, state: CyBenchState, observation: Dict[str, Any], decision: Decision[Action]) -> CyBenchState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: CyBenchState,
+        observation: Dict[str, Any],
+        decision: Decision[Action],
+    ) -> CyBenchState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -128,9 +156,13 @@ class CyBenchReactAgent(AgentModule[CyBenchState, Dict[str, Any], Action]):
 
 def _add_common_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--workspace", default="./qitos_cybench_workspace")
-    ap.add_argument("--model-base-url", default=os.getenv("OPENAI_BASE_URL", DEFAULT_MODEL_BASE_URL))
+    ap.add_argument(
+        "--model-base-url", default=os.getenv("OPENAI_BASE_URL", DEFAULT_MODEL_BASE_URL)
+    )
     ap.add_argument("--api-key", default="")
-    ap.add_argument("--model-name", default=os.getenv("QITOS_MODEL", DEFAULT_MODEL_NAME))
+    ap.add_argument(
+        "--model-name", default=os.getenv("QITOS_MODEL", DEFAULT_MODEL_NAME)
+    )
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--theme", default=DEFAULT_THEME)
@@ -141,9 +173,15 @@ def _add_common_args(ap: argparse.ArgumentParser) -> None:
 
 
 def _build_model(args: argparse.Namespace) -> OpenAICompatibleModel:
-    api_key = str(args.api_key).strip() or os.getenv("OPENAI_API_KEY", "").strip() or os.getenv("QITOS_API_KEY", "").strip()
+    api_key = (
+        str(args.api_key).strip()
+        or os.getenv("OPENAI_API_KEY", "").strip()
+        or os.getenv("QITOS_API_KEY", "").strip()
+    )
     if not api_key:
-        raise ValueError("Missing API key. Set --api-key or OPENAI_API_KEY/QITOS_API_KEY.")
+        raise ValueError(
+            "Missing API key. Set --api-key or OPENAI_API_KEY/QITOS_API_KEY."
+        )
     return OpenAICompatibleModel(
         model=str(args.model_name),
         api_key=api_key,
@@ -153,7 +191,9 @@ def _build_model(args: argparse.Namespace) -> OpenAICompatibleModel:
     )
 
 
-def _setup_workspace(path: str) -> tuple[Path, Optional[tempfile.TemporaryDirectory[str]]]:
+def _setup_workspace(
+    path: str,
+) -> tuple[Path, Optional[tempfile.TemporaryDirectory[str]]]:
     if path:
         root = Path(path).expanduser().resolve()
         root.mkdir(parents=True, exist_ok=True)
@@ -260,7 +300,9 @@ def _run_one_task(
     )
     prep = runtime.prepare()
 
-    if not prep.get("steps") or any(not bool(s.get("ok", True)) for s in prep.get("steps", [])):
+    if not prep.get("steps") or any(
+        not bool(s.get("ok", True)) for s in prep.get("steps", [])
+    ):
         cleanup = runtime.cleanup()
         return {
             "task_id": task.id,
@@ -272,7 +314,9 @@ def _run_one_task(
             "stop_reason": "setup_failed",
             "steps": 0,
             "predictions": [],
-            "references": runtime.expected_answers(run_with_subtasks=not args.unguided_mode),
+            "references": runtime.expected_answers(
+                run_with_subtasks=not args.unguided_mode
+            ),
             "guided_subtask_score": 0.0,
             "guided_final_score": 0.0,
             "unguided_success": False,
@@ -286,7 +330,15 @@ def _run_one_task(
         }
 
     model = _build_model(args)
-    hooks = [] if args.disable_render else [ClaudeStyleHook(output_jsonl=str(ws / "render_events.jsonl"), theme=args.theme)]
+    hooks = (
+        []
+        if args.disable_render
+        else [
+            ClaudeStyleHook(
+                output_jsonl=str(ws / "render_events.jsonl"), theme=args.theme
+            )
+        ]
+    )
 
     predictions: List[str] = []
     total_steps = 0
@@ -297,8 +349,20 @@ def _run_one_task(
         nonlocal predictions, total_steps, stop_reason
         env = HostEnv(workspace_root=str(ws))
         if args.unguided_mode:
-            out = _run_objective(args, str(task.inputs.get("hard_prompt") or task.objective), f"{task.id}_unguided", ws, hooks, model, env)
-            predictions = out["submissions"] or ([str(out["result"].state.final_result)] if out["result"].state.final_result else [])
+            out = _run_objective(
+                args,
+                str(task.inputs.get("hard_prompt") or task.objective),
+                f"{task.id}_unguided",
+                ws,
+                hooks,
+                model,
+                env,
+            )
+            predictions = out["submissions"] or (
+                [str(out["result"].state.final_result)]
+                if out["result"].state.final_result
+                else []
+            )
             total_steps = out["steps"]
             stop_reason = str(out["stop_reason"])
         else:
@@ -310,9 +374,13 @@ def _run_one_task(
                 prompt = f"{q}\nAnswer format: {ans_fmt}"
                 if hint:
                     prompt += "\nHints:\n" + "\n".join(f"- {x}" for x in hint[:3])
-                out = _run_objective(args, prompt, f"{task.id}_subtask{sidx + 1}", ws, hooks, model, env)
+                out = _run_objective(
+                    args, prompt, f"{task.id}_subtask{sidx + 1}", ws, hooks, model, env
+                )
                 cand = out["submissions"]
-                predictions.append(str(cand[-1] if cand else (out["result"].state.final_result or "")))
+                predictions.append(
+                    str(cand[-1] if cand else (out["result"].state.final_result or ""))
+                )
                 total_steps += out["steps"]
                 stop_reason = str(out["stop_reason"])
 
@@ -336,21 +404,44 @@ def _run_one_task(
                         model,
                         denv,
                     )
-                    predictions = out["submissions"] or ([str(out["result"].state.final_result)] if out["result"].state.final_result else [])
+                    predictions = out["submissions"] or (
+                        [str(out["result"].state.final_result)]
+                        if out["result"].state.final_result
+                        else []
+                    )
                     total_steps = out["steps"]
                     stop_reason = str(out["stop_reason"])
                 else:
                     subtasks = list(task.inputs.get("subtasks") or [])
                     for sidx, sub in enumerate(subtasks):
-                        q = str(sub.get("question", "")).strip() or f"Solve subtask {sidx + 1}."
+                        q = (
+                            str(sub.get("question", "")).strip()
+                            or f"Solve subtask {sidx + 1}."
+                        )
                         ans_fmt = str(sub.get("answer_format", "")).strip()
                         hint = list(sub.get("hints") or [])
                         prompt = f"{q}\nAnswer format: {ans_fmt}"
                         if hint:
-                            prompt += "\nHints:\n" + "\n".join(f"- {x}" for x in hint[:3])
-                        out = _run_objective(args, prompt, f"{task.id}_subtask{sidx + 1}", ws, hooks, model, denv)
+                            prompt += "\nHints:\n" + "\n".join(
+                                f"- {x}" for x in hint[:3]
+                            )
+                        out = _run_objective(
+                            args,
+                            prompt,
+                            f"{task.id}_subtask{sidx + 1}",
+                            ws,
+                            hooks,
+                            model,
+                            denv,
+                        )
                         cand = out["submissions"]
-                        predictions.append(str(cand[-1] if cand else (out["result"].state.final_result or "")))
+                        predictions.append(
+                            str(
+                                cand[-1]
+                                if cand
+                                else (out["result"].state.final_result or "")
+                            )
+                        )
                         total_steps += out["steps"]
                         stop_reason = str(out["stop_reason"])
         else:
@@ -359,9 +450,16 @@ def _run_one_task(
         error_msg = str(exc)
 
     references = runtime.expected_answers(run_with_subtasks=not args.unguided_mode)
-    eval_score = score_cybench_submission(predictions=predictions, references=references, run_with_subtasks=not args.unguided_mode)
+    eval_score = score_cybench_submission(
+        predictions=predictions,
+        references=references,
+        run_with_subtasks=not args.unguided_mode,
+    )
 
-    suite = EvaluationSuite(evaluators=[CyBenchEvaluator(run_with_subtasks=not args.unguided_mode)], mode="all")
+    suite = EvaluationSuite(
+        evaluators=[CyBenchEvaluator(run_with_subtasks=not args.unguided_mode)],
+        mode="all",
+    )
     suite_out = suite.evaluate(
         EvaluationContext(
             task=task,
@@ -430,9 +528,18 @@ def _print_metrics(rows: List[Dict[str, Any]]) -> None:
         print(f"- {rep.name}: {rep.value}")
 
 
-def _run_full(args: argparse.Namespace, adapter: CyBenchAdapter, records: List[Dict[str, Any]], root: Path) -> None:
+def _run_full(
+    args: argparse.Namespace,
+    adapter: CyBenchAdapter,
+    records: List[Dict[str, Any]],
+    root: Path,
+) -> None:
     start_idx = max(0, int(args.start_index))
-    end_idx = len(records) if int(args.end_index) < 0 else min(len(records), int(args.end_index))
+    end_idx = (
+        len(records)
+        if int(args.end_index) < 0
+        else min(len(records), int(args.end_index))
+    )
     indices = list(range(start_idx, end_idx))
     if int(args.limit) > 0:
         indices = indices[: int(args.limit)]
@@ -445,12 +552,25 @@ def _run_full(args: argparse.Namespace, adapter: CyBenchAdapter, records: List[D
     out_file = out_dir / "results.jsonl"
 
     done = _read_done(out_file) if bool(args.resume) else set()
-    todo = [i for i in indices if adapter.to_task(records[i], split=("guided" if not args.unguided_mode else "unguided"), idx=i).id not in done]
+    todo = [
+        i
+        for i in indices
+        if adapter.to_task(
+            records[i],
+            split=("guided" if not args.unguided_mode else "unguided"),
+            idx=i,
+        ).id
+        not in done
+    ]
 
     print(f"running tasks: {len(todo)} / {len(indices)}")
 
     rows: List[Dict[str, Any]] = []
-    scheduler = DockerEnvScheduler(max_active=max(1, int(args.max_workers))) if args.use_docker_env else None
+    scheduler = (
+        DockerEnvScheduler(max_active=max(1, int(args.max_workers)))
+        if args.use_docker_env
+        else None
+    )
 
     with ThreadPoolExecutor(max_workers=max(1, int(args.max_workers))) as ex:
         futures = {
@@ -477,7 +597,11 @@ def _run_full(args: argparse.Namespace, adapter: CyBenchAdapter, records: List[D
             )
 
     if not rows and out_file.exists():
-        rows = [json.loads(line) for line in out_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+        rows = [
+            json.loads(line)
+            for line in out_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
     _print_metrics(rows)
     print("results_jsonl:", out_file)
@@ -489,7 +613,11 @@ def main() -> None:
     ap.add_argument("--cybench-root", default="references/cybench")
     ap.add_argument("--task-index", type=int, default=-1)
     ap.add_argument("--run-all", action="store_true")
-    ap.add_argument("--unguided-mode", action="store_true", help="If set, run one final objective per task")
+    ap.add_argument(
+        "--unguided-mode",
+        action="store_true",
+        help="If set, run one final objective per task",
+    )
     ap.add_argument("--easy-prompt", action="store_true")
     ap.add_argument("--run-requirements", action="store_true")
     ap.add_argument("--start-docker", action="store_true", default=True)
@@ -510,8 +638,12 @@ def main() -> None:
     args = ap.parse_args()
 
     root, temp_ctx = _setup_workspace(args.workspace)
-    adapter = CyBenchAdapter(cybench_root=args.cybench_root, run_with_subtasks=not bool(args.unguided_mode))
-    records = adapter.load_records(cybench_root=args.cybench_root, run_with_subtasks=not bool(args.unguided_mode))
+    adapter = CyBenchAdapter(
+        cybench_root=args.cybench_root, run_with_subtasks=not bool(args.unguided_mode)
+    )
+    records = adapter.load_records(
+        cybench_root=args.cybench_root, run_with_subtasks=not bool(args.unguided_mode)
+    )
 
     if args.run_all:
         _run_full(args, adapter, records, root)
@@ -520,7 +652,9 @@ def main() -> None:
         if idx >= len(records):
             raise IndexError(f"task_index out of range: {idx} >= {len(records)}")
         scheduler = DockerEnvScheduler(max_active=1) if args.use_docker_env else None
-        row = _run_one_task(args, adapter, idx, records[idx], root, trial=0, docker_scheduler=scheduler)
+        row = _run_one_task(
+            args, adapter, idx, records[idx], root, trial=0, docker_scheduler=scheduler
+        )
         print(json.dumps(row, ensure_ascii=False, indent=2))
         _print_metrics([row])
 

@@ -8,7 +8,12 @@ from .basic import (
     StopReasonDistributionMetric,
     SuccessRateMetric,
 )
-from .reward import RewardAverageMetric, RewardPassHatMetric, RewardSuccessRateMetric, is_successful_reward
+from .reward import (
+    RewardAverageMetric,
+    RewardPassHatMetric,
+    RewardSuccessRateMetric,
+    is_successful_reward,
+)
 from .cybench import (
     CyBenchGuidedFinalScoreMetric,
     CyBenchGuidedSubtaskScoreMetric,

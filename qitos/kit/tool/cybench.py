@@ -21,7 +21,10 @@ class SubmitAnswer(BaseTool):
                 description="Submit one answer candidate for current CyBench objective",
                 parameters={
                     "answer": {"type": "string", "description": "candidate answer"},
-                    "subtask_index": {"type": "integer", "description": "optional subtask index"},
+                    "subtask_index": {
+                        "type": "integer",
+                        "description": "optional subtask index",
+                    },
                 },
                 required=["answer"],
                 permissions=ToolPermission(),
@@ -29,7 +32,9 @@ class SubmitAnswer(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Submit one final answer candidate for the active CyBench task.
 
@@ -42,7 +47,9 @@ class SubmitAnswer(BaseTool):
         _ = runtime_context
         answer = str(args.get("answer", ""))
         raw_subtask_index = args.get("subtask_index")
-        subtask_index = int(raw_subtask_index) if raw_subtask_index is not None else None
+        subtask_index = (
+            int(raw_subtask_index) if raw_subtask_index is not None else None
+        )
         return {
             "status": "success",
             "type": "answer_submission",

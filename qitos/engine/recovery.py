@@ -63,7 +63,9 @@ class RecoveryPolicy:
         self._recoveries = 0
         self.tracker = RecoveryTracker()
 
-    def handle(self, state: Any, phase: str, step_id: int, exc: Exception) -> RecoveryDecision:
+    def handle(
+        self, state: Any, phase: str, step_id: int, exc: Exception
+    ) -> RecoveryDecision:
         info = classify_exception(exc, phase, step_id)
         recommendation = self._recommendation_for(info.category)
 
@@ -79,7 +81,9 @@ class RecoveryPolicy:
         if info.recoverable:
             self._recoveries += 1
             self.tracker.add(info, recommendation, decision="continue")
-            return RecoveryDecision(handled=True, continue_run=True, note="recoverable_continue")
+            return RecoveryDecision(
+                handled=True, continue_run=True, note="recoverable_continue"
+            )
 
         self.tracker.add(info, recommendation, decision="stop")
         return RecoveryDecision(
@@ -98,10 +102,14 @@ class RecoveryPolicy:
             "model_error": "Check model connectivity/timeout and retry strategy.",
             "system_error": "Inspect runtime configuration and uncaught exceptions.",
         }
-        return mapping.get(key, "Inspect runtime diagnostics and retry with stricter guards.")
+        return mapping.get(
+            key, "Inspect runtime diagnostics and retry with stricter guards."
+        )
 
 
-def build_failure_report(policy: RecoveryPolicy, stop_reason: Optional[str]) -> Dict[str, Any]:
+def build_failure_report(
+    policy: RecoveryPolicy, stop_reason: Optional[str]
+) -> Dict[str, Any]:
     summary = policy.tracker.summary()
     summary["stop_reason"] = stop_reason
     return summary

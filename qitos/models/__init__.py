@@ -15,11 +15,11 @@ Usage:
     # OpenAI
     from qitos.models import OpenAIModel
     llm = OpenAIModel(model="gpt-4")
-    
+
     # Ollama
     from qitos.models import OllamaModel
     llm = OllamaModel(model="llama3")
-    
+
     # 从环境变量自动选择
     from qitos.models import ModelFactory
     llm = ModelFactory.from_env()
@@ -27,16 +27,17 @@ Usage:
 
 from .base import Model, AsyncModel, ModelFactory
 from .context_registry import infer_context_window
+from .profile_registry import (
+    ModelProfile,
+    infer_default_protocol,
+    infer_model_profile,
+    known_model_profiles,
+)
 from .anthropic import AnthropicModel
 from .gemini import GeminiModel
 from .litellm import LiteLLMModel
 from .openai import OpenAIModel, OpenAICompatibleModel, AzureOpenAIModel
-from .local import (
-    OllamaModel,
-    OllamaGenerateModel,
-    LMStudioModel,
-    VLLMModel
-)
+from .local import OllamaModel, OllamaGenerateModel, LMStudioModel, VLLMModel
 
 __all__ = [
     # 基类
@@ -44,7 +45,10 @@ __all__ = [
     "AsyncModel",
     "ModelFactory",
     "infer_context_window",
-    
+    "ModelProfile",
+    "infer_model_profile",
+    "infer_default_protocol",
+    "known_model_profiles",
     # OpenAI
     "OpenAIModel",
     "OpenAICompatibleModel",
@@ -52,7 +56,6 @@ __all__ = [
     "AnthropicModel",
     "GeminiModel",
     "LiteLLMModel",
-    
     # 本地模型
     "OllamaModel",
     "OllamaGenerateModel",

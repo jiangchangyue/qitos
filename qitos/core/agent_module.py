@@ -11,6 +11,7 @@ from .decision import Decision
 from .env import EnvSpec
 from .history import History
 from .memory import Memory
+from .model_response import ModelResponse
 from .task import Task, TaskBudget
 
 
@@ -29,6 +30,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         tool_registry: Any = None,
         llm: Any = None,
         model_parser: Any = None,
+        model_protocol: Any = None,
         memory: Memory | None = None,
         history: History | None = None,
         **config: Any,
@@ -36,6 +38,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         self.tool_registry = tool_registry
         self.llm = llm
         self.model_parser = model_parser
+        self.model_protocol = model_protocol
         self.memory = memory
         self.history = history
         self.config = config
@@ -52,8 +55,22 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         """Convert current state into model-ready text."""
         return str(state)
 
-    def decide(self, state: StateT, observation: ObservationT) -> Optional[Decision[ActionT]]:
+    def decide(
+        self, state: StateT, observation: ObservationT
+    ) -> Optional[Decision[ActionT]]:
         """Optional custom decision hook. Return None to use Engine model decision."""
+        return None
+
+    def interpret_model_response(
+        self,
+        state: StateT,
+        observation: ObservationT,
+        response: ModelResponse,
+    ) -> Optional[Decision[ActionT]]:
+        """Optional hook to interpret a normalized model response before parser execution."""
+        _ = state
+        _ = observation
+        _ = response
         return None
 
     @abstractmethod
@@ -75,6 +92,29 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
 
         return Engine(agent=self, **engine_kwargs)
 
+    def active_protocol(self) -> Any:
+        runtime_protocol = getattr(self, "_runtime_protocol", None)
+        if runtime_protocol is not None:
+            return runtime_protocol
+        return self.model_protocol
+
+    def render_tool_schema(self, protocol: Any = None) -> str:
+        if self.tool_registry is None:
+            return ""
+        resolved = protocol if protocol is not None else self.active_protocol()
+        if hasattr(self.tool_registry, "render_tool_schema"):
+            return self.tool_registry.render_tool_schema(protocol=resolved)
+        return self.tool_registry.get_tool_descriptions(protocol=resolved)
+
+    def compose_system_prompt(self, base_prompt: str, protocol: Any = None) -> str:
+        resolved = protocol if protocol is not None else self.active_protocol()
+        try:
+            from ..protocols import render_protocol_prompt
+
+            return render_protocol_prompt(base_prompt, resolved, self.tool_registry)
+        except Exception:
+            return str(base_prompt or "")
+
     def run(
         self,
         task: str | Task,
@@ -86,6 +126,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         max_steps: int | None = None,
         env: Any = None,
         parser: Any = None,
+        protocol: Any = None,
         search: Any = None,
         critics: List[Any] | None = None,
         stop_criteria: List[Any] | None = None,
@@ -106,6 +147,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
             workspace=workspace,
             env=env,
             parser=parser,
+            protocol=protocol,
             search=search,
             critics=critics,
             stop_criteria=stop_criteria,
@@ -119,7 +161,9 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
             hooks=hooks,
             render_hooks=render_hooks,
         )
-        task = self._coerce_task(task=task, workspace=workspace, max_steps=max_steps, env=kwargs.get("env"))
+        task = self._coerce_task(
+            task=task, workspace=workspace, max_steps=max_steps, env=kwargs.get("env")
+        )
         if max_steps is not None:
             state_kwargs.setdefault("max_steps", int(max_steps))
         engine = self.build_engine(**kwargs)
@@ -128,7 +172,9 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
             return result
         return result.state.final_result
 
-    def _coerce_task(self, task: str | Task, workspace: str | None, max_steps: int | None, env: Any) -> str | Task:
+    def _coerce_task(
+        self, task: str | Task, workspace: str | None, max_steps: int | None, env: Any
+    ) -> str | Task:
         if isinstance(task, Task):
             if max_steps is None and (workspace is None or task.env_spec is not None):
                 return task
@@ -137,8 +183,15 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
                 budget = dict(payload.get("budget") or {})
                 budget["max_steps"] = int(max_steps)
                 payload["budget"] = budget
-            if workspace is not None and payload.get("env_spec") is None and env is not None:
-                payload["env_spec"] = {"type": "host", "config": {"workspace_root": workspace}}
+            if (
+                workspace is not None
+                and payload.get("env_spec") is None
+                and env is not None
+            ):
+                payload["env_spec"] = {
+                    "type": "host",
+                    "config": {"workspace_root": workspace},
+                }
             return Task.from_dict(payload)
 
         if max_steps is None and workspace is None:
@@ -148,7 +201,11 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         return Task(
             id=task_id,
             objective=str(task),
-            env_spec=EnvSpec(type="host", config={"workspace_root": workspace}) if workspace is not None and env is not None else None,
+            env_spec=(
+                EnvSpec(type="host", config={"workspace_root": workspace})
+                if workspace is not None and env is not None
+                else None
+            ),
             budget=TaskBudget(max_steps=max_steps),
         )
 
@@ -160,6 +217,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         workspace: str | None,
         env: Any,
         parser: Any,
+        protocol: Any,
         search: Any,
         critics: List[Any] | None,
         stop_criteria: List[Any] | None,
@@ -192,6 +250,8 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
 
         if parser is not None:
             kwargs["parser"] = parser
+        if protocol is not None:
+            kwargs["protocol"] = protocol
         if search is not None:
             kwargs["search"] = search
         if critics is not None:
@@ -217,7 +277,9 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         if render_setting is None and "render_hooks" not in kwargs:
             render_setting = True
         if render_setting:
-            render_obj = self._render_hook_from_input(render=render_setting, workspace=workspace, theme=theme)
+            render_obj = self._render_hook_from_input(
+                render=render_setting, workspace=workspace, theme=theme
+            )
             if isinstance(render_obj, list):
                 render_list.extend(render_obj)
             elif render_obj is not None:
@@ -228,7 +290,9 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         if render_list:
             kwargs["render_hooks"] = render_list
 
-    def _trace_writer_from_input(self, trace: Any, trace_logdir: str, trace_prefix: str | None) -> Any:
+    def _trace_writer_from_input(
+        self, trace: Any, trace_logdir: str, trace_prefix: str | None
+    ) -> Any:
         if trace is not True:
             return trace
         from ..trace import TraceWriter
@@ -242,14 +306,18 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
             metadata={"model_id": getattr(getattr(self, "llm", None), "model", None)},
         )
 
-    def _render_hook_from_input(self, render: Any, workspace: str | None, theme: str) -> Any:
+    def _render_hook_from_input(
+        self, render: Any, workspace: str | None, theme: str
+    ) -> Any:
         if render is not True:
             return render
         from ..render import ClaudeStyleHook
 
         output_jsonl = None
         if workspace:
-            output_jsonl = str(Path(workspace).expanduser().resolve() / "render_events.jsonl")
+            output_jsonl = str(
+                Path(workspace).expanduser().resolve() / "render_events.jsonl"
+            )
         return ClaudeStyleHook(output_jsonl=output_jsonl, theme=theme)
 
 

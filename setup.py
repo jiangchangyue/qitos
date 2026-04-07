@@ -59,6 +59,8 @@ setup(
             "black>=23.0.0",
             "flake8>=6.0.0",
             "mypy>=1.0.0",
+            "pre-commit>=3.7.0",
+            "pip-audit>=2.7.0",
         ],
         "all": [
             "openai>=1.0.0",

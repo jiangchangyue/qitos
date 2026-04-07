@@ -86,7 +86,9 @@ class Task:
     budget: TaskBudget = dc_field(default_factory=TaskBudget)
     metadata: Dict[str, Any] = dc_field(default_factory=dict)
 
-    def resolve_resources(self, workspace: Optional[str] = None) -> List[TaskResourceBinding]:
+    def resolve_resources(
+        self, workspace: Optional[str] = None
+    ) -> List[TaskResourceBinding]:
         root = Path(workspace).resolve() if workspace else None
         out: List[TaskResourceBinding] = []
         for item in self.resources:
@@ -115,7 +117,9 @@ class Task:
             first = issues[0]
             raise ValueError(f"{first.code}: {first.message}")
 
-    def validate_structured(self, workspace: Optional[str] = None) -> List[TaskValidationIssue]:
+    def validate_structured(
+        self, workspace: Optional[str] = None
+    ) -> List[TaskValidationIssue]:
         issues: List[TaskValidationIssue] = []
         if not self.id or not isinstance(self.id, str):
             issues.append(
@@ -143,7 +147,10 @@ class Task:
                     details={"value": self.budget.max_steps},
                 )
             )
-        if self.budget.max_runtime_seconds is not None and float(self.budget.max_runtime_seconds) <= 0:
+        if (
+            self.budget.max_runtime_seconds is not None
+            and float(self.budget.max_runtime_seconds) <= 0
+        ):
             issues.append(
                 TaskValidationIssue(
                     code="TASK_BUDGET_RUNTIME_INVALID",
@@ -163,7 +170,10 @@ class Task:
             )
 
         if self.env_spec is not None:
-            if not isinstance(self.env_spec.type, str) or not self.env_spec.type.strip():
+            if (
+                not isinstance(self.env_spec.type, str)
+                or not self.env_spec.type.strip()
+            ):
                 issues.append(
                     TaskValidationIssue(
                         code="TASK_ENV_SPEC_INVALID",
@@ -191,7 +201,9 @@ class Task:
                         field=f"resources[{idx}]",
                     )
                 )
-            if item.mount_to is not None and (not isinstance(item.mount_to, str) or not item.mount_to.strip()):
+            if item.mount_to is not None and (
+                not isinstance(item.mount_to, str) or not item.mount_to.strip()
+            ):
                 issues.append(
                     TaskValidationIssue(
                         code="TASK_RESOURCE_MOUNT_INVALID",
@@ -271,15 +283,29 @@ class Task:
         obj = cls(
             id=str(payload.get("id", "")),
             objective=str(payload.get("objective", "")),
-            inputs=payload.get("inputs", {}) if isinstance(payload.get("inputs", {}), dict) else {},
+            inputs=(
+                payload.get("inputs", {})
+                if isinstance(payload.get("inputs", {}), dict)
+                else {}
+            ),
             resources=resources,
             env_spec=env_spec,
-            constraints=payload.get("constraints", {}) if isinstance(payload.get("constraints", {}), dict) else {},
+            constraints=(
+                payload.get("constraints", {})
+                if isinstance(payload.get("constraints", {}), dict)
+                else {}
+            ),
             success_criteria=[
-                str(x) for x in payload.get("success_criteria", []) if isinstance(payload.get("success_criteria", []), list)
+                str(x)
+                for x in payload.get("success_criteria", [])
+                if isinstance(payload.get("success_criteria", []), list)
             ],
             budget=budget,
-            metadata=payload.get("metadata", {}) if isinstance(payload.get("metadata", {}), dict) else {},
+            metadata=(
+                payload.get("metadata", {})
+                if isinstance(payload.get("metadata", {}), dict)
+                else {}
+            ),
         )
         obj.validate()
         return obj

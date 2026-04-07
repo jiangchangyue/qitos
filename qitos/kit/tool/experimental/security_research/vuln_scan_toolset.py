@@ -24,7 +24,9 @@ class VulnScanToolSet:
     All targets must be within authorized scope.
     """
 
-    def __init__(self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."):
+    def __init__(
+        self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."
+    ):
         """
         Initialize vulnerability scanning toolset.
 
@@ -49,13 +51,25 @@ class VulnScanToolSet:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
             )
-            return {"stdout": result.stdout, "stderr": result.stderr, "return_code": result.returncode}
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+            }
         except subprocess.TimeoutExpired:
             return {"stdout": "", "stderr": "Command timed out", "return_code": -1}
         except FileNotFoundError:
-            return {"stdout": "", "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.",
+                "return_code": -1,
+            }
         except Exception as e:
-            return {"stdout": "", "stderr": f"Error executing command: {str(e)}", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Error executing command: {str(e)}",
+                "return_code": -1,
+            }
 
     def _parse_nuclei_json(self, json_output: str) -> List[Dict[str, Any]]:
         """
@@ -106,21 +120,28 @@ class VulnScanToolSet:
         findings = []
         # Nikto output format: + OSVDB-XXXX: message (URL)
         # or: + message (URL)
-        pattern = r'\+\s+(?:(?:OSVDB-(\d+)|):\s*)?(.+?)(?:\s+\(([^)]+)\))?$'
+        pattern = r"\+\s+(?:(?:OSVDB-(\d+)|):\s*)?(.+?)(?:\s+\(([^)]+)\))?$"
 
         for line in text.split("\n"):
             line = line.strip()
-            if line.startswith("+ ") and not line.startswith("+ Target IP") and not line.startswith("+ Start Time") and not line.startswith("+ End Time"):
+            if (
+                line.startswith("+ ")
+                and not line.startswith("+ Target IP")
+                and not line.startswith("+ Start Time")
+                and not line.startswith("+ End Time")
+            ):
                 match = re.match(pattern, line[2:])
                 if match:
                     osvdb_id = match.group(1)
                     message = match.group(2).strip()
                     url = match.group(3) or ""
-                    findings.append({
-                        "osvdb_id": osvdb_id or "N/A",
-                        "message": message,
-                        "url": url,
-                    })
+                    findings.append(
+                        {
+                            "osvdb_id": osvdb_id or "N/A",
+                            "message": message,
+                            "url": url,
+                        }
+                    )
 
         return findings
 
@@ -141,12 +162,14 @@ class VulnScanToolSet:
             # Format: Title | Path | Type | Platform
             parts = [p.strip() for p in line.split("|")]
             if len(parts) >= 4:
-                entries.append({
-                    "title": parts[0].strip(),
-                    "path": parts[1].strip(),
-                    "type": parts[2].strip(),
-                    "platform": parts[3].strip(),
-                })
+                entries.append(
+                    {
+                        "title": parts[0].strip(),
+                        "path": parts[1].strip(),
+                        "type": parts[2].strip(),
+                        "platform": parts[3].strip(),
+                    }
+                )
 
         return entries
 
@@ -162,9 +185,15 @@ class VulnScanToolSet:
         }
         return mapping.get(severity.lower(), "⚪")
 
-    @tool(name='nuclei_scan')
-    def nuclei_scan(self, target: str, templates: str = "cves", severity: str = "critical,high,medium",
-                    rate_limit: int = 150, timeout_sec: int = 10) -> Dict[str, Any]:
+    @tool(name="nuclei_scan")
+    def nuclei_scan(
+        self,
+        target: str,
+        templates: str = "cves",
+        severity: str = "critical,high,medium",
+        rate_limit: int = 150,
+        timeout_sec: int = 10,
+    ) -> Dict[str, Any]:
         """
         Run Nuclei vulnerability scanner against a target.
 
@@ -186,15 +215,23 @@ class VulnScanToolSet:
         :return: Structured list of vulnerability findings with severity, description, and remediation.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         cmd = [
             "nuclei",
-            "-u", target,
-            "-t", templates,
-            "-severity", severity,
-            "-rl", str(rate_limit),
-            "-timeout", str(timeout_sec),
+            "-u",
+            target,
+            "-t",
+            templates,
+            "-severity",
+            severity,
+            "-rl",
+            str(rate_limit),
+            "-timeout",
+            str(timeout_sec),
             "-json",
             "-silent",
         ]
@@ -202,12 +239,22 @@ class VulnScanToolSet:
         result = self._run_command(cmd, timeout=1800)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"Nuclei scan failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Nuclei scan failed: {result['stderr']}",
+            }
 
         findings = self._parse_nuclei_json(result["stdout"])
 
         # Sort by severity
-        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4, "unknown": 5}
+        severity_order = {
+            "critical": 0,
+            "high": 1,
+            "medium": 2,
+            "low": 3,
+            "info": 4,
+            "unknown": 5,
+        }
         findings.sort(key=lambda f: severity_order.get(f["severity"].lower(), 5))
 
         # Group by severity
@@ -250,11 +297,13 @@ class VulnScanToolSet:
                 "findings": findings,
                 "finding_count": len(findings),
                 "by_severity": {k: len(v) for k, v in by_severity.items()},
-            }
+            },
         }
 
-    @tool(name='nikto_scan')
-    def nikto_scan(self, target: str, tuning: str = "123457890", ports: str = "80,443") -> Dict[str, Any]:
+    @tool(name="nikto_scan")
+    def nikto_scan(
+        self, target: str, tuning: str = "123457890", ports: str = "80,443"
+    ) -> Dict[str, Any]:
         """
         Run Nikto web server scanner against a target.
 
@@ -278,21 +327,31 @@ class VulnScanToolSet:
         :return: Structured list of findings with OSVDB IDs, descriptions, and affected URLs.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         cmd = [
             "nikto",
-            "-h", target,
-            "-Tuning", tuning,
-            "-ports", ports,
-            "-Format", "txt",
+            "-h",
+            target,
+            "-Tuning",
+            tuning,
+            "-ports",
+            ports,
+            "-Format",
+            "txt",
             "-nointeractive",
         ]
 
         result = self._run_command(cmd, timeout=1800)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"Nikto scan failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Nikto scan failed: {result['stderr']}",
+            }
 
         findings = self._parse_nikto_output(result["stdout"])
 
@@ -304,7 +363,11 @@ class VulnScanToolSet:
             output += "| # | Severity | Finding | URL |\n"
             output += "|---|----------|---------|-----|\n"
             for i, f in enumerate(findings, 1):
-                msg = f["message"][:100] + "..." if len(f["message"]) > 100 else f["message"]
+                msg = (
+                    f["message"][:100] + "..."
+                    if len(f["message"]) > 100
+                    else f["message"]
+                )
                 url = f["url"][:80] + "..." if len(f["url"]) > 80 else f["url"]
                 output += f"| {i} | {f['osvdb_id']} | {msg} | {url} |\n"
 
@@ -316,11 +379,13 @@ class VulnScanToolSet:
                 "tuning": tuning,
                 "findings": findings,
                 "finding_count": len(findings),
-            }
+            },
         }
 
-    @tool(name='searchsploit')
-    def searchsploit(self, query: str, exclude_sourced: bool = False, exact: bool = False) -> Dict[str, Any]:
+    @tool(name="searchsploit")
+    def searchsploit(
+        self, query: str, exclude_sourced: bool = False, exact: bool = False
+    ) -> Dict[str, Any]:
         """
         Search Exploit-DB for public exploits and vulnerabilities.
 
@@ -349,7 +414,10 @@ class VulnScanToolSet:
                 cmd_text.append("--exact")
             result_text = self._run_command(cmd_text, timeout=120)
             if not result_text["stdout"]:
-                return {"status": "error", "message": f"No exploits found for '{query}'."}
+                return {
+                    "status": "error",
+                    "message": f"No exploits found for '{query}'.",
+                }
 
             entries = self._parse_searchsploit(result_text["stdout"])
         else:
@@ -357,13 +425,16 @@ class VulnScanToolSet:
             try:
                 data = json.loads(result["stdout"])
                 if isinstance(data, list):
-                    entries = [{
-                        "title": e.get("Title", ""),
-                        "path": e.get("Path", ""),
-                        "type": e.get("Type", ""),
-                        "platform": e.get("Platform", ""),
-                        "date": e.get("Date", ""),
-                    } for e in data]
+                    entries = [
+                        {
+                            "title": e.get("Title", ""),
+                            "path": e.get("Path", ""),
+                            "type": e.get("Type", ""),
+                            "platform": e.get("Platform", ""),
+                            "date": e.get("Date", ""),
+                        }
+                        for e in data
+                    ]
             except json.JSONDecodeError:
                 entries = self._parse_searchsploit(result["stdout"])
 
@@ -374,7 +445,11 @@ class VulnScanToolSet:
             output += "| # | Title | Type | Platform | Path |\n"
             output += "|---|-------|------|----------|------|\n"
             for i, e in enumerate(entries[:30], 1):
-                title = e.get("title", "")[:80] + "..." if len(e.get("title", "")) > 80 else e.get("title", "")
+                title = (
+                    e.get("title", "")[:80] + "..."
+                    if len(e.get("title", "")) > 80
+                    else e.get("title", "")
+                )
                 output += f"| {i} | {title} | {e.get('type', '')} | {e.get('platform', '')} | `{e.get('path', '')}` |\n"
 
             if len(entries) > 30:
@@ -387,10 +462,10 @@ class VulnScanToolSet:
                 "query": query,
                 "exploits": entries,
                 "exploit_count": len(entries),
-            }
+            },
         }
 
-    @tool(name='vuln_quick')
+    @tool(name="vuln_quick")
     def vuln_quick(self, target: str) -> Dict[str, Any]:
         """
         Quick vulnerability assessment combining multiple scanners.
@@ -402,16 +477,26 @@ class VulnScanToolSet:
         :return: Combined vulnerability findings from all scanners.
         """
         if not self._validate_target(target):
-            return {"status": "error", "message": f"Target '{target}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target}' is not in the authorized scope.",
+            }
 
         # Run nuclei with critical+high severity only
         nuclei_cmd = [
-            "nuclei", "-u", target,
-            "-t", "cves",
-            "-severity", "critical,high",
-            "-rl", "100",
-            "-timeout", "5",
-            "-json", "-silent",
+            "nuclei",
+            "-u",
+            target,
+            "-t",
+            "cves",
+            "-severity",
+            "critical,high",
+            "-rl",
+            "100",
+            "-timeout",
+            "5",
+            "-json",
+            "-silent",
         ]
 
         nuclei_result = self._run_command(nuclei_cmd, timeout=900)
@@ -440,10 +525,10 @@ class VulnScanToolSet:
                 "target": target,
                 "nuclei_findings": nuclei_findings,
                 "total_findings": len(nuclei_findings),
-            }
+            },
         }
 
-    @tool(name='cve_query')
+    @tool(name="cve_query")
     def cve_query(self, service: str, version: str = "") -> Dict[str, Any]:
         """
         Query known CVEs for a specific service and version.
@@ -468,13 +553,16 @@ class VulnScanToolSet:
             try:
                 data = json.loads(result["stdout"])
                 if isinstance(data, list):
-                    entries = [{
-                        "title": e.get("Title", ""),
-                        "path": e.get("Path", ""),
-                        "type": e.get("Type", ""),
-                        "platform": e.get("Platform", ""),
-                        "date": e.get("Date", ""),
-                    } for e in data]
+                    entries = [
+                        {
+                            "title": e.get("Title", ""),
+                            "path": e.get("Path", ""),
+                            "type": e.get("Type", ""),
+                            "platform": e.get("Platform", ""),
+                            "date": e.get("Date", ""),
+                        }
+                        for e in data
+                    ]
             except json.JSONDecodeError:
                 pass
 
@@ -485,7 +573,11 @@ class VulnScanToolSet:
             output += "| # | Title | Type | Platform |\n"
             output += "|---|-------|------|----------|\n"
             for i, e in enumerate(entries[:20], 1):
-                title = e.get("title", "")[:100] + "..." if len(e.get("title", "")) > 100 else e.get("title", "")
+                title = (
+                    e.get("title", "")[:100] + "..."
+                    if len(e.get("title", "")) > 100
+                    else e.get("title", "")
+                )
                 output += f"| {i} | {title} | {e.get('type', '')} | {e.get('platform', '')} |\n"
 
         else:
@@ -501,5 +593,5 @@ class VulnScanToolSet:
                 "query": query,
                 "exploits": entries,
                 "exploit_count": len(entries),
-            }
+            },
         }

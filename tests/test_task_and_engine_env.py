@@ -30,14 +30,18 @@ class _TerminalAfterOneStepEnv(Env):
 
     def reset(self, task=None, workspace=None, **kwargs):
         self.reset_count += 1
-        return EnvObservation(data={"task": getattr(task, "id", str(task)), "workspace": workspace})
+        return EnvObservation(
+            data={"task": getattr(task, "id", str(task)), "workspace": workspace}
+        )
 
     def observe(self, state=None):
         return EnvObservation(data={"step_count": self.step_count})
 
     def step(self, action, state=None):
         self.step_count += 1
-        return EnvStepResult(observation=self.observe(state=state), done=self.step_count >= 1)
+        return EnvStepResult(
+            observation=self.observe(state=state), done=self.step_count >= 1
+        )
 
 
 @dataclass
@@ -68,8 +72,14 @@ class _DemoAgent(AgentModule[_DemoState, Dict[str, Any], Action]):
         state.logs.append(f"env_enabled={env_enabled}")
         return Decision.act(actions=[Action(name="noop")])
 
-    def reduce(self, state: _DemoState, observation: Dict[str, Any], decision: Decision[Action]) -> _DemoState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self, state: _DemoState, observation: Dict[str, Any], decision: Decision[Action]
+    ) -> _DemoState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         state.logs.append(f"results={len(action_results)}")
         return state
 
@@ -96,7 +106,9 @@ def test_engine_accepts_task_and_env_terminal_stop():
     agent = _DemoAgent()
     task = Task(id="t1", objective="do one noop", budget=TaskBudget(max_steps=3))
 
-    result = Engine(agent=agent, budget=RuntimeBudget(max_steps=3), env=env).run(task, workspace="/tmp")
+    result = Engine(agent=agent, budget=RuntimeBudget(max_steps=3), env=env).run(
+        task, workspace="/tmp"
+    )
     assert result.state.task == "do one noop"
     assert result.state.stop_reason == StopReason.ENV_TERMINAL.value
     assert result.task_result is not None
@@ -107,7 +119,9 @@ def test_engine_accepts_task_and_env_terminal_stop():
 
 def test_task_budget_overrides_engine_budget():
     agent = _DemoAgent()
-    task = Task(id="t_budget", objective="budgeted noop", budget=TaskBudget(max_steps=1))
+    task = Task(
+        id="t_budget", objective="budgeted noop", budget=TaskBudget(max_steps=1)
+    )
 
     result = Engine(agent=agent, budget=RuntimeBudget(max_steps=5)).run(task)
     assert result.state.stop_reason == StopReason.BUDGET_STEPS.value
@@ -128,7 +142,9 @@ def test_task_preflight_reports_missing_resource(tmp_path):
         objective="noop",
         resources=[TaskResource(kind="file", path="missing.txt", required=True)],
     )
-    result = Engine(agent=agent, budget=RuntimeBudget(max_steps=3)).run(task, workspace=str(tmp_path))
+    result = Engine(agent=agent, budget=RuntimeBudget(max_steps=3)).run(
+        task, workspace=str(tmp_path)
+    )
     assert result.state.stop_reason == StopReason.TASK_VALIDATION_FAILED.value
     assert result.step_count == 0
     end_events = [e for e in result.events if e.phase.value == "END"]
@@ -166,9 +182,18 @@ def test_engine_respects_max_tokens_budget():
                 return None
             return Decision.final("done")
 
-        def reduce(self, state: _LLMState, observation: Dict[str, Any], decision: Decision[Action]) -> _LLMState:
+        def reduce(
+            self,
+            state: _LLMState,
+            observation: Dict[str, Any],
+            decision: Decision[Action],
+        ) -> _LLMState:
             return state
 
-    task = Task(id="t_token", objective="token limited", budget=TaskBudget(max_steps=10, max_tokens=5))
+    task = Task(
+        id="t_token",
+        objective="token limited",
+        budget=TaskBudget(max_steps=10, max_tokens=5),
+    )
     result = Engine(agent=_LLMAgent(), budget=RuntimeBudget(max_steps=10)).run(task)
     assert result.state.stop_reason == StopReason.BUDGET_TOKENS.value

@@ -36,4 +36,3 @@ def test_text_web_atomic_tools_use_ops_context():
 
     next_match = FindNext().run(runtime_context=ctx)
     assert next_match["status"] == "error"
-

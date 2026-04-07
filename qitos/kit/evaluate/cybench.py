@@ -20,7 +20,9 @@ class CyBenchEvaluator(TrajectoryEvaluator):
         extras = dict(context.extras or {})
         predictions = list(extras.get("predictions") or [])
         references = list(extras.get("references") or [])
-        run_with_subtasks = bool(extras.get("run_with_subtasks", self.run_with_subtasks))
+        run_with_subtasks = bool(
+            extras.get("run_with_subtasks", self.run_with_subtasks)
+        )
 
         score = score_cybench_submission(
             predictions=[str(x) for x in predictions],

@@ -72,7 +72,9 @@ class CyBenchPartialMatchRateMetric(Metric):
             total += len(bits)
             matched += sum(1 for b in bits if bool(b))
         value = (float(matched) / float(total)) if total else 0.0
-        return MetricReport(name=self.name, value=value, details={"matched": matched, "total": total})
+        return MetricReport(
+            name=self.name, value=value, details={"matched": matched, "total": total}
+        )
 
 
 __all__ = [

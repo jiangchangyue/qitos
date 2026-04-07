@@ -36,8 +36,7 @@ Fields:
 
 What it wires:
 
-- `EditorToolSet` (view/replace_lines/insert/etc.)
-- `RunCommand` (verification)
+- `CodingToolSet` with the legacy-compatible editor, file, and shell surface
 - `ReActTextParser` for text-protocol decisions
 
 ### `history_policy`: control model-facing history in Engine

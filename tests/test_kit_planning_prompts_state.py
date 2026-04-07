@@ -1,6 +1,13 @@
 from dataclasses import dataclass, field
 
-from qitos.kit.planning import LLMDecisionBlock, PlanCursor, ToolAwareMessageBuilder, append_log, parse_numbered_plan, set_final
+from qitos.kit.planning import (
+    LLMDecisionBlock,
+    PlanCursor,
+    ToolAwareMessageBuilder,
+    append_log,
+    parse_numbered_plan,
+    set_final,
+)
 from qitos.kit.parser import ReActTextParser
 from qitos.kit.prompts import PLAN_ACT_SYSTEM_PROMPT, REACT_SYSTEM_PROMPT, render_prompt
 from qitos.kit.state import append_str, set_str
@@ -28,14 +35,19 @@ class _S:
 
 def test_planning_blocks_and_state_helpers():
     builder = ToolAwareMessageBuilder(system_template="Tools:\n{tool_schema}")
-    msgs = builder.build(task="compute", tool_registry=_DummyRegistry(), scratchpad=["Thought: start"])
+    msgs = builder.build(
+        task="compute", tool_registry=_DummyRegistry(), scratchpad=["Thought: start"]
+    )
     assert len(msgs) == 2
     obs_msgs = builder.build_from_observation(
         observation={
             "task": "compute",
             "scratchpad": ["Thought: start"],
             "phase": "act",
-            "memory": {"summary": "recent memory", "records": [{"role": "observation", "content": "x"}]},
+            "memory": {
+                "summary": "recent memory",
+                "records": [{"role": "observation", "content": "x"}],
+            },
         },
         tool_registry=_DummyRegistry(),
     )

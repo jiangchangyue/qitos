@@ -84,7 +84,10 @@ def classify_exception(exc: Exception, phase: str, step_id: int) -> RuntimeError
 
     msg = str(exc).lower()
 
-    if isinstance(exc, (TimeoutError, ConnectionError)) and phase.lower() in {"decide", "propose"}:
+    if isinstance(exc, (TimeoutError, ConnectionError)) and phase.lower() in {
+        "decide",
+        "propose",
+    }:
         return RuntimeErrorInfo(
             category=ErrorCategory.MODEL,
             message=str(exc),
@@ -93,7 +96,9 @@ def classify_exception(exc: Exception, phase: str, step_id: int) -> RuntimeError
             recoverable=True,
         )
 
-    if isinstance(exc, ValueError) and ("decision mode" in msg or "parser" in msg or "json" in msg or "xml" in msg):
+    if isinstance(exc, ValueError) and (
+        "decision mode" in msg or "parser" in msg or "json" in msg or "xml" in msg
+    ):
         return RuntimeErrorInfo(
             category=ErrorCategory.PARSE,
             message=str(exc),

@@ -13,18 +13,30 @@ from .registry import SkillRegistry
 
 def build_parser(prog: str = "qit skill") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=prog, description="Manage QitOS skills")
-    parser.add_argument("--workspace", help="Workspace root for workspace-scoped skills")
-    parser.add_argument("--provider", default="skillhub", help="Default skill provider (default: skillhub)")
+    parser.add_argument(
+        "--workspace", help="Workspace root for workspace-scoped skills"
+    )
+    parser.add_argument(
+        "--provider",
+        default="skillhub",
+        help="Default skill provider (default: skillhub)",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    search_parser = subparsers.add_parser("search", help="Search skills from a provider catalog")
+    search_parser = subparsers.add_parser(
+        "search", help="Search skills from a provider catalog"
+    )
     search_parser.add_argument("query", nargs="+", help="Search query")
     search_parser.add_argument("--limit", type=int, default=10)
     search_parser.set_defaults(func=cmd_search)
 
     install_parser = subparsers.add_parser("install", help="Install a skill")
-    install_parser.add_argument("source", help="Provider ref like skillhub:github, slug, URL, or path")
-    install_parser.add_argument("--activate", action="store_true", help="Activate immediately after install")
+    install_parser.add_argument(
+        "source", help="Provider ref like skillhub:github, slug, URL, or path"
+    )
+    install_parser.add_argument(
+        "--activate", action="store_true", help="Activate immediately after install"
+    )
     install_parser.set_defaults(func=cmd_install)
 
     list_parser = subparsers.add_parser("list", help="List installed skills")
@@ -35,15 +47,21 @@ def build_parser(prog: str = "qit skill") -> argparse.ArgumentParser:
     info_parser.add_argument("name", help="Skill ref, slug, or manifest name")
     info_parser.set_defaults(func=cmd_info)
 
-    activate_parser = subparsers.add_parser("activate", help="Activate an installed skill")
+    activate_parser = subparsers.add_parser(
+        "activate", help="Activate an installed skill"
+    )
     activate_parser.add_argument("name", help="Skill ref, slug, or manifest name")
     activate_parser.set_defaults(func=cmd_activate)
 
-    uninstall_parser = subparsers.add_parser("uninstall", help="Remove an installed skill")
+    uninstall_parser = subparsers.add_parser(
+        "uninstall", help="Remove an installed skill"
+    )
     uninstall_parser.add_argument("name", help="Skill ref, slug, or manifest name")
     uninstall_parser.set_defaults(func=cmd_uninstall)
 
-    validate_parser = subparsers.add_parser("validate", help="Validate a local skill directory")
+    validate_parser = subparsers.add_parser(
+        "validate", help="Validate a local skill directory"
+    )
     validate_parser.add_argument("path", help="Path to skill directory")
     validate_parser.set_defaults(func=cmd_validate)
 
@@ -80,7 +98,9 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 def cmd_list(args: argparse.Namespace) -> int:
     registry = SkillRegistry(workspace_root=args.workspace)
-    installed = registry.list_active() if args.active_only else registry.list_installed()
+    installed = (
+        registry.list_active() if args.active_only else registry.list_installed()
+    )
     if not installed:
         print("No skills installed.")
         return 0

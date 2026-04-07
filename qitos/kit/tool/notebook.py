@@ -15,7 +15,11 @@ def _load_notebook(root_dir: str, path: str) -> tuple[Path, Dict[str, Any]]:
     resolved = Path(resolve_workspace_path(root_dir, path))
     with resolved.open("r", encoding="utf-8") as f:
         data = json.load(f)
-    if not isinstance(data, dict) or "cells" not in data or not isinstance(data["cells"], list):
+    if (
+        not isinstance(data, dict)
+        or "cells" not in data
+        or not isinstance(data["cells"], list)
+    ):
         raise ValueError(f"Invalid notebook format: {path}")
     return resolved, data
 
@@ -55,7 +59,9 @@ class ReadNotebook(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Read a window of cells from a notebook file.
 
@@ -121,7 +127,9 @@ class ReplaceNotebookCell(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Replace the source text of one notebook cell.
 
@@ -178,7 +186,9 @@ class InsertNotebookCell(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Insert a new notebook cell into a `.ipynb` file.
 
@@ -198,7 +208,10 @@ class InsertNotebookCell(BaseTool):
         index = int(args.get("index", -1))
         normalized_type = str(cell_type or "").strip().lower()
         if normalized_type not in {"code", "markdown", "raw"}:
-            return {"status": "error", "message": f"Unsupported cell_type: {normalized_type}"}
+            return {
+                "status": "error",
+                "message": f"Unsupported cell_type: {normalized_type}",
+            }
         try:
             resolved, data = _load_notebook(self._root_dir, path)
             cells = data["cells"]
@@ -210,7 +223,9 @@ class InsertNotebookCell(BaseTool):
             if normalized_type == "code":
                 new_cell["execution_count"] = None
                 new_cell["outputs"] = []
-            insert_at = len(cells) if int(index) < 0 else min(max(0, int(index)), len(cells))
+            insert_at = (
+                len(cells) if int(index) < 0 else min(max(0, int(index)), len(cells))
+            )
             cells.insert(insert_at, new_cell)
             _dump_notebook(resolved, data)
             return {

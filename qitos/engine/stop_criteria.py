@@ -30,7 +30,11 @@ class MaxStepsCriteria(StopCriteria):
         runtime_info: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, Optional[StopReason], Optional[str]]:
         if step_count >= self.max_steps:
-            return True, StopReason.BUDGET_STEPS, f"step_id={step_count} reached max_steps={self.max_steps}"
+            return (
+                True,
+                StopReason.BUDGET_STEPS,
+                f"step_id={step_count} reached max_steps={self.max_steps}",
+            )
         return False, None, None
 
 
@@ -60,14 +64,24 @@ class MaxRuntimeCriteria(StopCriteria):
         info = runtime_info or {}
         elapsed = float(info.get("elapsed_seconds", 0.0))
         if elapsed >= self.max_runtime_seconds:
-            return True, StopReason.BUDGET_TIME, f"elapsed={elapsed:.3f}s >= max_runtime_seconds={self.max_runtime_seconds:.3f}s"
+            return (
+                True,
+                StopReason.BUDGET_TIME,
+                f"elapsed={elapsed:.3f}s >= max_runtime_seconds={self.max_runtime_seconds:.3f}s",
+            )
         return False, None, None
 
 
 class StagnationCriteria(StopCriteria):
-    def __init__(self, max_stagnant_steps: int = 3, signature_fn: Optional[Callable[[Any], Any]] = None):
+    def __init__(
+        self,
+        max_stagnant_steps: int = 3,
+        signature_fn: Optional[Callable[[Any], Any]] = None,
+    ):
         self.max_stagnant_steps = max_stagnant_steps
-        self.signature_fn = signature_fn or (lambda s: (getattr(s, "final_result", None), getattr(s, "phase", None)))
+        self.signature_fn = signature_fn or (
+            lambda s: (getattr(s, "final_result", None), getattr(s, "phase", None))
+        )
         self._last_signature: Any = object()
         self._stagnant_steps: int = 0
 

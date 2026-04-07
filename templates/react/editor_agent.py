@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
-from qitos.kit.tool.editor import EditorToolSet
+from qitos.kit.tool import CodingToolSet
 
 
 @dataclass
@@ -23,15 +23,29 @@ class ReActEditorAgent(AgentModule[ReActEditorState, Dict[str, Any], Action]):
 
     def __init__(self, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+                profile="editor",
+            )
+        )
         super().__init__(tool_registry=registry)
 
     def init_state(self, task: str, **kwargs: Any) -> ReActEditorState:
         path = kwargs.get("path", "react_notes.txt")
         content = kwargs.get("content", "hello from react editor")
-        return ReActEditorState(task=task, target_path=path, target_content=content, max_steps=6)
+        return ReActEditorState(
+            task=task, target_path=path, target_content=content, max_steps=6
+        )
 
-    def observe(self, state: ReActEditorState, env_view: Dict[str, Any]) -> Dict[str, Any]:
+    def observe(
+        self, state: ReActEditorState, env_view: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return {
             "task": state.task,
             "stage": state.stage,
@@ -39,13 +53,23 @@ class ReActEditorAgent(AgentModule[ReActEditorState, Dict[str, Any], Action]):
             "target_path": state.target_path,
         }
 
-    def decide(self, state: ReActEditorState, observation: Dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: ReActEditorState, observation: Dict[str, Any]
+    ) -> Decision[Action]:
         if state.stage == "done":
             return Decision.final(state.final_result or "done")
 
         if state.stage == "init":
             return Decision.act(
-                actions=[Action(name="create", args={"path": state.target_path, "file_text": state.target_content})],
+                actions=[
+                    Action(
+                        name="create",
+                        args={
+                            "path": state.target_path,
+                            "file_text": state.target_content,
+                        },
+                    )
+                ],
                 rationale="Need to create file first",
             )
 

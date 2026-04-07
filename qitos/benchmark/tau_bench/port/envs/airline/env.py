@@ -20,7 +20,9 @@ class MockAirlineDomainEnv(Env):
     ):
         match task_split:
             case "test":
-                from qitos.benchmark.tau_bench.port.envs.airline.tasks_test import TASKS as tasks
+                from qitos.benchmark.tau_bench.port.envs.airline.tasks_test import (
+                    TASKS as tasks,
+                )
             case _:
                 raise ValueError(f"Unknown task split: {task_split}")
         super().__init__(

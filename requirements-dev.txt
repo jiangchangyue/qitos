@@ -1,0 +1,6 @@
+# Full contributor setup for a local clone of QitOS.
+#
+# This installs QitOS in editable mode together with development tooling,
+# optional model SDKs, and benchmark dependencies.
+
+-e .[dev,models,benchmarks]

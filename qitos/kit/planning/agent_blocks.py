@@ -24,8 +24,12 @@ class ToolAwareMessageBuilder:
         scratchpad: Optional[List[str]] = None,
         extra: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, str]]:
-        tool_schema = tool_registry.get_tool_descriptions() if tool_registry is not None else ""
-        system_prompt = render_prompt(self.system_template, {"tool_schema": tool_schema})
+        tool_schema = (
+            tool_registry.get_tool_descriptions() if tool_registry is not None else ""
+        )
+        system_prompt = render_prompt(
+            self.system_template, {"tool_schema": tool_schema}
+        )
 
         lines = [f"Task: {task}"]
         if scratchpad:

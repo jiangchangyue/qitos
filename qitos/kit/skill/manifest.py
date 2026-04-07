@@ -61,7 +61,9 @@ class SkillManifest:
         name = str(frontmatter.get("name") or "").strip()
         description = str(frontmatter.get("description") or "").strip()
         if not name or not description:
-            raise ValueError("SKILL.md must have 'name' and 'description' in frontmatter")
+            raise ValueError(
+                "SKILL.md must have 'name' and 'description' in frontmatter"
+            )
 
         tags = _coerce_list(frontmatter.get("tags"))
         requires = _coerce_list(frontmatter.get("requires"))
@@ -79,11 +81,25 @@ class SkillManifest:
             slug=_string_or_none(frontmatter.get("slug")),
             homepage=_string_or_none(frontmatter.get("homepage")),
             categories=categories,
-            package_type=str(frontmatter.get("package_type", "prompt")).strip() or "prompt",
-            extra={k: v for k, v in frontmatter.items() if k not in {
-                "name", "description", "version", "author", "tags", "requires",
-                "slug", "homepage", "categories", "package_type",
-            }},
+            package_type=str(frontmatter.get("package_type", "prompt")).strip()
+            or "prompt",
+            extra={
+                k: v
+                for k, v in frontmatter.items()
+                if k
+                not in {
+                    "name",
+                    "description",
+                    "version",
+                    "author",
+                    "tags",
+                    "requires",
+                    "slug",
+                    "homepage",
+                    "categories",
+                    "package_type",
+                }
+            },
         )
 
     def validate(self) -> List[str]:
@@ -158,9 +174,12 @@ def parse_skill_package_dir(
     merged_metadata = dict(metadata or {})
     merged_metadata.update(meta)
 
-    resolved_slug = slug or merged_metadata.get("slug") or manifest.slug or manifest.name
+    resolved_slug = (
+        slug or merged_metadata.get("slug") or manifest.slug or manifest.name
+    )
     resolved_version = (
-        str(merged_metadata.get("version") or manifest.version or "1.0.0").strip() or "1.0.0"
+        str(merged_metadata.get("version") or manifest.version or "1.0.0").strip()
+        or "1.0.0"
     )
     homepage = (
         _string_or_none(merged_metadata.get("homepage"))
@@ -168,14 +187,18 @@ def parse_skill_package_dir(
         or _string_or_none(merged_metadata.get("url"))
     )
     tags = _merge_unique(manifest.tags, _coerce_list(merged_metadata.get("tags")))
-    categories = _merge_unique(manifest.categories, _coerce_list(merged_metadata.get("categories")))
+    categories = _merge_unique(
+        manifest.categories, _coerce_list(merged_metadata.get("categories"))
+    )
 
     manifest.slug = str(resolved_slug)
     manifest.version = resolved_version
     manifest.homepage = homepage
     manifest.tags = tags
     manifest.categories = categories
-    manifest.package_type = str(merged_metadata.get("package_type") or manifest.package_type or "prompt")
+    manifest.package_type = str(
+        merged_metadata.get("package_type") or manifest.package_type or "prompt"
+    )
 
     return SkillPackage(
         provider=provider,

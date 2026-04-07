@@ -25,7 +25,12 @@ class WindowHistory(History):
         observation: Any = None,
     ) -> List[HistoryMessage]:
         query = query or {}
-        max_items = int(query.get("max_items", self.window_size if self.window_size > 0 else len(self._messages)))
+        max_items = int(
+            query.get(
+                "max_items",
+                self.window_size if self.window_size > 0 else len(self._messages),
+            )
+        )
         roles = query.get("roles")
         step_min = query.get("step_min")
         step_max = query.get("step_max")
@@ -42,7 +47,9 @@ class WindowHistory(History):
             items = items[-max_items:]
         pending = str(query.get("pending_content") or "")
         budget = int(query.get("max_tokens") or 0)
-        before_tokens = self._estimate_tokens(items) + self._estimate_text_tokens(pending)
+        before_tokens = self._estimate_tokens(items) + self._estimate_text_tokens(
+            pending
+        )
         stage = "within_budget"
         if budget > 0 and before_tokens > budget:
             stage = "compact_skipped"
@@ -60,7 +67,11 @@ class WindowHistory(History):
                     "messages_after": len(items),
                     "strategy": "window_history",
                     "warning_ratio": query.get("warning_ratio"),
-                    "reason": None if stage == "within_budget" else "window_history_no_compactor",
+                    "reason": (
+                        None
+                        if stage == "within_budget"
+                        else "window_history_no_compactor"
+                    ),
                 },
             }
         ]

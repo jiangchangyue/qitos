@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry
-from qitos.kit import EditorToolSet, REACT_SYSTEM_PROMPT, ReActTextParser, RunCommand, format_action, render_prompt
+from qitos.kit import (
+    CodingToolSet,
+    REACT_SYSTEM_PROMPT,
+    ReActTextParser,
+    format_action,
+    render_prompt,
+)
 from qitos.models import OpenAICompatibleModel
 
 TASK = "Open buggy_module.py, fix add(a, b) so it returns a + b, then run verification."
@@ -22,21 +28,36 @@ MAX_STEPS = 8
 class ReactState(StateSchema):
     scratchpad: list[str] = field(default_factory=list)
     target_file: str = "buggy_module.py"
-    test_command: str = 'python -c "import buggy_module; assert buggy_module.add(20, 22) == 42"'
+    test_command: str = (
+        'python -c "import buggy_module; assert buggy_module.add(20, 22) == 42"'
+    )
 
 
 class ReactAgent(AgentModule[ReactState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> ReactState:
         return ReactState(task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS)))
 
     def build_system_prompt(self, state: ReactState) -> str | None:
-        return render_prompt(REACT_SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            REACT_SYSTEM_PROMPT,
+            {"tool_schema": self.tool_registry.get_tool_descriptions()},
+        )
 
     def prepare(self, state: ReactState) -> str:
         lines = [
@@ -50,8 +71,14 @@ class ReactAgent(AgentModule[ReactState, dict[str, Any], Action]):
             lines.extend(state.scratchpad[-8:])
         return "\n".join(lines)
 
-    def reduce(self, state: ReactState, observation: dict[str, Any], decision: Decision[Action]) -> ReactState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self, state: ReactState, observation: dict[str, Any], decision: Decision[Action]
+    ) -> ReactState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -68,7 +95,9 @@ class ReactAgent(AgentModule[ReactState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

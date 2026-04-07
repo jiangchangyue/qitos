@@ -15,8 +15,12 @@ class ToolArtifact:
     summary: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     version: int = 1
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    updated_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     metadata: Dict[str, Any] = field(default_factory=dict)
     active: bool = True
 
@@ -26,13 +30,17 @@ class ToolArtifact:
 
 
 class BaseToolLibrary:
-    def add_or_update(self, artifact: ToolArtifact) -> ToolArtifact:  # pragma: no cover - interface
+    def add_or_update(
+        self, artifact: ToolArtifact
+    ) -> ToolArtifact:  # pragma: no cover - interface
         raise NotImplementedError
 
     def get(self, name: str) -> Optional[ToolArtifact]:  # pragma: no cover - interface
         raise NotImplementedError
 
-    def search(self, query: str, top_k: int = 5) -> List[ToolArtifact]:  # pragma: no cover - interface
+    def search(
+        self, query: str, top_k: int = 5
+    ) -> List[ToolArtifact]:  # pragma: no cover - interface
         raise NotImplementedError
 
     def list_active(self) -> List[ToolArtifact]:  # pragma: no cover - interface

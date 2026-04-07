@@ -42,6 +42,7 @@ def render_prompt(
     text = _DOUBLE_BRACE.sub(repl_double, text)
 
     if enable_single_brace:
+
         def repl_single(match: re.Match[str]) -> str:
             key = match.group(1)
             if key in vars_map:

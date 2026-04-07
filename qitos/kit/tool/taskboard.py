@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from qitos.core.tool import BaseTool, ToolPermission, ToolSpec
-from qitos.kit.tool.codebase import _resolve_workspace_path
+from qitos.kit.tool._workspace import resolve_workspace_path
 
 TASK_STATUSES = {"pending", "in_progress", "blocked", "completed", "cancelled"}
 
@@ -53,9 +53,13 @@ class TaskRecord:
 class TaskBoardStore:
     """Persist a lightweight external task board as JSON inside the workspace."""
 
-    def __init__(self, workspace_root: str = ".", board_relpath: str = ".qitos/task_board.json"):
+    def __init__(
+        self, workspace_root: str = ".", board_relpath: str = ".qitos/task_board.json"
+    ):
         self._workspace_root = os.path.abspath(workspace_root)
-        self._board_path = Path(_resolve_workspace_path(self._workspace_root, board_relpath))
+        self._board_path = Path(
+            resolve_workspace_path(self._workspace_root, board_relpath)
+        )
         self._lock = threading.Lock()
 
     @property
@@ -77,7 +81,9 @@ class TaskBoardStore:
     def save(self, payload: Dict[str, Any]) -> None:
         with self._lock:
             self._board_path.parent.mkdir(parents=True, exist_ok=True)
-            fd, temp_path = tempfile.mkstemp(prefix="task_board_", suffix=".json", dir=str(self._board_path.parent))
+            fd, temp_path = tempfile.mkstemp(
+                prefix="task_board_", suffix=".json", dir=str(self._board_path.parent)
+            )
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -154,7 +160,9 @@ class CreateTask(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Create a new task record in the task board.
 
@@ -185,7 +193,11 @@ class CreateTask(BaseTool):
             status=normalized,
         )
         self._store.upsert(task)
-        return {"status": "success", "task": task.to_dict(), "board_path": self._store.board_path}
+        return {
+            "status": "success",
+            "task": task.to_dict(),
+            "board_path": self._store.board_path,
+        }
 
 
 class ListTaskBoard(BaseTool):
@@ -210,7 +222,9 @@ class ListTaskBoard(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         List task records from the task board.
 
@@ -251,7 +265,9 @@ class GetTask(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Fetch one task record by id.
 
@@ -265,7 +281,11 @@ class GetTask(BaseTool):
         task = self._store.get_task(task_id)
         if task is None:
             return {"status": "error", "message": f"Task not found: {task_id}"}
-        return {"status": "success", "task": task.to_dict(), "board_path": self._store.board_path}
+        return {
+            "status": "success",
+            "task": task.to_dict(),
+            "board_path": self._store.board_path,
+        }
 
 
 class UpdateTask(BaseTool):
@@ -299,7 +319,9 @@ class UpdateTask(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Update fields, status, ownership, or dependency links for one task.
 
@@ -336,7 +358,10 @@ class UpdateTask(BaseTool):
         if status is not None:
             normalized = str(status).strip()
             if normalized not in TASK_STATUSES:
-                return {"status": "error", "message": f"Unsupported status: {normalized}"}
+                return {
+                    "status": "error",
+                    "message": f"Unsupported status: {normalized}",
+                }
             task.status = normalized
         if subject is not None:
             task.subject = subject
@@ -347,12 +372,16 @@ class UpdateTask(BaseTool):
         if owner is not None:
             task.owner = owner
         if isinstance(add_blocks, list) and add_blocks:
-            task.blocks = sorted({*task.blocks, *[str(x) for x in add_blocks if str(x).strip()]})
+            task.blocks = sorted(
+                {*task.blocks, *[str(x) for x in add_blocks if str(x).strip()]}
+            )
         if isinstance(remove_blocks, list) and remove_blocks:
             remove_set = {str(x) for x in remove_blocks}
             task.blocks = [x for x in task.blocks if x not in remove_set]
         if isinstance(add_blocked_by, list) and add_blocked_by:
-            task.blocked_by = sorted({*task.blocked_by, *[str(x) for x in add_blocked_by if str(x).strip()]})
+            task.blocked_by = sorted(
+                {*task.blocked_by, *[str(x) for x in add_blocked_by if str(x).strip()]}
+            )
         if isinstance(remove_blocked_by, list) and remove_blocked_by:
             remove_set = {str(x) for x in remove_blocked_by}
             task.blocked_by = [x for x in task.blocked_by if x not in remove_set]
@@ -366,7 +395,11 @@ class UpdateTask(BaseTool):
             task.metadata = merged
         task.updated_at = _utc_now()
         self._store.upsert(task)
-        return {"status": "success", "task": task.to_dict(), "board_path": self._store.board_path}
+        return {
+            "status": "success",
+            "task": task.to_dict(),
+            "board_path": self._store.board_path,
+        }
 
 
 class AppendTaskNote(BaseTool):
@@ -388,7 +421,9 @@ class AppendTaskNote(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Append a timestamped note to one task record.
 
@@ -406,7 +441,9 @@ class AppendTaskNote(BaseTool):
         task = self._store.get_task(task_id)
         if task is None:
             return {"status": "error", "message": f"Task not found: {task_id}"}
-        task.notes.append(TaskNote(created_at=_utc_now(), text=text, kind=str(kind or "note")))
+        task.notes.append(
+            TaskNote(created_at=_utc_now(), text=text, kind=str(kind or "note"))
+        )
         task.updated_at = _utc_now()
         self._store.upsert(task)
         return {
@@ -423,8 +460,12 @@ class TaskToolSet:
     name = "task"
     version = "1"
 
-    def __init__(self, workspace_root: str = ".", board_relpath: str = ".qitos/task_board.json"):
-        self.store = TaskBoardStore(workspace_root=workspace_root, board_relpath=board_relpath)
+    def __init__(
+        self, workspace_root: str = ".", board_relpath: str = ".qitos/task_board.json"
+    ):
+        self.store = TaskBoardStore(
+            workspace_root=workspace_root, board_relpath=board_relpath
+        )
         self.task_create = CreateTask(self.store)
         self.task_list = ListTaskBoard(self.store)
         self.task_get = GetTask(self.store)

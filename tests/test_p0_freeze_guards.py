@@ -21,7 +21,9 @@ class _FinalAgent(AgentModule[_S, Dict[str, Any], Action]):
     def decide(self, state: _S, observation: Dict[str, Any]):
         return Decision.final(f"done:{observation['task']}")
 
-    def reduce(self, state: _S, observation: Dict[str, Any], decision: Decision[Action]) -> _S:
+    def reduce(
+        self, state: _S, observation: Dict[str, Any], decision: Decision[Action]
+    ) -> _S:
         return state
 
 

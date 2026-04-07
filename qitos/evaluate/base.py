@@ -51,14 +51,23 @@ class SuiteEvaluationResult:
 class EvaluationSuite:
     """Compose multiple evaluators into one judgement."""
 
-    def __init__(self, evaluators: Optional[Iterable[TrajectoryEvaluator]] = None, mode: str = "all"):
+    def __init__(
+        self,
+        evaluators: Optional[Iterable[TrajectoryEvaluator]] = None,
+        mode: str = "all",
+    ):
         self.evaluators = list(evaluators or [])
         self.mode = mode  # all | any | mean_score
 
     def evaluate(self, context: EvaluationContext) -> SuiteEvaluationResult:
         results = [e.evaluate(context) for e in self.evaluators]
         if not results:
-            return SuiteEvaluationResult(success=False, score=0.0, results=[], metadata={"reason": "no_evaluators"})
+            return SuiteEvaluationResult(
+                success=False,
+                score=0.0,
+                results=[],
+                metadata={"reason": "no_evaluators"},
+            )
 
         success_flags = [r.success for r in results]
         scores = [float(r.score) for r in results]

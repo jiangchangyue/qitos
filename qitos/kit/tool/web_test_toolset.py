@@ -25,7 +25,9 @@ class WebTestToolSet:
     All targets must be within authorized scope.
     """
 
-    def __init__(self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."):
+    def __init__(
+        self, authorized_targets: Optional[List[str]] = None, workspace_root: str = "."
+    ):
         """
         Initialize web testing toolset.
 
@@ -42,7 +44,7 @@ class WebTestToolSet:
         parsed = urlparse(target)
         hostname = parsed.hostname or target
         for auth in self._authorized_targets:
-            if hostname == auth or hostname.endswith('.' + auth):
+            if hostname == auth or hostname.endswith("." + auth):
                 return True
         return False
 
@@ -58,13 +60,25 @@ class WebTestToolSet:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
             )
-            return {"stdout": result.stdout, "stderr": result.stderr, "return_code": result.returncode}
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+            }
         except subprocess.TimeoutExpired:
             return {"stdout": "", "stderr": "Command timed out", "return_code": -1}
         except FileNotFoundError:
-            return {"stdout": "", "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Tool not found: {cmd[0]}. Please ensure it is installed.",
+                "return_code": -1,
+            }
         except Exception as e:
-            return {"stdout": "", "stderr": f"Error executing command: {str(e)}", "return_code": -1}
+            return {
+                "stdout": "",
+                "stderr": f"Error executing command: {str(e)}",
+                "return_code": -1,
+            }
 
     def _parse_sqlmap_output(self, text: str) -> Dict[str, Any]:
         """
@@ -88,10 +102,12 @@ class WebTestToolSet:
         # Extract parameter-based injections
         param_pattern = r"Parameter:\s+(\S+)\s+\((\w+)\)"
         for match in re.finditer(param_pattern, text):
-            result["parameters"].append({
-                "name": match.group(1),
-                "type": match.group(2),
-            })
+            result["parameters"].append(
+                {
+                    "name": match.group(1),
+                    "type": match.group(2),
+                }
+            )
 
         # Extract backend DBMS
         dbms_pattern = r"back-end DBMS:\s+(.+)"
@@ -125,14 +141,16 @@ class WebTestToolSet:
                 continue
             try:
                 data = json.loads(line)
-                results.append({
-                    "path": data.get("path", ""),
-                    "status": data.get("status", 0),
-                    "length": data.get("length", 0),
-                    "words": data.get("words", 0),
-                    "lines": data.get("lines", 0),
-                    "content_type": data.get("content_type", ""),
-                })
+                results.append(
+                    {
+                        "path": data.get("path", ""),
+                        "status": data.get("status", 0),
+                        "length": data.get("length", 0),
+                        "words": data.get("words", 0),
+                        "lines": data.get("lines", 0),
+                        "content_type": data.get("content_type", ""),
+                    }
+                )
             except json.JSONDecodeError:
                 continue
         return results
@@ -146,7 +164,11 @@ class WebTestToolSet:
         """
         headers = {}
         for line in text.split("\n"):
-            if ":" in line and not line.startswith("*") and not line.startswith("HTTP/"):
+            if (
+                ":" in line
+                and not line.startswith("*")
+                and not line.startswith("HTTP/")
+            ):
                 key, _, value = line.partition(":")
                 headers[key.strip().lower()] = value.strip()
         return headers
@@ -202,26 +224,38 @@ class WebTestToolSet:
         findings = []
         for header_key, info in security_headers.items():
             if header_key in headers:
-                findings.append({
-                    "header": info["name"],
-                    "status": "present",
-                    "value": headers[header_key],
-                    "recommendation": "",
-                })
+                findings.append(
+                    {
+                        "header": info["name"],
+                        "status": "present",
+                        "value": headers[header_key],
+                        "recommendation": "",
+                    }
+                )
             else:
-                findings.append({
-                    "header": info["name"],
-                    "status": "missing",
-                    "value": None,
-                    "recommendation": info["recommendation"],
-                    "risk": info["risk"],
-                })
+                findings.append(
+                    {
+                        "header": info["name"],
+                        "status": "missing",
+                        "value": None,
+                        "recommendation": info["recommendation"],
+                        "risk": info["risk"],
+                    }
+                )
 
         return findings
 
-    @tool(name='sqlmap_scan')
-    def sqlmap_scan(self, target_url: str, method: str = "GET", data: str = "", level: int = 3,
-                    risk: int = 2, dbms: str = "", threads: int = 5) -> Dict[str, Any]:
+    @tool(name="sqlmap_scan")
+    def sqlmap_scan(
+        self,
+        target_url: str,
+        method: str = "GET",
+        data: str = "",
+        level: int = 3,
+        risk: int = 2,
+        dbms: str = "",
+        threads: int = 5,
+    ) -> Dict[str, Any]:
         """
         Run SQLMap to detect and exploit SQL injection vulnerabilities.
 
@@ -240,7 +274,10 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         if not 1 <= level <= 5:
             return {"status": "error", "message": "Level must be between 1 and 5."}
@@ -249,13 +286,18 @@ class WebTestToolSet:
 
         cmd = [
             "sqlmap",
-            "-u", target_url,
-            "--level", str(level),
-            "--risk", str(risk),
-            "--threads", str(threads),
+            "-u",
+            target_url,
+            "--level",
+            str(level),
+            "--risk",
+            str(risk),
+            "--threads",
+            str(threads),
             "--batch",
             "--random-agent",
-            "--output-dir", self._workspace_root,
+            "--output-dir",
+            self._workspace_root,
         ]
 
         if method.upper() == "POST" and data:
@@ -269,7 +311,9 @@ class WebTestToolSet:
         if result["return_code"] not in (0, 1):
             return {"status": "error", "message": f"SQLMap failed: {result['stderr']}"}
 
-        parsed = self._parse_sqlmap_output(result.get("stdout", "") + result.get("stderr", ""))
+        parsed = self._parse_sqlmap_output(
+            result.get("stdout", "") + result.get("stderr", "")
+        )
 
         output = f"### 💉 SQLMap Scan: {target_url}\n\n"
         output += f"Method: {method} | Level: {level} | Risk: {risk}\n\n"
@@ -300,12 +344,18 @@ class WebTestToolSet:
                 "risk": risk,
                 **parsed,
                 "vulnerable": len(parsed["injections"]) > 0,
-            }
+            },
         }
 
-    @tool(name='dir_bruteforce')
-    def dir_bruteforce(self, target_url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt",
-                       extensions: str = "", threads: int = 10, status_codes: str = "200,204,301,302,403") -> Dict[str, Any]:
+    @tool(name="dir_bruteforce")
+    def dir_bruteforce(
+        self,
+        target_url: str,
+        wordlist: str = "/usr/share/wordlists/dirb/common.txt",
+        extensions: str = "",
+        threads: int = 10,
+        status_codes: str = "200,204,301,302,403",
+    ) -> Dict[str, Any]:
         """
         Discover hidden directories and files using Gobuster.
 
@@ -322,14 +372,22 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         cmd = [
-            "gobuster", "dir",
-            "-u", target_url,
-            "-w", wordlist,
-            "-t", str(threads),
-            "-s", status_codes,
+            "gobuster",
+            "dir",
+            "-u",
+            target_url,
+            "-w",
+            wordlist,
+            "-t",
+            str(threads),
+            "-s",
+            status_codes,
             "--no-error",
             "-json",
         ]
@@ -340,7 +398,10 @@ class WebTestToolSet:
         result = self._run_command(cmd, timeout=1200)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"Directory brute-force failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Directory brute-force failed: {result['stderr']}",
+            }
 
         findings = self._parse_gobuster_output(result["stdout"])
 
@@ -354,13 +415,17 @@ class WebTestToolSet:
         output += f"Found **{len(findings)}** path(s)\n\n"
 
         for status, items in sorted(by_status.items()):
-            status_emoji = "✅" if status.startswith("2") else ("🔄" if status.startswith("3") else "⛔")
+            status_emoji = (
+                "✅"
+                if status.startswith("2")
+                else ("🔄" if status.startswith("3") else "⛔")
+            )
             output += f"#### {status_emoji} Status {status} ({len(items)} results)\n\n"
             output += "| Path | Size | Content-Type |\n"
             output += "|------|------|-------------|\n"
             for item in items:
-                size = f"{item['length']} bytes" if item['length'] else "-"
-                ct = item.get('content_type', '-')[:50]
+                size = f"{item['length']} bytes" if item["length"] else "-"
+                ct = item.get("content_type", "-")[:50]
                 output += f"| `{item['path']}` | {size} | {ct} |\n"
             output += "\n"
 
@@ -373,10 +438,10 @@ class WebTestToolSet:
                 "findings": findings,
                 "finding_count": len(findings),
                 "by_status": {k: len(v) for k, v in by_status.items()},
-            }
+            },
         }
 
-    @tool(name='header_check')
+    @tool(name="header_check")
     def header_check(self, target_url: str) -> Dict[str, Any]:
         """
         Analyze HTTP security headers of a target.
@@ -389,13 +454,19 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         cmd = ["curl", "-sI", "-L", "--max-time", "15", target_url]
         result = self._run_command(cmd, timeout=30)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"Failed to fetch headers: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Failed to fetch headers: {result['stderr']}",
+            }
 
         headers = self._parse_headers(result["stdout"])
         findings = self._check_security_headers(headers)
@@ -435,10 +506,10 @@ class WebTestToolSet:
                 "findings": findings,
                 "present_count": len(present),
                 "missing_count": len(missing),
-            }
+            },
         }
 
-    @tool(name='ssl_check')
+    @tool(name="ssl_check")
     def ssl_check(self, target_url: str) -> Dict[str, Any]:
         """
         Check SSL/TLS configuration of a target.
@@ -451,14 +522,27 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         parsed = urlparse(target_url)
-        host = parsed.hostname or target_url.replace("https://", "").replace("http://", "")
+        host = parsed.hostname or target_url.replace("https://", "").replace(
+            "http://", ""
+        )
         port = str(parsed.port or 443)
 
         # Use openssl to check SSL
-        cmd = ["openssl", "s_client", "-connect", f"{host}:{port}", "-servername", host, "-brief"]
+        cmd = [
+            "openssl",
+            "s_client",
+            "-connect",
+            f"{host}:{port}",
+            "-servername",
+            host,
+            "-brief",
+        ]
         result = self._run_command(cmd, timeout=30)
 
         output = f"### 🔒 SSL/TLS Check: {host}:{port}\n\n"
@@ -504,10 +588,10 @@ class WebTestToolSet:
                 "host": host,
                 "port": port,
                 "certificate": cert_info,
-            }
+            },
         }
 
-    @tool(name='tech_detect')
+    @tool(name="tech_detect")
     def tech_detect(self, target_url: str) -> Dict[str, Any]:
         """
         Detect technologies used by a web application.
@@ -520,7 +604,10 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         cmd = ["whatweb", "-q", "--color=never", target_url]
         result = self._run_command(cmd, timeout=60)
@@ -546,12 +633,20 @@ class WebTestToolSet:
                 for key, value in headers.items():
                     for sig, name in server_map.items():
                         if sig in value.lower():
-                            technologies.append({"name": name, "version": value, "source": "header"})
+                            technologies.append(
+                                {"name": name, "version": value, "source": "header"}
+                            )
 
                 # Check common technology indicators
                 for header in headers:
                     if "x-powered-by" in header:
-                        technologies.append({"name": headers[header], "version": "", "source": "x-powered-by"})
+                        technologies.append(
+                            {
+                                "name": headers[header],
+                                "version": "",
+                                "source": "x-powered-by",
+                            }
+                        )
 
                 output = f"### 🔧 Technology Detection: {target_url}\n\n"
                 output += f"Detected **{len(technologies)}** technologies via HTTP headers\n\n"
@@ -568,7 +663,10 @@ class WebTestToolSet:
                     "data": {"technologies": technologies, "target_url": target_url},
                 }
 
-            return {"status": "error", "message": f"Technology detection failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"Technology detection failed: {result['stderr']}",
+            }
 
         # Parse WhatWeb output
         technologies = []
@@ -576,14 +674,16 @@ class WebTestToolSet:
             line = line.strip()
             if line:
                 # WhatWeb format: URL [tech1, tech2[v], ...]
-                match = re.search(r'\[(.+)\]', line)
+                match = re.search(r"\[(.+)\]", line)
                 if match:
                     techs = match.group(1)
-                    for item in re.findall(r'([^\[,]+)(?:\[([^\]]+)\])?', techs):
-                        technologies.append({
-                            "name": item[0].strip(),
-                            "version": item[1].strip() if item[1] else "",
-                        })
+                    for item in re.findall(r"([^\[,]+)(?:\[([^\]]+)\])?", techs):
+                        technologies.append(
+                            {
+                                "name": item[0].strip(),
+                                "version": item[1].strip() if item[1] else "",
+                            }
+                        )
 
         output = f"### 🔧 Technology Detection: {target_url}\n\n"
         output += f"Detected **{len(technologies)}** technologies\n\n"
@@ -604,12 +704,16 @@ class WebTestToolSet:
                 "target_url": target_url,
                 "technologies": technologies,
                 "tech_count": len(technologies),
-            }
+            },
         }
 
-    @tool(name='vhost_enum')
-    def vhost_enum(self, target_url: str, wordlist: str = "/usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt",
-                   threads: int = 20) -> Dict[str, Any]:
+    @tool(name="vhost_enum")
+    def vhost_enum(
+        self,
+        target_url: str,
+        wordlist: str = "/usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt",
+        threads: int = 20,
+    ) -> Dict[str, Any]:
         """
         Enumerate virtual hosts on a target server.
 
@@ -623,13 +727,20 @@ class WebTestToolSet:
         """
         target_url = self._normalize_url(target_url)
         if not self._validate_target(target_url):
-            return {"status": "error", "message": f"Target '{target_url}' is not in the authorized scope."}
+            return {
+                "status": "error",
+                "message": f"Target '{target_url}' is not in the authorized scope.",
+            }
 
         cmd = [
-            "gobuster", "vhost",
-            "-u", target_url,
-            "-w", wordlist,
-            "-t", str(threads),
+            "gobuster",
+            "vhost",
+            "-u",
+            target_url,
+            "-w",
+            wordlist,
+            "-t",
+            str(threads),
             "--no-error",
             "-json",
         ]
@@ -637,7 +748,10 @@ class WebTestToolSet:
         result = self._run_command(cmd, timeout=1200)
 
         if result["return_code"] != 0 and not result["stdout"]:
-            return {"status": "error", "message": f"VHost enumeration failed: {result['stderr']}"}
+            return {
+                "status": "error",
+                "message": f"VHost enumeration failed: {result['stderr']}",
+            }
 
         vhosts = []
         for line in result["stdout"].strip().split("\n"):
@@ -645,12 +759,14 @@ class WebTestToolSet:
                 continue
             try:
                 data = json.loads(line)
-                vhosts.append({
-                    "vhost": data.get("input", ""),
-                    "url": data.get("url", ""),
-                    "status": data.get("status", 0),
-                    "length": data.get("length", 0),
-                })
+                vhosts.append(
+                    {
+                        "vhost": data.get("input", ""),
+                        "url": data.get("url", ""),
+                        "status": data.get("status", 0),
+                        "length": data.get("length", 0),
+                    }
+                )
             except json.JSONDecodeError:
                 continue
 
@@ -672,5 +788,5 @@ class WebTestToolSet:
                 "target_url": target_url,
                 "vhosts": vhosts,
                 "vhost_count": len(vhosts),
-            }
+            },
         }

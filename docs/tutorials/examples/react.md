@@ -26,7 +26,7 @@ Design principle:
 
 What the example does:
 
-- registers `EditorToolSet` (file edit ops) and `RunCommand` (verification)
+- registers `CodingToolSet` with the legacy-compatible editor, file, and shell surface
 - attaches `ReActTextParser` so Engine can parse LLM output into `Decision`
 
 ### `init_state`: keep state small and bounded

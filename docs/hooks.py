@@ -60,15 +60,23 @@ def _signature(obj: object) -> str:
         return "()"
 
 
-def _public_symbols(module) -> Tuple[List[Tuple[str, object]], List[Tuple[str, object]]]:
+def _public_symbols(
+    module,
+) -> Tuple[List[Tuple[str, object]], List[Tuple[str, object]]]:
     classes: List[Tuple[str, object]] = []
     funcs: List[Tuple[str, object]] = []
     for name, member in inspect.getmembers(module):
         if name.startswith("_"):
             continue
-        if inspect.isclass(member) and getattr(member, "__module__", "") == module.__name__:
+        if (
+            inspect.isclass(member)
+            and getattr(member, "__module__", "") == module.__name__
+        ):
             classes.append((name, member))
-        if inspect.isfunction(member) and getattr(member, "__module__", "") == module.__name__:
+        if (
+            inspect.isfunction(member)
+            and getattr(member, "__module__", "") == module.__name__
+        ):
             funcs.append((name, member))
     return classes, funcs
 
@@ -77,7 +85,11 @@ def _write_module_page(module_name: str, out_path: Path, locale: str = "en") -> 
     try:
         module = importlib.import_module(module_name)
     except Exception as exc:
-        title = "Failed to import this module during docs build." if locale == "en" else "构建文档时导入模块失败。"
+        title = (
+            "Failed to import this module during docs build."
+            if locale == "en"
+            else "构建文档时导入模块失败。"
+        )
         out_path.write_text(
             "\n".join([f"# `{module_name}`", "", title, "", f"- Error: `{exc}`"]),
             encoding="utf-8",
@@ -169,7 +181,9 @@ def _write_module_page(module_name: str, out_path: Path, locale: str = "en") -> 
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_grouped_index(modules: List[str], out_path: Path, locale: str = "en") -> None:
+def _write_grouped_index(
+    modules: List[str], out_path: Path, locale: str = "en"
+) -> None:
     grouped: Dict[str, List[str]] = {}
     for mod in modules:
         grouped.setdefault(_group_key(mod), []).append(mod)
@@ -196,7 +210,7 @@ def _write_grouped_index(modules: List[str], out_path: Path, locale: str = "en")
         ]
 
     for group in group_names:
-        lines.append(f'- [{group}](#group-{_slug(group)})')
+        lines.append(f"- [{group}](#group-{_slug(group)})")
     lines.append("")
 
     if locale == "en":
@@ -214,7 +228,13 @@ def _write_grouped_index(modules: List[str], out_path: Path, locale: str = "en")
             lines.append(f"- [`{mod}`]({rel})")
         lines.append("")
 
-    lines.extend(["## Source Index", "", "- [qitos/](https://github.com/Qitor/qitos/tree/main/qitos)"])
+    lines.extend(
+        [
+            "## Source Index",
+            "",
+            "- [qitos/](https://github.com/Qitor/qitos/tree/main/qitos)",
+        ]
+    )
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 

@@ -25,7 +25,10 @@ class HistoryPolicy:
     max_tokens: Optional[int] = None
 
     def build_query(self, step_id: int, **kwargs: Any) -> Dict[str, Any]:
-        query: Dict[str, Any] = {"roles": list(self.roles), "max_items": int(self.max_messages)}
+        query: Dict[str, Any] = {
+            "roles": list(self.roles),
+            "max_items": int(self.max_messages),
+        }
         if self.step_window is not None and self.step_window > 0:
             query["step_min"] = max(0, int(step_id) - int(self.step_window) + 1)
         if self.max_tokens is not None and int(self.max_tokens) > 0:

@@ -7,7 +7,13 @@ from typing import Any, Dict, List, Optional
 
 from qitos import Action, AgentModule, Decision, StateSchema, ToolRegistry, tool
 from qitos.kit.parser import ReActTextParser
-from qitos.kit.planning import PlanCursor, append_log, format_action, parse_numbered_plan, set_final
+from qitos.kit.planning import (
+    PlanCursor,
+    append_log,
+    format_action,
+    parse_numbered_plan,
+    set_final,
+)
 from qitos.kit.prompts import PLAN_DRAFT_PROMPT, PLAN_EXEC_SYSTEM_PROMPT, render_prompt
 from qitos.models import Model
 
@@ -34,8 +40,12 @@ class PlanActAgent(AgentModule[PlanActState, Dict[str, Any], Action]):
         registry.register(add)
         registry.register(multiply)
 
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
-        self.cursor = PlanCursor(plan_field="plan_steps", cursor_field="plan_cursor_local")
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
+        self.cursor = PlanCursor(
+            plan_field="plan_steps", cursor_field="plan_cursor_local"
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> PlanActState:
         return PlanActState(task=task, max_steps=int(kwargs.get("max_steps", 10)))
@@ -49,12 +59,24 @@ class PlanActAgent(AgentModule[PlanActState, Dict[str, Any], Action]):
             "memory": env_view.get("memory", {}),
         }
 
-    def decide(self, state: PlanActState, observation: Dict[str, Any]) -> Decision[Action]:
+    def decide(
+        self, state: PlanActState, observation: Dict[str, Any]
+    ) -> Decision[Action]:
         if not state.plan_steps:
-            raw = self.llm([
-                {"role": "system", "content": "You are a strict planner. Return numbered plan only."},
-                {"role": "user", "content": render_prompt(PLAN_DRAFT_PROMPT, {"task": state.task})},
-            ])
+            raw = self.llm(
+                [
+                    {
+                        "role": "system",
+                        "content": "You are a strict planner. Return numbered plan only.",
+                    },
+                    {
+                        "role": "user",
+                        "content": render_prompt(
+                            PLAN_DRAFT_PROMPT, {"task": state.task}
+                        ),
+                    },
+                ]
+            )
             steps = parse_numbered_plan(str(raw))
             if not steps:
                 return Decision.final("failed_to_plan")
@@ -69,7 +91,11 @@ class PlanActAgent(AgentModule[PlanActState, Dict[str, Any], Action]):
         return None
 
     def build_system_prompt(self, state: PlanActState) -> str | None:
-        tool_schema = self.tool_registry.get_tool_descriptions() if self.tool_registry is not None else ""
+        tool_schema = (
+            self.tool_registry.get_tool_descriptions()
+            if self.tool_registry is not None
+            else ""
+        )
         return render_prompt(PLAN_EXEC_SYSTEM_PROMPT, {"tool_schema": tool_schema})
 
     def prepare(self, state: PlanActState, observation: Dict[str, Any]) -> str:
@@ -96,11 +122,20 @@ class PlanActAgent(AgentModule[PlanActState, Dict[str, Any], Action]):
         action_results: List[Any],
     ) -> PlanActState:
         if decision.rationale:
-            append_log(state, "scratchpad", f"Thought: {decision.rationale}", max_items=16)
+            append_log(
+                state, "scratchpad", f"Thought: {decision.rationale}", max_items=16
+            )
         if decision.actions:
-            append_log(state, "scratchpad", f"Action: {format_action(decision.actions[0])}", max_items=16)
+            append_log(
+                state,
+                "scratchpad",
+                f"Action: {format_action(decision.actions[0])}",
+                max_items=16,
+            )
         if action_results:
-            append_log(state, "scratchpad", f"Observation: {action_results[0]}", max_items=16)
+            append_log(
+                state, "scratchpad", f"Observation: {action_results[0]}", max_items=16
+            )
             set_final(state, str(action_results[0]))
             self.cursor.advance(state)
         return state

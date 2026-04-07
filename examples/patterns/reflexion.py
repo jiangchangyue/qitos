@@ -80,10 +80,18 @@ class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
 
     def decide(self, state: ReflexionState, observation: dict[str, Any]):
         if not state.page_html:
-            return Decision.act([Action(name="http_get", args={"url": state.target_url})], rationale="fetch_source")
+            return Decision.act(
+                [Action(name="http_get", args={"url": state.target_url})],
+                rationale="fetch_source",
+            )
         if not state.page_text:
             return Decision.act(
-                [Action(name="extract_web_text", args={"html": state.page_html, "max_chars": 12000})],
+                [
+                    Action(
+                        name="extract_web_text",
+                        args={"html": state.page_html, "max_chars": 12000},
+                    )
+                ],
                 rationale="extract_source_text",
             )
 
@@ -91,7 +99,9 @@ class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
         if payload is None:
             return Decision.final("Failed to produce valid reflexion JSON output.")
 
-        critique = payload.get("critique") if isinstance(payload.get("critique"), dict) else {}
+        critique = (
+            payload.get("critique") if isinstance(payload.get("critique"), dict) else {}
+        )
         needs_revision = bool(critique.get("needs_revision", False))
         answer = str(payload.get("answer", "")).strip()
 
@@ -101,11 +111,24 @@ class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
         if needs_revision and len(state.reflections) <= state.max_reflections:
             return Decision.wait(rationale="reflexion_revision_cycle")
 
-        citations = payload.get("citations") if isinstance(payload.get("citations"), list) else []
+        citations = (
+            payload.get("citations")
+            if isinstance(payload.get("citations"), list)
+            else []
+        )
         return Decision.final(answer=f"{answer}\n\nCitations: {citations}")
 
-    def reduce(self, state: ReflexionState, observation: dict[str, Any], decision: Decision[Action]) -> ReflexionState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: ReflexionState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> ReflexionState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if action_results:
             first = action_results[0]
             if isinstance(first, dict):
@@ -126,7 +149,9 @@ class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
                         target_url=state.target_url,
                         text=state.page_text[:9000],
                         draft=state.draft_answer or "<empty>",
-                        reflections=json.dumps(state.reflections[-2:], ensure_ascii=False),
+                        reflections=json.dumps(
+                            state.reflections[-2:], ensure_ascii=False
+                        ),
                     ),
                 },
             ]
@@ -149,7 +174,9 @@ class ReflexionAgent(AgentModule[ReflexionState, dict[str, Any], Action]):
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

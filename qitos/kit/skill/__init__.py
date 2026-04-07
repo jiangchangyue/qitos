@@ -10,8 +10,20 @@ from .injector import (
 from .integration import SkillMixin, SkilledAgent
 from .loader import SkillInstaller, SkillLoader
 from .manager import SkillManager
-from .manifest import InstalledSkill, SkillManifest, SkillPackage, parse_skill_package_dir, validate_skill_structure
-from .provider import LocalSkillProvider, SkillDownload, SkillHubProvider, SkillProvider, SkillSearchResult
+from .manifest import (
+    InstalledSkill,
+    SkillManifest,
+    SkillPackage,
+    parse_skill_package_dir,
+    validate_skill_structure,
+)
+from .provider import (
+    LocalSkillProvider,
+    SkillDownload,
+    SkillHubProvider,
+    SkillProvider,
+    SkillSearchResult,
+)
 from .registry import RegistryEntry, SkillRegistry, installed_to_entry
 
 __all__ = [

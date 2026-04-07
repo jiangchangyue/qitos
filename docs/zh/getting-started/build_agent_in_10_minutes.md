@@ -68,13 +68,12 @@ parser = ReActTextParser()
 ```python
 from typing import Any
 from qitos import Action, AgentModule, Decision, ToolRegistry
-from qitos.kit import EditorToolSet, ReActTextParser, RunCommand
+from qitos.kit import CodingToolSet, ReActTextParser
 
 class FixAgent(AgentModule[FixState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         reg = ToolRegistry()
-        reg.include(EditorToolSet(workspace_root=workspace_root))
-        reg.register(RunCommand(cwd=workspace_root))
+        reg.include(CodingToolSet(workspace_root=workspace_root, include_notebook=False, enable_lsp=False, enable_tasks=False, enable_web=False, expose_modern_names=False))
         super().__init__(
             tool_registry=reg,
             llm=llm,

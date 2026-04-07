@@ -24,7 +24,7 @@ def _make_run(root: Path, run_id: str) -> Path:
                 "status": "completed",
                 "updated_at": "2026-01-01T00:00:00+00:00",
                 "step_count": 1,
-                "event_count": 1,
+                "event_count": 2,
                 "summary": {
                     "stop_reason": "final",
                     "final_result": "ok",
@@ -34,6 +34,12 @@ def _make_run(root: Path, run_id: str) -> Path:
                         "tokens_total": 144,
                         "peak_occupancy_ratio": 0.74,
                         "compact_counts": {"warning": 1, "microcompact_applied": 1},
+                    },
+                    "parser": {
+                        "error_count": 1,
+                        "warning_count": 1,
+                        "salvage_count": 1,
+                        "error_codes": {"missing_required_field": 1},
                     },
                 },
                 "schema_version": "v1",
@@ -46,9 +52,13 @@ def _make_run(root: Path, run_id: str) -> Path:
         ),
         encoding="utf-8",
     )
-    (run / "events.jsonl").write_text('{"step_id":0,"phase":"INIT","ok":true,"ts":"x"}\n', encoding="utf-8")
+    (run / "events.jsonl").write_text(
+        '{"step_id":0,"phase":"INIT","ok":true,"ts":"x"}\n'
+        '{"step_id":0,"phase":"DECIDE","ok":true,"ts":"y","payload":{"stage":"model_output","raw_output":"Thought: inspect the run","model_response":{"text":"Thought: inspect the run","usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14},"finish_reason":"stop","tool_calls":[{"id":"call_1","type":"function","function":{"name":"visit_url","arguments":"{\\"url\\":\\"https://example.com\\"}"}}],"model_name":"demo-model","provider":"demo-provider","metadata":{}},"context":{"input_tokens_total":3200,"occupancy_ratio":0.74}}}\n',
+        encoding="utf-8",
+    )
     (run / "steps.jsonl").write_text(
-        '{"step_id":0,"observation":{},"decision":{},"actions":[],"action_results":[],"tool_invocations":[],"critic_outputs":[],"state_diff":{},"context":{"context_window":8192,"input_tokens_total":3200,"history_tokens":1800,"output_tokens":240,"occupancy_ratio":0.74,"compact_events":[{"stage":"warning","before_tokens":3200,"after_tokens":3200,"saved_tokens":0},{"stage":"microcompact_applied","before_tokens":3200,"after_tokens":2400,"saved_tokens":800}]}}\n',
+        '{"step_id":0,"observation":{},"decision":{},"model_response":{"text":"Thought: inspect the run","usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14},"finish_reason":"stop","tool_calls":[{"id":"call_1","type":"function","function":{"name":"visit_url","arguments":"{\\"url\\":\\"https://example.com\\"}"}}],"model_name":"demo-model","provider":"demo-provider","metadata":{}},"actions":[],"action_results":[],"tool_invocations":[],"critic_outputs":[],"state_diff":{},"context":{"context_window":8192,"input_tokens_total":3200,"history_tokens":1800,"output_tokens":240,"occupancy_ratio":0.74,"compact_events":[{"stage":"warning","before_tokens":3200,"after_tokens":3200,"saved_tokens":0},{"stage":"microcompact_applied","before_tokens":3200,"after_tokens":2400,"saved_tokens":800}]},"parser_diagnostics":{"parser":"TerminusJsonParser","contract":"terminus_json_v1","severity":"error","code":"missing_required_field","summary":"Missing required field: tools","extraction_mode":"extracted","repair_instruction":"Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.","raw_output_preview":"{\\"analysis\\":\\"x\\",\\"plan\\":\\"y\\"}"},"parser_contract":"terminus_json_v1","parser_salvage_applied":false}\n',
         encoding="utf-8",
     )
     return run
@@ -71,13 +81,20 @@ def test_discover_runs_and_export(tmp_path: Path):
 
 def test_render_pages(tmp_path: Path):
     run = _make_run(tmp_path, "r2")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     payload = {
         "run": str(run),
         "run_id": "r2",
         "manifest": json.loads((run / "manifest.json").read_text(encoding="utf-8")),
-        "events": [json.loads((run / "events.jsonl").read_text(encoding="utf-8").strip())],
-        "steps": [json.loads((run / "steps.jsonl").read_text(encoding="utf-8").strip())],
-        "events_by_step": {"0": [json.loads((run / "events.jsonl").read_text(encoding="utf-8").strip())]},
+        "events": event_lines,
+        "steps": [
+            json.loads((run / "steps.jsonl").read_text(encoding="utf-8").strip())
+        ],
+        "events_by_step": {"0": event_lines},
     }
     board = _render_board_html()
     view = _render_run_html(payload, embedded=False)
@@ -86,13 +103,20 @@ def test_render_pages(tmp_path: Path):
     assert "export raw" in view
     assert "QitOS Replay" in replay
     assert "context timeline" in view
+    assert "parser timeline" in view
+    assert "Parser Diagnostics" in view
     assert "Context occupancy timeline" in view
     assert "compact markers" in view
+    assert "missing_required_field" in view
+    assert "extracted" in view
+    assert "finish_reason" in view
+    assert "tool_calls" in view
     marker = '<script id="payload" type="application/json">'
     start = view.index(marker) + len(marker)
     end = view.index("</script>", start)
     payload_block = view[start:end]
     assert '"run_id": "r2"' in payload_block
+    assert '"finish_reason": "stop"' in payload_block
     assert "&quot;" not in payload_block
 
 

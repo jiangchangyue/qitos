@@ -193,7 +193,9 @@ class SecurityAuditToolSet:
     def _iter_repo_files(self) -> List[Path]:
         files: List[Path] = []
         for root, dirs, names in os.walk(self._repo_root()):
-            dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith(".cache")]
+            dirs[:] = [
+                d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith(".cache")
+            ]
             for name in names:
                 files.append(Path(root) / name)
         return files
@@ -231,7 +233,11 @@ class SecurityAuditToolSet:
         files: List[Path] = []
         for path in self._iter_repo_files():
             suffix = path.suffix.lower()
-            if suffix in TEXT_FILE_EXTENSIONS or path.name in MANIFEST_FILES or path.name in SECURITY_RELEVANT_NAMES:
+            if (
+                suffix in TEXT_FILE_EXTENSIONS
+                or path.name in MANIFEST_FILES
+                or path.name in SECURITY_RELEVANT_NAMES
+            ):
                 files.append(path)
         return files
 
@@ -262,7 +268,9 @@ class SecurityAuditToolSet:
             "tags": list(tags or []),
         }
 
-    def _summarize_findings(self, findings: Sequence[Dict[str, Any]], heading: str) -> str:
+    def _summarize_findings(
+        self, findings: Sequence[Dict[str, Any]], heading: str
+    ) -> str:
         if not findings:
             return f"{heading}: no high-signal candidates found."
         lines = [f"{heading}: {len(findings)} candidate(s)."]
@@ -313,15 +321,45 @@ class SecurityAuditToolSet:
 
     def _scan_entrypoints(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         patterns = [
-            ("http_route", re.compile(r"@\s*(app|router|bp)\.(get|post|put|delete|patch|route)\b")),
-            ("http_route", re.compile(r"\b(app|router)\.(get|post|put|delete|patch|use)\s*\(")),
+            (
+                "http_route",
+                re.compile(r"@\s*(app|router|bp)\.(get|post|put|delete|patch|route)\b"),
+            ),
+            (
+                "http_route",
+                re.compile(r"\b(app|router)\.(get|post|put|delete|patch|use)\s*\("),
+            ),
             ("framework_route", re.compile(r"\b(path|re_path)\s*\(")),
-            ("rpc_handler", re.compile(r"\b(grpc|rpc|GraphQL|resolver)\b", re.IGNORECASE)),
+            (
+                "rpc_handler",
+                re.compile(r"\b(grpc|rpc|GraphQL|resolver)\b", re.IGNORECASE),
+            ),
             ("webhook", re.compile(r"\bwebhook\b", re.IGNORECASE)),
-            ("queue_consumer", re.compile(r"\b(kafka|sqs|consumer|subscriber|celery task|@app\.task)\b", re.IGNORECASE)),
-            ("cli_entrypoint", re.compile(r"\b(argparse|click\.command|typer\.Typer|if __name__ == ['\"]__main__['\"])\b")),
-            ("template_render", re.compile(r"\b(render_template|string|Response\.render|TemplateResponse|res\.render)\b")),
-            ("file_upload", re.compile(r"\b(request\.files|UploadFile|multer|multipart/form-data|IFormFile)\b")),
+            (
+                "queue_consumer",
+                re.compile(
+                    r"\b(kafka|sqs|consumer|subscriber|celery task|@app\.task)\b",
+                    re.IGNORECASE,
+                ),
+            ),
+            (
+                "cli_entrypoint",
+                re.compile(
+                    r"\b(argparse|click\.command|typer\.Typer|if __name__ == ['\"]__main__['\"])\b"
+                ),
+            ),
+            (
+                "template_render",
+                re.compile(
+                    r"\b(render_template|string|Response\.render|TemplateResponse|res\.render)\b"
+                ),
+            ),
+            (
+                "file_upload",
+                re.compile(
+                    r"\b(request\.files|UploadFile|multer|multipart/form-data|IFormFile)\b"
+                ),
+            ),
         ]
         records: List[Dict[str, Any]] = []
         for path in self._code_files():
@@ -382,11 +420,24 @@ class SecurityAuditToolSet:
             rel = self._relative(path)
             suffix = path.suffix.lower()
             for language, extensions in LANGUAGE_EXTENSIONS.items():
-                if suffix in extensions or (path.name == "Dockerfile" and language == "docker"):
+                if suffix in extensions or (
+                    path.name == "Dockerfile" and language == "docker"
+                ):
                     languages[language] += 1
             if path.name in MANIFEST_FILES:
                 manifests.append({"path": rel, "kind": MANIFEST_FILES[path.name]})
-            if path.name in SECURITY_RELEVANT_NAMES or any(token in rel.lower() for token in ("auth", "secret", "config", "docker", ".github/workflows", "k8s", "helm")):
+            if path.name in SECURITY_RELEVANT_NAMES or any(
+                token in rel.lower()
+                for token in (
+                    "auth",
+                    "secret",
+                    "config",
+                    "docker",
+                    ".github/workflows",
+                    "k8s",
+                    "helm",
+                )
+            ):
                 security_relevant.append(rel)
         entrypoint_candidates = self._scan_entrypoints(limit=min(self.max_matches, 40))
         payload = self._store(
@@ -400,9 +451,17 @@ class SecurityAuditToolSet:
                 "data": {
                     "languages": dict(languages.most_common()),
                     "manifests": manifests,
-                    "framework_hints": self._framework_hints([path for path in files if path.name in MANIFEST_FILES or path.name == "Dockerfile"]),
+                    "framework_hints": self._framework_hints(
+                        [
+                            path
+                            for path in files
+                            if path.name in MANIFEST_FILES or path.name == "Dockerfile"
+                        ]
+                    ),
                     "entrypoint_candidates": entrypoint_candidates,
-                    "security_relevant_files": sorted(security_relevant)[: max(20, self.max_matches)],
+                    "security_relevant_files": sorted(security_relevant)[
+                        : max(20, self.max_matches)
+                    ],
                 },
             },
         )
@@ -452,33 +511,130 @@ class SecurityAuditToolSet:
         """
         pattern_map: Dict[str, List[Dict[str, Any]]] = {
             "command_exec": [
-                {"regex": re.compile(r"\b(os\.system|subprocess\.(run|Popen|call)|child_process\.(exec|spawn)|Runtime\.getRuntime\(\)\.exec)\b"), "severity": "high", "confidence": 0.72, "title": "Command execution sink", "rationale": "Command execution primitives often become RCE when user input reaches arguments.", "recommendation": "Trace whether user-controlled input can reach this sink and prefer safe APIs without shell interpretation."},
-                {"regex": re.compile(r"\bshell\s*=\s*True\b"), "severity": "high", "confidence": 0.82, "title": "Shell interpretation enabled", "rationale": "Enabling shell interpretation increases command injection risk.", "recommendation": "Avoid `shell=True` and pass command arguments as a list."},
+                {
+                    "regex": re.compile(
+                        r"\b(os\.system|subprocess\.(run|Popen|call)|child_process\.(exec|spawn)|Runtime\.getRuntime\(\)\.exec)\b"
+                    ),
+                    "severity": "high",
+                    "confidence": 0.72,
+                    "title": "Command execution sink",
+                    "rationale": "Command execution primitives often become RCE when user input reaches arguments.",
+                    "recommendation": "Trace whether user-controlled input can reach this sink and prefer safe APIs without shell interpretation.",
+                },
+                {
+                    "regex": re.compile(r"\bshell\s*=\s*True\b"),
+                    "severity": "high",
+                    "confidence": 0.82,
+                    "title": "Shell interpretation enabled",
+                    "rationale": "Enabling shell interpretation increases command injection risk.",
+                    "recommendation": "Avoid `shell=True` and pass command arguments as a list.",
+                },
             ],
             "sql_injection": [
-                {"regex": re.compile(r"\b(execute|executemany|raw|query)\s*\(\s*f[\"']"), "severity": "high", "confidence": 0.78, "title": "Interpolated SQL execution", "rationale": "Building SQL queries with string interpolation is a common SQL injection path.", "recommendation": "Use parameterized queries or ORM-safe query builders."},
-                {"regex": re.compile(r"\b(cursor|db|session)\.(execute|query)\s*\([^)]*\+"), "severity": "high", "confidence": 0.74, "title": "Concatenated SQL query", "rationale": "String concatenation into SQL often indicates unescaped user input in queries.", "recommendation": "Replace concatenation with bind parameters."},
+                {
+                    "regex": re.compile(
+                        r"\b(execute|executemany|raw|query)\s*\(\s*f[\"']"
+                    ),
+                    "severity": "high",
+                    "confidence": 0.78,
+                    "title": "Interpolated SQL execution",
+                    "rationale": "Building SQL queries with string interpolation is a common SQL injection path.",
+                    "recommendation": "Use parameterized queries or ORM-safe query builders.",
+                },
+                {
+                    "regex": re.compile(
+                        r"\b(cursor|db|session)\.(execute|query)\s*\([^)]*\+"
+                    ),
+                    "severity": "high",
+                    "confidence": 0.74,
+                    "title": "Concatenated SQL query",
+                    "rationale": "String concatenation into SQL often indicates unescaped user input in queries.",
+                    "recommendation": "Replace concatenation with bind parameters.",
+                },
             ],
             "path_traversal": [
-                {"regex": re.compile(r"\b(open|send_file|send_from_directory|File\(|fs\.(readFile|createReadStream))\b.*\b(request|params|query|input|filename|path)\b"), "severity": "high", "confidence": 0.68, "title": "User-influenced file path", "rationale": "File APIs fed by request/path input may allow traversal outside intended directories.", "recommendation": "Normalize paths and enforce an allowlisted root before reading or serving files."},
+                {
+                    "regex": re.compile(
+                        r"\b(open|send_file|send_from_directory|File\(|fs\.(readFile|createReadStream))\b.*\b(request|params|query|input|filename|path)\b"
+                    ),
+                    "severity": "high",
+                    "confidence": 0.68,
+                    "title": "User-influenced file path",
+                    "rationale": "File APIs fed by request/path input may allow traversal outside intended directories.",
+                    "recommendation": "Normalize paths and enforce an allowlisted root before reading or serving files.",
+                },
             ],
             "ssrf": [
-                {"regex": re.compile(r"\b(requests\.(get|post)|httpx\.(get|post)|fetch|axios\.(get|post))\b.*\b(url|request|params|query|input)\b"), "severity": "medium", "confidence": 0.63, "title": "Outbound request from variable URL", "rationale": "Dynamic URLs can become SSRF if influenced by external input.", "recommendation": "Validate destination hosts and block internal address ranges."},
+                {
+                    "regex": re.compile(
+                        r"\b(requests\.(get|post)|httpx\.(get|post)|fetch|axios\.(get|post))\b.*\b(url|request|params|query|input)\b"
+                    ),
+                    "severity": "medium",
+                    "confidence": 0.63,
+                    "title": "Outbound request from variable URL",
+                    "rationale": "Dynamic URLs can become SSRF if influenced by external input.",
+                    "recommendation": "Validate destination hosts and block internal address ranges.",
+                },
             ],
             "xss_template": [
-                {"regex": re.compile(r"\b(dangerouslySetInnerHTML|innerHTML\s*=|render_template_string|Markup\(|v-html)\b"), "severity": "medium", "confidence": 0.69, "title": "Raw HTML rendering sink", "rationale": "Raw HTML rendering bypasses standard escaping and can enable XSS.", "recommendation": "Prefer escaped rendering and sanitize any HTML content that must be rendered."},
+                {
+                    "regex": re.compile(
+                        r"\b(dangerouslySetInnerHTML|innerHTML\s*=|render_template_string|Markup\(|v-html)\b"
+                    ),
+                    "severity": "medium",
+                    "confidence": 0.69,
+                    "title": "Raw HTML rendering sink",
+                    "rationale": "Raw HTML rendering bypasses standard escaping and can enable XSS.",
+                    "recommendation": "Prefer escaped rendering and sanitize any HTML content that must be rendered.",
+                },
             ],
             "deserialization": [
-                {"regex": re.compile(r"\b(pickle\.loads|yaml\.load\(|marshal\.loads|jsonpickle\.decode|ObjectInputStream|unserialize\()\b"), "severity": "high", "confidence": 0.81, "title": "Unsafe deserialization sink", "rationale": "Unsafe deserialization primitives can execute attacker-controlled payloads.", "recommendation": "Use safe loaders and treat serialized input as untrusted."},
+                {
+                    "regex": re.compile(
+                        r"\b(pickle\.loads|yaml\.load\(|marshal\.loads|jsonpickle\.decode|ObjectInputStream|unserialize\()\b"
+                    ),
+                    "severity": "high",
+                    "confidence": 0.81,
+                    "title": "Unsafe deserialization sink",
+                    "rationale": "Unsafe deserialization primitives can execute attacker-controlled payloads.",
+                    "recommendation": "Use safe loaders and treat serialized input as untrusted.",
+                },
             ],
             "file_write": [
-                {"regex": re.compile(r"\b(open|write_text|write_bytes|fs\.(writeFile|appendFile)|shutil\.(copy|move))\b.*\b(request|params|query|filename|path)\b"), "severity": "medium", "confidence": 0.61, "title": "User-influenced file write", "rationale": "User-controlled paths or filenames in write operations may lead to overwrite or traversal issues.", "recommendation": "Constrain writes to a fixed directory and sanitize file names."},
+                {
+                    "regex": re.compile(
+                        r"\b(open|write_text|write_bytes|fs\.(writeFile|appendFile)|shutil\.(copy|move))\b.*\b(request|params|query|filename|path)\b"
+                    ),
+                    "severity": "medium",
+                    "confidence": 0.61,
+                    "title": "User-influenced file write",
+                    "rationale": "User-controlled paths or filenames in write operations may lead to overwrite or traversal issues.",
+                    "recommendation": "Constrain writes to a fixed directory and sanitize file names.",
+                },
             ],
             "crypto_auth": [
-                {"regex": re.compile(r"\b(hashlib\.(md5|sha1)|md5\(|sha1\(|jwt\.decode\([^)]*verify\s*=\s*False|verify\s*=\s*False|ssl\._create_unverified_context)\b"), "severity": "medium", "confidence": 0.79, "title": "Weak crypto or verification disabled", "rationale": "Weak hashes and disabled verification undermine authentication and transport guarantees.", "recommendation": "Use modern password hashing/signature verification and keep certificate checks enabled."},
+                {
+                    "regex": re.compile(
+                        r"\b(hashlib\.(md5|sha1)|md5\(|sha1\(|jwt\.decode\([^)]*verify\s*=\s*False|verify\s*=\s*False|ssl\._create_unverified_context)\b"
+                    ),
+                    "severity": "medium",
+                    "confidence": 0.79,
+                    "title": "Weak crypto or verification disabled",
+                    "rationale": "Weak hashes and disabled verification undermine authentication and transport guarantees.",
+                    "recommendation": "Use modern password hashing/signature verification and keep certificate checks enabled.",
+                },
             ],
             "redirect_header": [
-                {"regex": re.compile(r"\b(redirect|res\.redirect|Response\.redirect|header\(['\"]Location['\"])\b.*\b(request|params|query|next|url)\b"), "severity": "medium", "confidence": 0.64, "title": "User-influenced redirect", "rationale": "Redirect targets influenced by user input can create open redirect and phishing issues.", "recommendation": "Allowlist redirect destinations or use symbolic route names instead of raw URLs."},
+                {
+                    "regex": re.compile(
+                        r"\b(redirect|res\.redirect|Response\.redirect|header\(['\"]Location['\"])\b.*\b(request|params|query|next|url)\b"
+                    ),
+                    "severity": "medium",
+                    "confidence": 0.64,
+                    "title": "User-influenced redirect",
+                    "rationale": "Redirect targets influenced by user input can create open redirect and phishing issues.",
+                    "recommendation": "Allowlist redirect destinations or use symbolic route names instead of raw URLs.",
+                },
             ],
         }
         categories = list(pattern_map.keys()) if category == "all" else [category]
@@ -520,7 +676,11 @@ class SecurityAuditToolSet:
             {
                 "status": "success",
                 "stdout": self._summarize_findings(findings, f"Sink scan ({category})"),
-                "data": {"category": category, "count": len(findings), "findings": findings},
+                "data": {
+                    "category": category,
+                    "count": len(findings),
+                    "findings": findings,
+                },
             },
         )
         return payload
@@ -536,12 +696,50 @@ class SecurityAuditToolSet:
         Scan for hard-coded credentials, tokens, private keys, and suspicious high-entropy secrets.
         """
         patterns = [
-            ("Private key block", re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"), "critical", 0.99, "Remove committed private keys and rotate them immediately."),
-            ("AWS access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "high", 0.97, "Replace committed AWS access keys with environment-backed secrets."),
-            ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"), "high", 0.96, "Rotate the token and store it in a secret manager."),
-            ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "high", 0.95, "Rotate the token and remove it from source control."),
-            ("Generic credential assignment", re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd|client_secret)\b\s*[:=]\s*[\"'][^\"']{8,}[\"']"), "medium", 0.7, "Move secrets out of source files and into environment-backed configuration."),
-            ("JWT-like token", re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b"), "medium", 0.68, "Do not hard-code bearer tokens or JWTs in the repository."),
+            (
+                "Private key block",
+                re.compile(r"-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"),
+                "critical",
+                0.99,
+                "Remove committed private keys and rotate them immediately.",
+            ),
+            (
+                "AWS access key",
+                re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+                "high",
+                0.97,
+                "Replace committed AWS access keys with environment-backed secrets.",
+            ),
+            (
+                "GitHub token",
+                re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"),
+                "high",
+                0.96,
+                "Rotate the token and store it in a secret manager.",
+            ),
+            (
+                "Slack token",
+                re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
+                "high",
+                0.95,
+                "Rotate the token and remove it from source control.",
+            ),
+            (
+                "Generic credential assignment",
+                re.compile(
+                    r"(?i)\b(api[_-]?key|secret|token|password|passwd|client_secret)\b\s*[:=]\s*[\"'][^\"']{8,}[\"']"
+                ),
+                "medium",
+                0.7,
+                "Move secrets out of source files and into environment-backed configuration.",
+            ),
+            (
+                "JWT-like token",
+                re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b"),
+                "medium",
+                0.68,
+                "Do not hard-code bearer tokens or JWTs in the repository.",
+            ),
         ]
         findings: List[Dict[str, Any]] = []
         for path in self._text_files():
@@ -604,7 +802,10 @@ class SecurityAuditToolSet:
         return payload
 
     def _extract_entropy_secret(self, line: str) -> Optional[str]:
-        match = re.search(r"(?i)\b(api[_-]?key|secret|token|password)\b\s*[:=]\s*[\"']([^\"']{16,})[\"']", line)
+        match = re.search(
+            r"(?i)\b(api[_-]?key|secret|token|password)\b\s*[:=]\s*[\"']([^\"']{16,})[\"']",
+            line,
+        )
         if not match:
             return None
         value = match.group(2).strip()
@@ -626,13 +827,79 @@ class SecurityAuditToolSet:
         Scan configuration and deployment files for risky security settings.
         """
         patterns = [
-            ("Debug mode enabled", "debug_config", re.compile(r"(?i)\b(debug|devMode)\b\s*[:=]\s*(true|1)\b"), "medium", 0.78, "Debug mode can leak stack traces, secrets, and internal behavior.", "Disable debug mode in production and gate it behind environment checks."),
-            ("Wildcard CORS", "cors", re.compile(r"(?i)(allow_origins|cors_allowed_origins|Access-Control-Allow-Origin).*\*"), "medium", 0.76, "Wildcard CORS often exposes authenticated APIs to unintended origins.", "Restrict allowed origins to known frontends."),
-            ("TLS verification disabled", "tls_verification", re.compile(r"\b(verify\s*=\s*False|insecureSkipVerify\s*:\s*true|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0)\b"), "high", 0.86, "Disabling TLS verification enables machine-in-the-middle attacks.", "Keep certificate validation enabled and trust explicit CA bundles when required."),
-            ("Insecure cookie flags", "cookie_security", re.compile(r"(?i)\b(SESSION_COOKIE_SECURE|COOKIE_SECURE|secure)\b\s*[:=]\s*(false|0)\b"), "medium", 0.69, "Session cookies without secure flags are exposed over plaintext channels.", "Mark session cookies as Secure and HttpOnly in production."),
-            ("Placeholder secret key", "default_secret", re.compile(r"(?i)\b(secret[_-]?key|jwt[_-]?secret)\b\s*[:=]\s*[\"'](changeme|example|test|dummy|secret)[\"']"), "high", 0.83, "Default or placeholder secret keys undermine signing and session protection.", "Load a strong secret from managed configuration."),
-            ("Privileged container", "container_privilege", re.compile(r"(?i)\b(privileged|allowPrivilegeEscalation|hostNetwork)\b\s*:\s*true"), "high", 0.8, "Privileged containers increase blast radius during compromise.", "Drop privilege escalation and only add specific capabilities that are required."),
-            ("Container running as root", "container_user", re.compile(r"^\s*USER\s+root\b", re.IGNORECASE), "medium", 0.7, "Running containers as root increases post-compromise impact.", "Use a non-root user in container images."),
+            (
+                "Debug mode enabled",
+                "debug_config",
+                re.compile(r"(?i)\b(debug|devMode)\b\s*[:=]\s*(true|1)\b"),
+                "medium",
+                0.78,
+                "Debug mode can leak stack traces, secrets, and internal behavior.",
+                "Disable debug mode in production and gate it behind environment checks.",
+            ),
+            (
+                "Wildcard CORS",
+                "cors",
+                re.compile(
+                    r"(?i)(allow_origins|cors_allowed_origins|Access-Control-Allow-Origin).*\*"
+                ),
+                "medium",
+                0.76,
+                "Wildcard CORS often exposes authenticated APIs to unintended origins.",
+                "Restrict allowed origins to known frontends.",
+            ),
+            (
+                "TLS verification disabled",
+                "tls_verification",
+                re.compile(
+                    r"\b(verify\s*=\s*False|insecureSkipVerify\s*:\s*true|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0)\b"
+                ),
+                "high",
+                0.86,
+                "Disabling TLS verification enables machine-in-the-middle attacks.",
+                "Keep certificate validation enabled and trust explicit CA bundles when required.",
+            ),
+            (
+                "Insecure cookie flags",
+                "cookie_security",
+                re.compile(
+                    r"(?i)\b(SESSION_COOKIE_SECURE|COOKIE_SECURE|secure)\b\s*[:=]\s*(false|0)\b"
+                ),
+                "medium",
+                0.69,
+                "Session cookies without secure flags are exposed over plaintext channels.",
+                "Mark session cookies as Secure and HttpOnly in production.",
+            ),
+            (
+                "Placeholder secret key",
+                "default_secret",
+                re.compile(
+                    r"(?i)\b(secret[_-]?key|jwt[_-]?secret)\b\s*[:=]\s*[\"'](changeme|example|test|dummy|secret)[\"']"
+                ),
+                "high",
+                0.83,
+                "Default or placeholder secret keys undermine signing and session protection.",
+                "Load a strong secret from managed configuration.",
+            ),
+            (
+                "Privileged container",
+                "container_privilege",
+                re.compile(
+                    r"(?i)\b(privileged|allowPrivilegeEscalation|hostNetwork)\b\s*:\s*true"
+                ),
+                "high",
+                0.8,
+                "Privileged containers increase blast radius during compromise.",
+                "Drop privilege escalation and only add specific capabilities that are required.",
+            ),
+            (
+                "Container running as root",
+                "container_user",
+                re.compile(r"^\s*USER\s+root\b", re.IGNORECASE),
+                "medium",
+                0.7,
+                "Running containers as root increases post-compromise impact.",
+                "Use a non-root user in container images.",
+            ),
         ]
         findings: List[Dict[str, Any]] = []
         for path in self._text_files():
@@ -640,7 +907,15 @@ class SecurityAuditToolSet:
             if not text:
                 continue
             for line_no, line in enumerate(text.splitlines(), start=1):
-                for title, category, pattern, severity, confidence, rationale, recommendation in patterns:
+                for (
+                    title,
+                    category,
+                    pattern,
+                    severity,
+                    confidence,
+                    rationale,
+                    recommendation,
+                ) in patterns:
                     if not pattern.search(line):
                         continue
                     findings.append(
@@ -742,7 +1017,8 @@ class SecurityAuditToolSet:
             payload["outdated_clues"] = [
                 f"{name}:{version}"
                 for name, version in {**deps, **dev_deps}.items()
-                if str(version) in {"*", "latest"} or str(version).startswith((">", "^0", "~0"))
+                if str(version) in {"*", "latest"}
+                or str(version).startswith((">", "^0", "~0"))
             ]
         elif path.name == "pyproject.toml":
             parsed = self._parse_toml(text)
@@ -755,12 +1031,16 @@ class SecurityAuditToolSet:
                 direct.append(re.split(r"[<>=!~\[]", dep, maxsplit=1)[0].strip())
                 if "==" not in dep:
                     outdated.append(dep)
-            poetry_deps = dict(parsed.get("tool", {}).get("poetry", {}).get("dependencies") or {})
+            poetry_deps = dict(
+                parsed.get("tool", {}).get("poetry", {}).get("dependencies") or {}
+            )
             for name, spec in poetry_deps.items():
                 if name == "python":
                     continue
                 direct.append(str(name))
-                if isinstance(spec, dict) and any(key in spec for key in ("git", "path", "url")):
+                if isinstance(spec, dict) and any(
+                    key in spec for key in ("git", "path", "url")
+                ):
                     git_or_path.append(name)
                 elif isinstance(spec, str) and not spec.startswith("=="):
                     outdated.append(f"{name}:{spec}")
@@ -768,9 +1048,17 @@ class SecurityAuditToolSet:
             payload["git_or_path_dependencies"] = sorted(set(git_or_path))
             payload["outdated_clues"] = sorted(set(outdated))
         elif path.name in {"Cargo.toml", "Cargo.lock", "go.mod"}:
-            payload["direct_dependencies"] = self._parse_simple_module_names(text, path.name)
+            payload["direct_dependencies"] = self._parse_simple_module_names(
+                text, path.name
+            )
             payload["locked_dependency_count"] = len(payload["direct_dependencies"])
-        suspicious = [dep for dep in payload["direct_dependencies"] if dep and any(ch.isupper() for ch in dep[:1]) is False and dep.count("-") >= 3]
+        suspicious = [
+            dep
+            for dep in payload["direct_dependencies"]
+            if dep
+            and any(ch.isupper() for ch in dep[:1]) is False
+            and dep.count("-") >= 3
+        ]
         payload["suspicious_dependencies"] = suspicious[:20]
         payload["direct_dependency_count"] = len(payload["direct_dependencies"])
         return payload
@@ -824,7 +1112,14 @@ class SecurityAuditToolSet:
         for scan in commands:
             result = self._run_command(scan["cmd"], cwd=scan.get("cwd"))
             parsed = self._parse_external_audit(scan["kind"], result)
-            scans.append({"kind": scan["kind"], "status": result["status"], "command": scan["cmd"], "stderr": result["stderr"]})
+            scans.append(
+                {
+                    "kind": scan["kind"],
+                    "status": result["status"],
+                    "command": scan["cmd"],
+                    "stderr": result["stderr"],
+                }
+            )
             findings.extend(parsed)
         payload = self._store(
             "audit_dependency_audit",
@@ -843,13 +1138,35 @@ class SecurityAuditToolSet:
         package_json = root / "package.json"
         pyproject = root / "pyproject.toml"
         if requirements.exists() and shutil.which("pip-audit"):
-            commands.append({"kind": "pip-audit", "cmd": ["pip-audit", "-r", str(requirements), "-f", "json"]})
+            commands.append(
+                {
+                    "kind": "pip-audit",
+                    "cmd": ["pip-audit", "-r", str(requirements), "-f", "json"],
+                }
+            )
         elif pyproject.exists() and shutil.which("pip-audit"):
-            commands.append({"kind": "pip-audit", "cmd": ["pip-audit", "-f", "json"], "cwd": str(root)})
+            commands.append(
+                {
+                    "kind": "pip-audit",
+                    "cmd": ["pip-audit", "-f", "json"],
+                    "cwd": str(root),
+                }
+            )
         if package_json.exists() and shutil.which("npm"):
-            commands.append({"kind": "npm-audit", "cmd": ["npm", "audit", "--json"], "cwd": str(root)})
+            commands.append(
+                {
+                    "kind": "npm-audit",
+                    "cmd": ["npm", "audit", "--json"],
+                    "cwd": str(root),
+                }
+            )
         if shutil.which("osv-scanner"):
-            commands.append({"kind": "osv-scanner", "cmd": ["osv-scanner", "--format", "json", "-r", str(root)]})
+            commands.append(
+                {
+                    "kind": "osv-scanner",
+                    "cmd": ["osv-scanner", "--format", "json", "-r", str(root)],
+                }
+            )
         return commands
 
     def _run_command(self, cmd: List[str], cwd: Optional[str] = None) -> Dict[str, Any]:
@@ -869,11 +1186,23 @@ class SecurityAuditToolSet:
                 "returncode": result.returncode,
             }
         except FileNotFoundError:
-            return {"status": "unavailable", "stdout": "", "stderr": f"{cmd[0]} not found", "returncode": -1}
+            return {
+                "status": "unavailable",
+                "stdout": "",
+                "stderr": f"{cmd[0]} not found",
+                "returncode": -1,
+            }
         except subprocess.TimeoutExpired:
-            return {"status": "error", "stdout": "", "stderr": "command timed out", "returncode": -1}
+            return {
+                "status": "error",
+                "stdout": "",
+                "stderr": "command timed out",
+                "returncode": -1,
+            }
 
-    def _parse_external_audit(self, kind: str, result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _parse_external_audit(
+        self, kind: str, result: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         if not result.get("stdout"):
             return []
         try:
@@ -919,7 +1248,11 @@ class SecurityAuditToolSet:
             severity = str(vuln.get("severity", "medium"))
             via = vuln.get("via") or []
             advisory = via[0] if isinstance(via, list) and via else {}
-            title = advisory.get("title") if isinstance(advisory, dict) else f"npm audit finding for {name}"
+            title = (
+                advisory.get("title")
+                if isinstance(advisory, dict)
+                else f"npm audit finding for {name}"
+            )
             findings.append(
                 self._build_finding(
                     title=str(title or f"Vulnerable dependency: {name}"),
@@ -971,7 +1304,9 @@ class SecurityAuditToolSet:
         """
         Find TODO, FIXME, HACK, nosec, and suppressive annotations that may hide security debt.
         """
-        pattern = re.compile(r"\b(TODO|FIXME|HACK|XXX|SECURITY|nosec|suppress|ignore)\b", re.IGNORECASE)
+        pattern = re.compile(
+            r"\b(TODO|FIXME|HACK|XXX|SECURITY|nosec|suppress|ignore)\b", re.IGNORECASE
+        )
         findings: List[Dict[str, Any]] = []
         for path in self._text_files():
             text = self._read_text(path, max_bytes=250_000)
@@ -1014,7 +1349,9 @@ class SecurityAuditToolSet:
         read_only=True,
         concurrency_safe=True,
     )
-    def audit_hotspots(self, findings: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    def audit_hotspots(
+        self, findings: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
         """
         Aggregate cached audit findings into a ranked shortlist of files and components that deserve manual review.
 
@@ -1024,7 +1361,13 @@ class SecurityAuditToolSet:
         file_scores: Dict[str, float] = defaultdict(float)
         categories: Dict[str, set[str]] = defaultdict(set)
         by_severity = Counter()
-        severity_score = {"critical": 5.0, "high": 3.0, "medium": 1.5, "low": 0.5, "info": 0.25}
+        severity_score = {
+            "critical": 5.0,
+            "high": 3.0,
+            "medium": 1.5,
+            "low": 0.5,
+            "info": 0.25,
+        }
         for item in source_findings:
             file_key = str(item.get("file", "unknown"))
             severity = str(item.get("severity", "low"))
@@ -1032,17 +1375,25 @@ class SecurityAuditToolSet:
             file_scores[file_key] += severity_score.get(severity, 0.5) * confidence
             categories[file_key].add(str(item.get("category", "unknown")))
             by_severity[severity] += 1
-        entrypoints = self._session_cache.get("audit_entrypoints", {}).get("data", {}).get("entrypoints", [])
+        entrypoints = (
+            self._session_cache.get("audit_entrypoints", {})
+            .get("data", {})
+            .get("entrypoints", [])
+        )
         for item in entrypoints:
             file_scores[str(item.get("file", "unknown"))] += 0.4
-            categories[str(item.get("file", "unknown"))].add(f"entrypoint:{item.get('kind', 'unknown')}")
+            categories[str(item.get("file", "unknown"))].add(
+                f"entrypoint:{item.get('kind', 'unknown')}"
+            )
         hotspots = [
             {
                 "file": file,
                 "score": round(score, 2),
                 "categories": sorted(categories[file]),
             }
-            for file, score in sorted(file_scores.items(), key=lambda pair: pair[1], reverse=True)
+            for file, score in sorted(
+                file_scores.items(), key=lambda pair: pair[1], reverse=True
+            )
         ]
         payload = self._store(
             "audit_hotspots",
@@ -1067,7 +1418,9 @@ class SecurityAuditToolSet:
         for payload in self._session_cache.values():
             data = payload.get("data", {}) if isinstance(payload, dict) else {}
             if isinstance(data, dict) and isinstance(data.get("findings"), list):
-                findings.extend(item for item in data["findings"] if isinstance(item, dict))
+                findings.extend(
+                    item for item in data["findings"] if isinstance(item, dict)
+                )
         return findings
 
 

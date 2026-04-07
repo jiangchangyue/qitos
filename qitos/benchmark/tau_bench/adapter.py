@@ -25,7 +25,10 @@ def _action_to_dict(action: Any) -> Dict[str, Any]:
         if "kwargs" not in out and "arguments" in out:
             out["kwargs"] = dict(out.get("arguments") or {})
         return out
-    return {"name": str(getattr(action, "name", "")), "kwargs": dict(getattr(action, "kwargs", {}) or {})}
+    return {
+        "name": str(getattr(action, "name", "")),
+        "kwargs": dict(getattr(action, "kwargs", {}) or {}),
+    }
 
 
 def _task_to_dict(task: Any) -> Dict[str, Any]:
@@ -38,7 +41,9 @@ def _task_to_dict(task: Any) -> Dict[str, Any]:
     return {
         "instruction": str(getattr(task, "instruction", "")),
         "outputs": list(getattr(task, "outputs", []) or []),
-        "actions": [_action_to_dict(x) for x in list(getattr(task, "actions", []) or [])],
+        "actions": [
+            _action_to_dict(x) for x in list(getattr(task, "actions", []) or [])
+        ],
         "user_id": str(getattr(task, "user_id", "")),
     }
 
@@ -62,15 +67,24 @@ class TauBenchAdapter(BenchmarkAdapter):
     )
 
     def __post_init__(self) -> None:
-        self.source = BenchmarkSource(name="tau-bench", split=self.task_split, subset=self.env_name)
+        self.source = BenchmarkSource(
+            name="tau-bench", split=self.task_split, subset=self.env_name
+        )
 
-    def load_records(self, env_name: Optional[str] = None, split: Optional[str] = None) -> list[dict[str, Any]]:
+    def load_records(
+        self, env_name: Optional[str] = None, split: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         env = str(env_name or self.env_name)
         sp = str(split or self.task_split)
         records = self._load_task_constants(env=env, split=sp)
         return [self._normalize_record(r) for r in records]
 
-    def to_tasks(self, records: Iterable[Mapping[str, Any]], split: str, limit: Optional[int] = None) -> list[Task]:
+    def to_tasks(
+        self,
+        records: Iterable[Mapping[str, Any]],
+        split: str,
+        limit: Optional[int] = None,
+    ) -> list[Task]:
         out: list[Task] = []
         for idx, row in enumerate(records):
             if limit is not None and idx >= int(limit):
@@ -80,8 +94,13 @@ class TauBenchAdapter(BenchmarkAdapter):
 
     def to_task(self, record: Mapping[str, Any], split: str, idx: int) -> Task:
         rec = self._normalize_record(record)
-        instruction = str(rec.get("instruction", "")).strip() or "Solve the Tau-Bench task."
-        task_id = str(rec.get("task_id") or f"{self.task_prefix}_{self.env_name}_{split}_{idx:05d}")
+        instruction = (
+            str(rec.get("instruction", "")).strip() or "Solve the Tau-Bench task."
+        )
+        task_id = str(
+            rec.get("task_id")
+            or f"{self.task_prefix}_{self.env_name}_{split}_{idx:05d}"
+        )
         outputs = list(rec.get("outputs", []) or [])
         actions = list(rec.get("actions", []) or [])
 
@@ -124,19 +143,27 @@ class TauBenchAdapter(BenchmarkAdapter):
 
         if env == "retail":
             if split == "test":
-                mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_test")
+                mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_test"
+                )
                 return list(getattr(mod, "TASKS_TEST"))
             if split == "train":
-                mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_train")
+                mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_train"
+                )
                 return list(getattr(mod, "TASKS_TRAIN"))
             if split == "dev":
-                mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_dev")
+                mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_dev"
+                )
                 return list(getattr(mod, "TASKS_DEV"))
             raise ValueError(f"Unsupported retail split: {split}")
 
         if env == "airline":
             if split == "test":
-                mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.tasks_test")
+                mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.airline.tasks_test"
+                )
                 return list(getattr(mod, "TASKS"))
             raise ValueError(f"Unsupported airline split: {split}")
 
@@ -155,7 +182,9 @@ class TauBenchAdapter(BenchmarkAdapter):
         }
 
 
-def load_tau_bench_tasks(env_name: str = "retail", split: str = "test", limit: Optional[int] = None) -> list[Task]:
+def load_tau_bench_tasks(
+    env_name: str = "retail", split: str = "test", limit: Optional[int] = None
+) -> list[Task]:
     adapter = TauBenchAdapter(env_name=env_name, task_split=split)
     rows = adapter.load_records(env_name=env_name, split=split)
     return adapter.to_tasks(rows, split=split, limit=limit)

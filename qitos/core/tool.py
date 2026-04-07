@@ -34,7 +34,9 @@ class ToolValidationResult:
         code: str = "validation_failed",
         suggested_args: Optional[Dict[str, Any]] = None,
     ) -> "ToolValidationResult":
-        return cls(valid=False, message=message, code=code, suggested_args=suggested_args)
+        return cls(
+            valid=False, message=message, code=code, suggested_args=suggested_args
+        )
 
 
 @dataclass
@@ -51,7 +53,8 @@ class ToolPermissionRule:
         if self.tool_name and self.tool_name != normalized_tool:
             return False
         if self.tool_family and not (
-            normalized_tool == self.tool_family or normalized_tool.startswith(f"{self.tool_family}.")
+            normalized_tool == self.tool_family
+            or normalized_tool.startswith(f"{self.tool_family}.")
         ):
             return False
         if self.scope and self.scope != normalized_scope:
@@ -68,7 +71,9 @@ class ToolPermissionDecision:
     updated_args: Optional[Dict[str, Any]] = None
 
     @classmethod
-    def allow(cls, *, scope: str = "", updated_args: Optional[Dict[str, Any]] = None) -> "ToolPermissionDecision":
+    def allow(
+        cls, *, scope: str = "", updated_args: Optional[Dict[str, Any]] = None
+    ) -> "ToolPermissionDecision":
         return cls(decision="allow", scope=scope, updated_args=updated_args)
 
     @classmethod
@@ -79,7 +84,9 @@ class ToolPermissionDecision:
         scope: str = "",
         matched_rule: Optional[ToolPermissionRule] = None,
     ) -> "ToolPermissionDecision":
-        return cls(decision="deny", message=message, scope=scope, matched_rule=matched_rule)
+        return cls(
+            decision="deny", message=message, scope=scope, matched_rule=matched_rule
+        )
 
     @classmethod
     def ask(
@@ -209,7 +216,11 @@ class BaseTool:
     """Base abstraction for callable tools."""
 
     def __init__(self, spec: ToolSpec):
-        description = inspect.getdoc(self.execute) or inspect.getdoc(self.run) or inspect.getdoc(self.__class__)
+        description = (
+            inspect.getdoc(self.execute)
+            or inspect.getdoc(self.run)
+            or inspect.getdoc(self.__class__)
+        )
         if description:
             spec.description = inspect.cleandoc(description)
         if spec.input_schema is None:
@@ -224,16 +235,22 @@ class BaseTool:
     def name(self) -> str:
         return self.spec.name
 
-    def _coerce_run_kwargs(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _coerce_run_kwargs(
+        self, args: tuple[Any, ...], kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
         if not args:
             return dict(kwargs)
         param_names = list(self.spec.parameters.keys())
         if len(args) > len(param_names):
-            raise TypeError(f"{self.__class__.__name__}.run() received too many positional arguments")
+            raise TypeError(
+                f"{self.__class__.__name__}.run() received too many positional arguments"
+            )
         merged = dict(kwargs)
         for name, value in zip(param_names, args):
             if name in merged:
-                raise TypeError(f"{self.__class__.__name__}.run() got multiple values for argument '{name}'")
+                raise TypeError(
+                    f"{self.__class__.__name__}.run() got multiple values for argument '{name}'"
+                )
             merged[name] = value
         return merged
 
@@ -243,7 +260,9 @@ class BaseTool:
         coerced = self._coerce_run_kwargs(args, kwargs)
         return self.execute(coerced, runtime_context=runtime_context)
 
-    def call(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def call(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """Normalized call path for tool execution."""
         return self.execute(args, runtime_context=runtime_context)
 
@@ -276,7 +295,9 @@ class BaseTool:
             return str(value or "")
         return ""
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """Execute tool with optional runtime context."""
         legacy_run = type(self).run
         if legacy_run is not BaseTool.run:
@@ -306,10 +327,14 @@ class FunctionTool(BaseTool):
     def run(self, **kwargs: Any) -> Any:
         return self.func(**kwargs)
 
-    def call(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def call(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         return self.execute(args, runtime_context=runtime_context)
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         runtime_context = runtime_context or {}
         env = runtime_context.get("env")
         ops = runtime_context.get("ops", {})
@@ -389,7 +414,15 @@ def build_tool_spec(func: Callable[..., Any], meta: ToolMeta) -> ToolSpec:
     required = []
 
     for name, p in sig.parameters.items():
-        if name in {"self", "cls", "runtime_context", "env", "ops", "file_ops", "process_ops"}:
+        if name in {
+            "self",
+            "cls",
+            "runtime_context",
+            "env",
+            "ops",
+            "file_ops",
+            "process_ops",
+        }:
             continue
         params[name] = {"type": _type_to_json(p.annotation), "description": ""}
         if p.default is inspect.Parameter.empty:

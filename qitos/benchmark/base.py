@@ -25,6 +25,10 @@ class BenchmarkAdapter(ABC):
     source: BenchmarkSource
 
     @abstractmethod
-    def to_tasks(self, records: Iterable[Mapping[str, Any]], split: str, limit: Optional[int] = None) -> list[Task]:
+    def to_tasks(
+        self,
+        records: Iterable[Mapping[str, Any]],
+        split: str,
+        limit: Optional[int] = None,
+    ) -> list[Task]:
         """Convert iterable records into validated QitOS Task objects."""
-

@@ -7,9 +7,16 @@ from hashlib import sha256
 from importlib import import_module
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from qitos.benchmark.tau_bench.port.types import Action, RESPOND_ACTION_FIELD_NAME, RESPOND_ACTION_NAME, Task
+from qitos.benchmark.tau_bench.port.types import (
+    Action,
+    RESPOND_ACTION_FIELD_NAME,
+    RESPOND_ACTION_NAME,
+    Task,
+)
 
-ToHashable = Union[str, int, float, Dict[str, "ToHashable"], List["ToHashable"], Set["ToHashable"]]
+ToHashable = Union[
+    str, int, float, Dict[str, "ToHashable"], List["ToHashable"], Set["ToHashable"]
+]
 Hashable = Union[str, int, float, Tuple["Hashable"], Tuple[Tuple[str, "Hashable"]]]
 
 
@@ -65,11 +72,18 @@ class TauRuntimeEnv:
         self.env_name = env_name
         self.task_split = task_split
 
-        self._load_data, self.tool_classes, self.tasks, self.wiki, self.rules, self.terminate_tools = self._load_assets(
-            env_name, task_split
-        )
+        (
+            self._load_data,
+            self.tool_classes,
+            self.tasks,
+            self.wiki,
+            self.rules,
+            self.terminate_tools,
+        ) = self._load_assets(env_name, task_split)
 
-        self.tools_map = {tool.get_info()["function"]["name"]: tool for tool in self.tool_classes}
+        self.tools_map = {
+            tool.get_info()["function"]["name"]: tool for tool in self.tool_classes
+        }
         self.tools_info = [tool.get_info() for tool in self.tool_classes]
 
         self.task_index = int(task_index or 0)
@@ -96,7 +110,9 @@ class TauRuntimeEnv:
 
         if action.name in self.tools_map:
             try:
-                observation = self.tools_map[action.name].invoke(data=self.data, **action.kwargs)
+                observation = self.tools_map[action.name].invoke(
+                    data=self.data, **action.kwargs
+                )
                 observation = str(observation)
             except Exception as exc:
                 observation = f"Error: {exc}"
@@ -113,7 +129,9 @@ class TauRuntimeEnv:
             reward = float(reward_info.get("reward", 0.0))
             info.reward_info = reward_info
 
-        return TauEnvResponse(observation=observation, reward=reward, done=done, info=info)
+        return TauEnvResponse(
+            observation=observation, reward=reward, done=done, info=info
+        )
 
     def get_data_hash(self) -> str:
         return _consistent_hash(_to_hashable(self.data))
@@ -148,7 +166,11 @@ class TauRuntimeEnv:
             ok = True
             for expected in self.task.outputs:
                 found = any(
-                    a.name == RESPOND_ACTION_NAME and str(expected).lower() in str(a.kwargs.get(RESPOND_ACTION_FIELD_NAME, "")).lower().replace(",", "")
+                    a.name == RESPOND_ACTION_NAME
+                    and str(expected).lower()
+                    in str(a.kwargs.get(RESPOND_ACTION_FIELD_NAME, ""))
+                    .lower()
+                    .replace(",", "")
                     for a in self.actions
                 )
                 outputs[str(expected)] = bool(found)
@@ -162,34 +184,54 @@ class TauRuntimeEnv:
         return {
             "reward": reward,
             "info": details,
-            "actions": [a.model_dump() for a in self.task.actions if a.name != RESPOND_ACTION_NAME],
+            "actions": [
+                a.model_dump()
+                for a in self.task.actions
+                if a.name != RESPOND_ACTION_NAME
+            ],
         }
 
     def _load_assets(self, env_name: str, split: str):
         if env_name == "retail":
             data_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.data")
-            tools_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tools")
+            tools_mod = import_module(
+                "qitos.benchmark.tau_bench.port.envs.retail.tools"
+            )
             wiki_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.wiki")
-            rules_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.rules")
+            rules_mod = import_module(
+                "qitos.benchmark.tau_bench.port.envs.retail.rules"
+            )
             if split == "test":
-                tasks_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_test")
+                tasks_mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_test"
+                )
                 tasks_raw = getattr(tasks_mod, "TASKS_TEST")
             elif split == "train":
-                tasks_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_train")
+                tasks_mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_train"
+                )
                 tasks_raw = getattr(tasks_mod, "TASKS_TRAIN")
             elif split == "dev":
-                tasks_mod = import_module("qitos.benchmark.tau_bench.port.envs.retail.tasks_dev")
+                tasks_mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.retail.tasks_dev"
+                )
                 tasks_raw = getattr(tasks_mod, "TASKS_DEV")
             else:
                 raise ValueError(f"Unsupported retail split: {split}")
             terminate_tools = ["transfer_to_human_agents"]
         elif env_name == "airline":
             data_mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.data")
-            tools_mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.tools")
+            tools_mod = import_module(
+                "qitos.benchmark.tau_bench.port.envs.airline.tools"
+            )
             wiki_mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.wiki")
-            rules_mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.rules")
+            rules_mod = import_module(
+                "qitos.benchmark.tau_bench.port.envs.airline.rules"
+            )
             if split == "test":
-                tasks_mod = import_module("qitos.benchmark.tau_bench.port.envs.airline.tasks_test")
+                tasks_mod = import_module(
+                    "qitos.benchmark.tau_bench.port.envs.airline.tasks_test"
+                )
                 tasks_raw = getattr(tasks_mod, "TASKS")
             else:
                 raise ValueError(f"Unsupported airline split: {split}")
@@ -198,14 +240,24 @@ class TauRuntimeEnv:
             raise ValueError(f"Unsupported Tau env: {env_name}")
 
         tasks = [self._normalize_task(t) for t in list(tasks_raw)]
-        return data_mod.load_data, list(tools_mod.ALL_TOOLS), tasks, str(wiki_mod.WIKI), list(rules_mod.RULES), terminate_tools
+        return (
+            data_mod.load_data,
+            list(tools_mod.ALL_TOOLS),
+            tasks,
+            str(wiki_mod.WIKI),
+            list(rules_mod.RULES),
+            terminate_tools,
+        )
 
     def _normalize_task(self, t: Any) -> Task:
         if isinstance(t, Task):
             return t
         payload = t.model_dump() if hasattr(t, "model_dump") else dict(t)
         actions = [
-            Action(name=str(a.get("name", "")), kwargs=dict(a.get("kwargs") or a.get("arguments") or {}))
+            Action(
+                name=str(a.get("name", "")),
+                kwargs=dict(a.get("kwargs") or a.get("arguments") or {}),
+            )
             for a in list(payload.get("actions", []) or [])
         ]
         return Task(
@@ -216,5 +268,9 @@ class TauRuntimeEnv:
         )
 
 
-def get_tau_runtime_env(env_name: str, task_split: str, task_index: Optional[int] = None) -> TauRuntimeEnv:
-    return TauRuntimeEnv(env_name=env_name, task_split=task_split, task_index=task_index)
+def get_tau_runtime_env(
+    env_name: str, task_split: str, task_index: Optional[int] = None
+) -> TauRuntimeEnv:
+    return TauRuntimeEnv(
+        env_name=env_name, task_split=task_split, task_index=task_index
+    )

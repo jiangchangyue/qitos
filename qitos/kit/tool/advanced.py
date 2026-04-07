@@ -36,16 +36,24 @@ class _DelegatingTool(BaseTool):
     def run(self, **kwargs: Any) -> Any:
         return self._delegate.run(**kwargs)
 
-    def call(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def call(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         return self._delegate.call(args, runtime_context=runtime_context)
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Any:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Any:
         return self._delegate.execute(args, runtime_context=runtime_context)
 
 
 class BashV2(_DelegatingTool):
     def __init__(self, workspace_root: str = "."):
-        super().__init__(CodingToolSet(workspace_root=workspace_root, expose_legacy_aliases=False).bash_v2)
+        super().__init__(
+            CodingToolSet(
+                workspace_root=workspace_root, expose_legacy_aliases=False
+            ).bash_v2
+        )
 
     def validate_input(
         self,
@@ -58,33 +66,76 @@ class BashV2(_DelegatingTool):
         text = str((args or {}).get("command", "")).strip()
         if not text:
             return ToolValidationResult.fail("Command cannot be empty")
-        destructive_tokens = ("rm -rf", "sudo rm", "mkfs", ":(){", "dd if=", "git reset --hard")
-        write_tokens = ("rm ", "mv ", "cp ", "mkdir ", "touch ", "sed -i", "> ", ">> ", "git commit", "git push")
-        if not bool((args or {}).get("allow_destructive")) and any(token in text for token in destructive_tokens):
-            return ToolValidationResult.fail("Destructive command blocked", code="destructive_command")
-        if bool((args or {}).get("read_only")) and any(token in text for token in write_tokens):
-            return ToolValidationResult.fail("Command appears to write to the workspace in read-only mode", code="read_only_violation")
+        destructive_tokens = (
+            "rm -rf",
+            "sudo rm",
+            "mkfs",
+            ":(){",
+            "dd if=",
+            "git reset --hard",
+        )
+        write_tokens = (
+            "rm ",
+            "mv ",
+            "cp ",
+            "mkdir ",
+            "touch ",
+            "sed -i",
+            "> ",
+            ">> ",
+            "git commit",
+            "git push",
+        )
+        if not bool((args or {}).get("allow_destructive")) and any(
+            token in text for token in destructive_tokens
+        ):
+            return ToolValidationResult.fail(
+                "Destructive command blocked", code="destructive_command"
+            )
+        if bool((args or {}).get("read_only")) and any(
+            token in text for token in write_tokens
+        ):
+            return ToolValidationResult.fail(
+                "Command appears to write to the workspace in read-only mode",
+                code="read_only_violation",
+            )
         return ToolValidationResult.ok()
 
 
 class FileReadV2(_DelegatingTool):
     def __init__(self, workspace_root: str = "."):
-        super().__init__(CodingToolSet(workspace_root=workspace_root, expose_legacy_aliases=False).file_read_v2)
+        super().__init__(
+            CodingToolSet(
+                workspace_root=workspace_root, expose_legacy_aliases=False
+            ).file_read_v2
+        )
 
 
 class FileEditV2(_DelegatingTool):
     def __init__(self, workspace_root: str = "."):
-        super().__init__(CodingToolSet(workspace_root=workspace_root, expose_legacy_aliases=False).file_edit_v2)
+        super().__init__(
+            CodingToolSet(
+                workspace_root=workspace_root, expose_legacy_aliases=False
+            ).file_edit_v2
+        )
 
 
 class GlobV2(_DelegatingTool):
     def __init__(self, workspace_root: str = "."):
-        super().__init__(CodingToolSet(workspace_root=workspace_root, expose_legacy_aliases=False).glob_v2)
+        super().__init__(
+            CodingToolSet(
+                workspace_root=workspace_root, expose_legacy_aliases=False
+            ).glob_v2
+        )
 
 
 class GrepV2(_DelegatingTool):
     def __init__(self, workspace_root: str = "."):
-        super().__init__(CodingToolSet(workspace_root=workspace_root, expose_legacy_aliases=False).grep_v2)
+        super().__init__(
+            CodingToolSet(
+                workspace_root=workspace_root, expose_legacy_aliases=False
+            ).grep_v2
+        )
 
 
 class AskUserChoiceTool(_DelegatingTool):
@@ -142,7 +193,12 @@ class _WebFetchV2Delegate:
         self.http_get = HTTPGet()
         self.extract_web_text = HTMLExtractText()
 
-    def run(self, url: str, prompt: str = "", runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(
+        self,
+        url: str,
+        prompt: str = "",
+        runtime_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         _ = runtime_context
         response = self.http_get.run(url=url, allow_redirects=False)
         if response.get("status") == "error":
@@ -150,14 +206,22 @@ class _WebFetchV2Delegate:
         if response.get("status_code") in {301, 302, 303, 307, 308}:
             headers = response.get("headers", {})
             redirect_url = headers.get("Location") or response.get("url")
-            return {"status": "success", "redirect_url": redirect_url, "url": response.get("url", url)}
+            return {
+                "status": "success",
+                "redirect_url": redirect_url,
+                "url": response.get("url", url),
+            }
         extracted = self.extract_web_text.run(html=str(response.get("content", "")))
         text = str(extracted.get("content", ""))
         result = text
         if prompt.strip():
             keywords = [item.lower() for item in prompt.split() if item.strip()]
             lines = [line.strip() for line in text.splitlines() if line.strip()]
-            picked = [line for line in lines if any(token in line.lower() for token in keywords)]
+            picked = [
+                line
+                for line in lines
+                if any(token in line.lower() for token in keywords)
+            ]
             if picked:
                 result = "\n".join(picked[:6])
         auth_hint = ""
@@ -223,6 +287,7 @@ class AdvancedCodingToolSet(CodingToolSet):
             profile="full",
             include_http_tools=False,
         )
+
 
 __all__ = [
     "AdvancedCodingToolSet",

@@ -1,5 +1,9 @@
 # Contributing To QitOS
 
+## Code Of Conduct
+
+Participation in this project is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
 ## Ways To Contribute
 
 - Improve docs, examples, and walkthroughs
@@ -9,32 +13,73 @@
 
 ## Development Setup
 
+Use the quickstart install if you only want to run examples:
+
+```bash
+pip install -r requirements.txt
+```
+
+Use the full contributor setup for code changes:
+
 ```bash
 git clone https://github.com/Qitor/qitos.git
 cd qitos
-pip install -e ".[dev,models,benchmarks]"
+pip install -r requirements-dev.txt
+pre-commit install
 ```
 
-Run the supported test suite:
+See [DEVELOPMENT.md](DEVELOPMENT.md) for common commands, coverage, troubleshooting, and docs workflow.
 
-```bash
-python -m pytest -q
-```
+## Branch Naming
 
-## Docs Workflow
+Use short branch names that reflect the change:
 
-```bash
-pip install -r docs/requirements.txt
-mkdocs serve
-```
+- `feat/<topic>`
+- `fix/<topic>`
+- `docs/<topic>`
+- `refactor/<topic>`
+- `chore/<topic>`
 
-## Pull Request Checklist
+When using Codex or other assistants, `codex/<topic>` is also acceptable.
+
+## Commit Messages
+
+Prefer small, reviewable commits with imperative summaries:
+
+- `feat: add model response summary to qita`
+- `fix: preserve parser fallback after model interpretation`
+- `docs: clarify coding toolset usage`
+
+## Pull Request Process
+
+Before opening a PR:
 
 - Keep changes aligned with the `AgentModule + Engine` mental model
 - Preserve or improve examples and docs when behavior changes
 - Add or update tests for user-facing behavior
-- Keep Python version expectations consistent across README, docs, and package metadata
+- Update [CHANGELOG.md](CHANGELOG.md) for high-signal user-facing changes
 - Avoid unrelated cleanup in the same PR unless it directly unblocks the change
+
+Before requesting review, run:
+
+```bash
+python -m pytest -q
+python -m flake8 qitos/core qitos/engine qitos/models qitos/trace
+python -m mypy qitos/core qitos/engine qitos/models qitos/trace
+pytest --cov=qitos.core --cov=qitos.engine --cov=qitos.trace --cov-report=term --cov-fail-under=80 -q
+python -m build
+pip-audit
+```
+
+## Review Criteria
+
+PRs are reviewed for:
+
+- correctness and regression risk
+- clarity of public surface changes
+- documentation and migration quality
+- test coverage for new behavior
+- consistency with existing architecture boundaries
 
 ## Good First Areas
 

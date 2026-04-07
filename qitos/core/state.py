@@ -31,7 +31,9 @@ class StateMigrationRegistry:
             raise StateMigrationError("to_version must be greater than from_version")
         self._migrations[(from_version, to_version)] = fn
 
-    def migrate(self, payload: Dict[str, Any], from_version: int, to_version: int) -> Dict[str, Any]:
+    def migrate(
+        self, payload: Dict[str, Any], from_version: int, to_version: int
+    ) -> Dict[str, Any]:
         if from_version == to_version:
             return payload
 
@@ -70,7 +72,9 @@ class StateSchema:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls: Type[StateT], payload: Dict[str, Any], strict: bool = True) -> StateT:
+    def from_dict(
+        cls: Type[StateT], payload: Dict[str, Any], strict: bool = True
+    ) -> StateT:
         from dataclasses import fields
 
         known_fields = {f.name for f in fields(cls)}
@@ -86,7 +90,9 @@ class StateSchema:
         return obj
 
     @classmethod
-    def migrate_payload(cls, payload: Dict[str, Any], target_version: int) -> Dict[str, Any]:
+    def migrate_payload(
+        cls, payload: Dict[str, Any], target_version: int
+    ) -> Dict[str, Any]:
         from_version = int(payload.get("schema_version", 1))
         migrated = cls.migration_registry.migrate(payload, from_version, target_version)
         migrated["schema_version"] = target_version
@@ -107,9 +113,13 @@ class StateSchema:
             try:
                 StopReason(str(self.stop_reason))
             except ValueError as exc:
-                raise StateValidationError(f"invalid stop_reason: {self.stop_reason}") from exc
+                raise StateValidationError(
+                    f"invalid stop_reason: {self.stop_reason}"
+                ) from exc
 
-    def set_stop(self, reason: StopReason | str, final_result: Optional[str] = None) -> None:
+    def set_stop(
+        self, reason: StopReason | str, final_result: Optional[str] = None
+    ) -> None:
         if isinstance(reason, StopReason):
             self.stop_reason = reason.value
         else:

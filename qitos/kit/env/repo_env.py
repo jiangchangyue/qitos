@@ -21,7 +21,9 @@ class RepoEnv(HostEnv):
         self.max_list_files = max_list_files
         self.task: Optional[Task] = None
 
-    def reset(self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any) -> EnvObservation:
+    def reset(
+        self, task: Any = None, workspace: Optional[str] = None, **kwargs: Any
+    ) -> EnvObservation:
         self.task = task if isinstance(task, Task) else None
         obs = super().reset(task=task, workspace=workspace, **kwargs)
         missing = self._missing_required_resources()

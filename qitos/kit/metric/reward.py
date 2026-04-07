@@ -37,9 +37,15 @@ class RewardSuccessRateMetric(Metric):
     def compute(self, rows: Iterable[MetricInput]) -> MetricReport:
         data = [r for r in rows if r.reward is not None]
         total = len(data)
-        success = sum(1 for r in data if is_successful_reward(float(r.reward), eps=self.eps))
+        success = sum(
+            1 for r in data if is_successful_reward(float(r.reward), eps=self.eps)
+        )
         value = (float(success) / float(total)) if total else 0.0
-        return MetricReport(name=self.name, value=value, details={"success": success, "total": total, "eps": self.eps})
+        return MetricReport(
+            name=self.name,
+            value=value,
+            details={"success": success, "total": total, "eps": self.eps},
+        )
 
 
 @dataclass
@@ -57,11 +63,19 @@ class RewardPassHatMetric(Metric):
     def compute(self, rows: Iterable[MetricInput]) -> MetricReport:
         data = list(rows)
         if not data:
-            return MetricReport(name=self.name, value={}, details={"num_trials": 0, "task_count": 0, "eps": self.eps})
+            return MetricReport(
+                name=self.name,
+                value={},
+                details={"num_trials": 0, "task_count": 0, "eps": self.eps},
+            )
 
         num_trials = len(set(int(r.trial) for r in data))
         if num_trials <= 0:
-            return MetricReport(name=self.name, value={}, details={"num_trials": 0, "task_count": 0, "eps": self.eps})
+            return MetricReport(
+                name=self.name,
+                value={},
+                details={"num_trials": 0, "task_count": 0, "eps": self.eps},
+            )
 
         c_per_task_id: Dict[str, int] = defaultdict(int)
         for r in data:
@@ -70,7 +84,11 @@ class RewardPassHatMetric(Metric):
             c_per_task_id[tid] += 1 if is_successful_reward(rv, eps=self.eps) else 0
 
         if not c_per_task_id:
-            return MetricReport(name=self.name, value={}, details={"num_trials": num_trials, "task_count": 0, "eps": self.eps})
+            return MetricReport(
+                name=self.name,
+                value={},
+                details={"num_trials": num_trials, "task_count": 0, "eps": self.eps},
+            )
 
         top_k = self.max_k if self.max_k is not None else num_trials
         top_k = max(1, min(int(top_k), num_trials))
@@ -88,5 +106,9 @@ class RewardPassHatMetric(Metric):
         return MetricReport(
             name=self.name,
             value=pass_hat_ks,
-            details={"num_trials": num_trials, "task_count": len(c_per_task_id), "eps": self.eps},
+            details={
+                "num_trials": num_trials,
+                "task_count": len(c_per_task_id),
+                "eps": self.eps,
+            },
         )

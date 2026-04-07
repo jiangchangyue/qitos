@@ -6,27 +6,33 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from qitos.core.decision import Decision
-from qitos.engine.parser import BaseParser
+from qitos.engine.parser import BaseParser, attach_parser_warning, parser_wait_decision
 
 
 class TerminusXmlParser(BaseParser[dict[str, Any]]):
-    def parse(self, raw_output: Any, context: Optional[Dict[str, Any]] = None) -> Decision[dict[str, Any]]:
+    contract_id = "terminus_xml_v1"
+
+    def parse(
+        self, raw_output: Any, context: Optional[Dict[str, Any]] = None
+    ) -> Decision[dict[str, Any]]:
         text = str(raw_output or "")
         payload, warnings = self._extract_response(text)
         if not payload:
-            return Decision.wait(
-                rationale="Repair the response format and try again.",
-                meta={
-                    "parser_error": True,
-                    "parser_feedback": self._format_feedback("No <response> block found.", warnings),
-                    "raw_output": text,
-                    "output_format": "xml",
-                },
+            return parser_wait_decision(
+                parser=self,
+                code="invalid_xml",
+                summary="No valid <response> block was found.",
+                raw_output=text,
+                details=self._format_feedback("No <response> block found.", warnings),
+                repair_instruction="Return XML with a <response> root containing analysis, plan, and either commands, tools, or task_complete=true.",
+                expected_shape="<response><analysis>...</analysis><plan>...</plan><commands>...</commands><tools>...</tools><task_complete>false</task_complete></response>",
+                extra_meta={"raw_output": text, "output_format": "xml"},
             )
 
         analysis = self._extract_section(payload, "analysis")
         plan = self._extract_section(payload, "plan")
         commands_block = self._extract_section(payload, "commands")
+        tools_block = self._extract_section(payload, "tools")
         task_complete = self._extract_section(payload, "task_complete")
         meta: Dict[str, Any] = {
             "analysis": analysis,
@@ -34,45 +40,99 @@ class TerminusXmlParser(BaseParser[dict[str, Any]]):
             "output_format": "xml",
         }
         if warnings:
-            meta["parser_warning"] = self._format_feedback("Parser warnings.", warnings)
+            meta = attach_parser_warning(
+                meta,
+                parser=self,
+                code="salvaged_xml_payload",
+                summary="Parser warnings were recorded while reading Terminus XML output.",
+                raw_output=text,
+                details=self._format_feedback("Parser warnings.", warnings),
+                expected_shape="<response><analysis>...</analysis><plan>...</plan><commands>...</commands><tools>...</tools><task_complete>false</task_complete></response>",
+                salvage_applied=True,
+                salvage_summary=self._format_feedback("Parser warnings.", warnings),
+            )
 
         missing = []
         if analysis is None:
             missing.append("analysis")
         if plan is None:
             missing.append("plan")
-        if commands_block is None and not self._as_bool(task_complete or False):
-            missing.append("commands")
+        if (
+            commands_block is None
+            and tools_block is None
+            and not self._as_bool(task_complete or False)
+        ):
+            missing.append("commands/tools")
         if missing:
-            meta["parser_error"] = True
-            meta["parser_feedback"] = self._format_feedback(
-                f"Missing required XML sections: {', '.join(missing)}",
-                warnings,
+            return parser_wait_decision(
+                parser=self,
+                code="missing_required_field",
+                summary=f"Missing required XML sections: {', '.join(missing)}",
+                raw_output=text,
+                details=self._format_feedback(
+                    f"Missing required XML sections: {', '.join(missing)}",
+                    warnings,
+                ),
+                repair_instruction="Return XML with <analysis>, <plan>, and either <commands>, <tools>, or <task_complete>true</task_complete>.",
+                expected_shape="<response><analysis>...</analysis><plan>...</plan><commands>...</commands><tools>...</tools><task_complete>false</task_complete></response>",
+                rationale=analysis
+                or f"Missing required XML sections: {', '.join(missing)}",
+                extra_meta=meta,
             )
-            return Decision.wait(rationale=analysis or "Repair the response format and try again.", meta=meta)
 
         is_complete = self._as_bool(task_complete or False)
-        actions, command_error = self._parse_commands(commands_block or "")
-        if command_error:
+        command_actions, command_error = self._parse_commands(commands_block or "")
+        tool_actions, tool_error = self._parse_tools(tools_block or "")
+        action_error = command_error or tool_error
+        if action_error:
             if is_complete:
                 meta["task_complete_requested"] = True
-                meta["parser_warning"] = self._format_feedback(command_error, warnings)
-                return Decision.wait(rationale=analysis or "Task appears complete.", meta=meta)
-            meta["parser_error"] = True
-            meta["parser_feedback"] = self._format_feedback(command_error, warnings)
-            return Decision.wait(rationale=analysis or "Repair the response format and try again.", meta=meta)
+                meta = attach_parser_warning(
+                    meta,
+                    parser=self,
+                    code="invalid_action_schema",
+                    summary=action_error,
+                    raw_output=text,
+                    details=self._format_feedback(action_error, warnings),
+                    expected_shape="<response><analysis>...</analysis><plan>...</plan><commands>...</commands><tools>...</tools><task_complete>false</task_complete></response>",
+                )
+                return Decision.wait(
+                    rationale=analysis or "Task appears complete.", meta=meta
+                )
+            return parser_wait_decision(
+                parser=self,
+                code="invalid_action_schema",
+                summary=action_error,
+                raw_output=text,
+                details=self._format_feedback(action_error, warnings),
+                repair_instruction="Return well-formed Terminus XML with valid <commands> or <tools> entries, or set task_complete=true if the task is done.",
+                expected_shape='<response><analysis>...</analysis><plan>...</plan><commands><keystrokes duration="0.1">...</keystrokes></commands><tools><tool name="tool_name"></tool></tools><task_complete>false</task_complete></response>',
+                rationale=analysis or action_error,
+                extra_meta=meta,
+            )
 
+        actions = command_actions + tool_actions
         if actions:
             return Decision.act(actions=actions, rationale=analysis or "", meta=meta)
         if is_complete:
             meta["task_complete_requested"] = True
-            return Decision.wait(rationale=analysis or "Task appears complete.", meta=meta)
-        meta["parser_error"] = True
-        meta["parser_feedback"] = self._format_feedback(
-            "No terminal commands were provided. If you want to wait, emit an empty keystrokes element with a duration.",
-            warnings,
+            return Decision.wait(
+                rationale=analysis or "Task appears complete.", meta=meta
+            )
+        return parser_wait_decision(
+            parser=self,
+            code="missing_action_or_final",
+            summary="No actions were provided.",
+            raw_output=text,
+            details=self._format_feedback(
+                "The Terminus XML payload did not include commands, tools, or task_complete=true.",
+                warnings,
+            ),
+            repair_instruction="Return at least one terminal command, one tool action, or set task_complete=true if the task is complete.",
+            expected_shape="<response><analysis>...</analysis><plan>...</plan><commands>...</commands><tools>...</tools><task_complete>false</task_complete></response>",
+            rationale=analysis or "No actions were provided.",
+            extra_meta=meta,
         )
-        return Decision.wait(rationale=analysis or "Repair the response format and try again.", meta=meta)
 
     def _extract_response(self, text: str) -> Tuple[str, List[str]]:
         warnings: List[str] = []
@@ -109,7 +169,7 @@ class TerminusXmlParser(BaseParser[dict[str, Any]]):
     def _parse_commands(self, block: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         if not block.strip():
             return [], None
-        matches = re.findall(r'<keystrokes([^>]*)>(.*?)</keystrokes>', block, re.DOTALL)
+        matches = re.findall(r"<keystrokes([^>]*)>(.*?)</keystrokes>", block, re.DOTALL)
         actions: List[Dict[str, Any]] = []
         for index, (attrs, keystrokes) in enumerate(matches, start=1):
             duration_match = re.search(r'duration\s*=\s*["\']([^"\']*)["\']', attrs)
@@ -118,7 +178,10 @@ class TerminusXmlParser(BaseParser[dict[str, Any]]):
                 try:
                     duration = float(duration_match.group(1))
                 except ValueError:
-                    return [], f"Command {index} has invalid duration value '{duration_match.group(1)}'."
+                    return (
+                        [],
+                        f"Command {index} has invalid duration value '{duration_match.group(1)}'.",
+                    )
             actions.append(
                 {
                     "name": "send_terminal_keys",
@@ -131,6 +194,40 @@ class TerminusXmlParser(BaseParser[dict[str, Any]]):
             )
         if "<keystrokes" in block and not actions:
             return [], "Unable to parse <keystrokes> elements from <commands>."
+        return actions, None
+
+    def _parse_tools(self, block: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        if not block.strip():
+            return [], None
+        matches = re.findall(r"<tool([^>]*)>(.*?)</tool>", block, re.DOTALL)
+        actions: List[Dict[str, Any]] = []
+        for index, (attrs, body) in enumerate(matches, start=1):
+            name_match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', attrs)
+            if name_match is None:
+                return (
+                    [],
+                    f"Tool action {index} is missing the required name attribute.",
+                )
+            args: Dict[str, Any] = {}
+            for arg_attrs, value in re.findall(
+                r"<arg([^>]*)>(.*?)</arg>", body, re.DOTALL
+            ):
+                key_match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', arg_attrs)
+                if key_match is None:
+                    return (
+                        [],
+                        f"Tool action {index} contains an <arg> without a name attribute.",
+                    )
+                args[key_match.group(1)] = value.strip()
+            actions.append(
+                {
+                    "name": name_match.group(1).strip(),
+                    "args": args,
+                    "metadata": {"tool_index": index},
+                }
+            )
+        if "<tool" in block and not actions:
+            return [], "Unable to parse <tool> elements from <tools>."
         return actions, None
 
     def _as_bool(self, value: Any) -> bool:

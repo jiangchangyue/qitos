@@ -19,7 +19,9 @@ class SuccessRateMetric(Metric):
         total = len(data)
         success = sum(1 for r in data if bool(r.success))
         value = (float(success) / float(total)) if total else 0.0
-        return MetricReport(name=self.name, value=value, details={"success": success, "total": total})
+        return MetricReport(
+            name=self.name, value=value, details={"success": success, "total": total}
+        )
 
 
 @dataclass
@@ -48,7 +50,11 @@ class StopReasonDistributionMetric(Metric):
 
     def compute(self, rows: Iterable[MetricInput]) -> MetricReport:
         counter = Counter(str(r.stop_reason or "") for r in rows)
-        return MetricReport(name=self.name, value=dict(counter), details={"count": sum(counter.values())})
+        return MetricReport(
+            name=self.name,
+            value=dict(counter),
+            details={"count": sum(counter.values())},
+        )
 
 
 @dataclass
@@ -77,7 +83,11 @@ class PassAtKMetric(Metric):
             task_scores.append(float(score))
 
         value = (sum(task_scores) / float(len(task_scores))) if task_scores else 0.0
-        return MetricReport(name=f"{self.name}_{self.k}", value=value, details={"task_count": len(task_scores)})
+        return MetricReport(
+            name=f"{self.name}_{self.k}",
+            value=value,
+            details={"task_count": len(task_scores)},
+        )
 
 
 @dataclass
@@ -92,4 +102,6 @@ class CustomFieldMetric(Metric):
             if isinstance(value, (int, float)):
                 vals.append(float(value))
         mean = (sum(vals) / float(len(vals))) if vals else 0.0
-        return MetricReport(name=f"{self.name}:{self.field}", value=mean, details={"count": len(vals)})
+        return MetricReport(
+            name=f"{self.name}:{self.field}", value=mean, details={"count": len(vals)}
+        )

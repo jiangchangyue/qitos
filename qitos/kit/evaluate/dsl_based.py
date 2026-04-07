@@ -57,7 +57,11 @@ class DSLEvaluator(TrajectoryEvaluator):
             for node in ast.walk(tree):
                 if not isinstance(node, _ALLOWED_NODES):
                     raise ValueError(f"disallowed_node:{node.__class__.__name__}")
-            value = eval(compile(tree, filename="<dsl>", mode="eval"), {"__builtins__": {}}, scope)
+            value = eval(
+                compile(tree, filename="<dsl>", mode="eval"),
+                {"__builtins__": {}},
+                scope,
+            )
             ok = bool(value)
             return EvaluationResult(
                 name=self.name,

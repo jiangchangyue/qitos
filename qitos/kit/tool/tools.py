@@ -118,7 +118,9 @@ def web_tools() -> ToolRegistry:
     return registry
 
 
-def coding_tools(workspace_root: str, shell_timeout: int = 30, include_notebook: bool = True) -> ToolRegistry:
+def coding_tools(
+    workspace_root: str, shell_timeout: int = 30, include_notebook: bool = True
+) -> ToolRegistry:
     """Build a registry with the standard coding-oriented tool bundle."""
     registry = ToolRegistry()
     registry.register_toolset(
@@ -138,17 +140,24 @@ def coding_tools(workspace_root: str, shell_timeout: int = 30, include_notebook:
     return registry
 
 
-def task_tools(workspace_root: str, board_relpath: str = ".qitos/task_board.json") -> ToolRegistry:
+def task_tools(
+    workspace_root: str, board_relpath: str = ".qitos/task_board.json"
+) -> ToolRegistry:
     """Build a registry containing the external task-board tools."""
     registry = ToolRegistry()
-    registry.register_toolset(TaskToolSet(workspace_root=workspace_root, board_relpath=board_relpath), namespace="")
+    registry.register_toolset(
+        TaskToolSet(workspace_root=workspace_root, board_relpath=board_relpath),
+        namespace="",
+    )
     return registry
 
 
 def report_tools(workspace_root: str) -> ToolRegistry:
     """Build a registry containing the assessment reporting toolset."""
     registry = ToolRegistry()
-    registry.register_toolset(ReportToolSet(workspace_root=workspace_root), namespace="")
+    registry.register_toolset(
+        ReportToolSet(workspace_root=workspace_root), namespace=""
+    )
     return registry
 
 

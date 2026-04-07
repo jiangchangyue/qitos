@@ -3,7 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, HistoryPolicy, StateSchema, ToolRegistry, tool
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    Engine,
+    HistoryPolicy,
+    StateSchema,
+    ToolRegistry,
+    tool,
+)
 from qitos.engine import RuntimeBudget
 from qitos.kit.history import CompactHistory, MessageGrouper
 from qitos.kit.parser import ReActTextParser
@@ -31,7 +40,9 @@ def test_message_grouper_prefers_step_rounds() -> None:
 def test_compact_history_emits_microcompact_and_summary_events() -> None:
     from qitos.core.history import HistoryMessage
 
-    history = CompactHistory(max_tokens=90, keep_last_rounds=1, keep_last_messages=4, hard_window=20)
+    history = CompactHistory(
+        max_tokens=90, keep_last_rounds=1, keep_last_messages=4, hard_window=20
+    )
     for idx in range(6):
         role = "user" if idx % 2 == 0 else "assistant"
         history.append(
@@ -56,9 +67,21 @@ def test_compact_history_emits_microcompact_and_summary_events() -> None:
 
     assert retrieved
     assert retrieved[0].metadata.get("summary") is True
-    assert any(event.get("stage") == "context_history" and (event.get("context") or {}).get("stage") == "warning" for event in events)
-    assert any(event.get("stage") == "context_history" and (event.get("context") or {}).get("stage") == "microcompact_applied" for event in events)
-    assert any(event.get("stage") == "context_history" and (event.get("context") or {}).get("stage") == "summary_compact_applied" for event in events)
+    assert any(
+        event.get("stage") == "context_history"
+        and (event.get("context") or {}).get("stage") == "warning"
+        for event in events
+    )
+    assert any(
+        event.get("stage") == "context_history"
+        and (event.get("context") or {}).get("stage") == "microcompact_applied"
+        for event in events
+    )
+    assert any(
+        event.get("stage") == "context_history"
+        and (event.get("context") or {}).get("stage") == "summary_compact_applied"
+        for event in events
+    )
     assert metadata[0].get("summary") is True
     assert metadata[0].get("source") == "compact_history"
 
@@ -88,7 +111,11 @@ class CompactDemoAgent(AgentModule[CompactDemoState, dict[str, Any], Action]):
         observation: dict[str, Any],
         decision: Decision[Action],
     ) -> CompactDemoState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if action_results:
             state.logs.append(str(action_results[0]))
         return state
@@ -111,7 +138,9 @@ def test_engine_surfaces_compact_events_and_history_metadata() -> None:
             super().__init__()
             self.llm = _DummyModel()
             self.model_parser = ReActTextParser()
-            self.history = CompactHistory(max_tokens=110, keep_last_rounds=1, keep_last_messages=4, hard_window=24)
+            self.history = CompactHistory(
+                max_tokens=110, keep_last_rounds=1, keep_last_messages=4, hard_window=24
+            )
 
         def build_system_prompt(self, state: CompactDemoState) -> str | None:
             return "Compact system prompt"
@@ -137,12 +166,18 @@ def test_engine_surfaces_compact_events_and_history_metadata() -> None:
     compact_stages = [
         (event.payload.get("context") or {}).get("stage")
         for event in result.events
-        if getattr(event.phase, "value", event.phase) == "DECIDE" and event.payload.get("stage") == "context_history"
+        if getattr(event.phase, "value", event.phase) == "DECIDE"
+        and event.payload.get("stage") == "context_history"
     ]
     assert "warning" in compact_stages
-    assert any(stage in {"microcompact_applied", "summary_compact_applied"} for stage in compact_stages)
+    assert any(
+        stage in {"microcompact_applied", "summary_compact_applied"}
+        for stage in compact_stages
+    )
 
-    model_input_events = [event for event in result.events if event.payload.get("stage") == "model_input"]
+    model_input_events = [
+        event for event in result.events if event.payload.get("stage") == "model_input"
+    ]
     assert model_input_events
     history_meta = model_input_events[-1].payload.get("history_messages_meta", [])
     assert isinstance(history_meta, list)

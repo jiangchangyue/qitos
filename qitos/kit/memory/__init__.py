@@ -19,7 +19,10 @@ def summary_memory(keep_last: int = 10) -> SummaryMemory:
 def vector_memory(top_k: int = 5) -> VectorMemory:
     return VectorMemory(top_k=top_k)
 
-def markdown_file_memory(path: str = "memory.md", max_in_memory: int = 200) -> MarkdownFileMemory:
+
+def markdown_file_memory(
+    path: str = "memory.md", max_in_memory: int = 200
+) -> MarkdownFileMemory:
     return MarkdownFileMemory(path=path, max_in_memory=max_in_memory)
 
 

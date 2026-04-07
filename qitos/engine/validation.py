@@ -34,7 +34,9 @@ def validate_final_consistency(state: StateSchema) -> None:
         try:
             StopReason(str(state.stop_reason))
         except ValueError as exc:
-            raise StateValidationError("stop_reason must be one of StopReason values") from exc
+            raise StateValidationError(
+                "stop_reason must be one of StopReason values"
+            ) from exc
     if state.stop_reason == StopReason.FINAL.value and not state.final_result:
         raise StateValidationError("stop_reason=final requires final_result")
 

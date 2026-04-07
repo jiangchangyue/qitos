@@ -1,17 +1,38 @@
 """Core modules for QitOS Framework."""
+
 from .agent_module import AgentModule
 from .decision import Decision
-from .action import Action, ActionResult, ActionKind, ActionStatus, ActionExecutionPolicy
+from .action import (
+    Action,
+    ActionResult,
+    ActionKind,
+    ActionStatus,
+    ActionExecutionPolicy,
+)
 from .errors import (
     ErrorCategory,
     StopReason,
     RuntimeErrorInfo,
     QitosRuntimeError,
 )
-from .state import StateSchema, StateMigrationRegistry, StateValidationError, StateMigrationError
+from .state import (
+    StateSchema,
+    StateMigrationRegistry,
+    StateValidationError,
+    StateMigrationError,
+)
 from .memory import Memory, MemoryRecord
+from .model_response import ModelResponse
 from .history import History, HistoryMessage, HistoryPolicy
-from .env import Env, EnvSpec, EnvObservation, EnvStepResult, FileSystemCapability, CommandCapability, TerminalCapability
+from .env import (
+    Env,
+    EnvSpec,
+    EnvObservation,
+    EnvStepResult,
+    FileSystemCapability,
+    CommandCapability,
+    TerminalCapability,
+)
 from .task import (
     Task,
     TaskResource,
@@ -42,6 +63,7 @@ __all__ = [
     "StateMigrationError",
     "Memory",
     "MemoryRecord",
+    "ModelResponse",
     "History",
     "HistoryMessage",
     "HistoryPolicy",

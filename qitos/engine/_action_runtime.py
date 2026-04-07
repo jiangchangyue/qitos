@@ -17,7 +17,9 @@ class _ActionRuntime(Generic[StateT, ActionT]):
     def __init__(self, engine: Any):
         self.engine = engine
 
-    def run_act(self, state: StateT, decision: Decision[ActionT], record: StepRecord) -> List[Any]:
+    def run_act(
+        self, state: StateT, decision: Decision[ActionT], record: StepRecord
+    ) -> List[Any]:
         engine = self.engine
         engine._dispatch_hook(
             "on_before_act",
@@ -32,7 +34,11 @@ class _ActionRuntime(Generic[StateT, ActionT]):
         engine._emit(record.step_id, RuntimePhase.ACT, payload={"stage": "start"})
 
         if decision.mode != "act":
-            engine._emit(record.step_id, RuntimePhase.ACT, payload={"stage": "skipped", "reason": "decision_not_act"})
+            engine._emit(
+                record.step_id,
+                RuntimePhase.ACT,
+                payload={"stage": "skipped", "reason": "decision_not_act"},
+            )
             return []
         if engine.executor is None:
             raise RuntimeError("No tool registry configured for action execution")
@@ -42,7 +48,9 @@ class _ActionRuntime(Generic[StateT, ActionT]):
             if isinstance(action, Action):
                 actions.append(action)
                 continue
-            payload = action if isinstance(action, dict) else cast(Dict[str, Any], action)
+            payload = (
+                action if isinstance(action, dict) else cast(Dict[str, Any], action)
+            )
             actions.append(Action.from_dict(payload))
         for normalized_action in actions:
             engine._memory_append("action", normalized_action, record.step_id)
@@ -62,7 +70,10 @@ class _ActionRuntime(Generic[StateT, ActionT]):
             }
             for item in execution
         ]
-        results = [r.output if r.status.value == "success" else {"error": r.error} for r in execution]
+        results = [
+            r.output if r.status.value == "success" else {"error": r.error}
+            for r in execution
+        ]
         if engine.env is not None:
             env_result = engine._run_env_step(decision=decision, action_results=results)
             if env_result is not None:

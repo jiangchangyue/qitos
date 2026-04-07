@@ -22,13 +22,17 @@ class SkillLoader:
         result = self._provider.resolve(source)
         if result is None:
             raise ValueError(f"Cannot load skill from: {source}")
-        manifest_result = self._provider.download(source, cache_dir=Path("~/.qitos/skill-cache").expanduser())
+        manifest_result = self._provider.download(
+            source, cache_dir=Path("~/.qitos/skill-cache").expanduser()
+        )
         package_dir = manifest_result.path if not manifest_result.is_archive else None
         if package_dir is not None:
             return SkillManifest.from_file(package_dir / "SKILL.md")
         raise ValueError(f"Cannot load manifest from archive source: {source}")
 
-    def fetch_hub_install_command(self, hub_manifest: SkillManifest, skill_name: str) -> Optional[str]:
+    def fetch_hub_install_command(
+        self, hub_manifest: SkillManifest, skill_name: str
+    ) -> Optional[str]:
         _ = hub_manifest
         if skill_name:
             return f"skillhub:{skill_name}"
@@ -54,14 +58,21 @@ class SkillInstaller:
 
     def install(self, source: str, name: Optional[str] = None) -> SkillManifest:
         ref = source
-        if name and not source.startswith(("http://", "https://")) and ":" not in source and not Path(source).exists():
+        if (
+            name
+            and not source.startswith(("http://", "https://"))
+            and ":" not in source
+            and not Path(source).exists()
+        ):
             ref = f"{self.manager.default_provider}:{name}"
         installed = self.manager.install(ref)
         return installed.manifest
 
     def install_from_hub(self, hub_url: str, skill_name: str) -> SkillManifest:
         _ = hub_url
-        installed = self.manager.install(f"{self.manager.default_provider}:{skill_name}")
+        installed = self.manager.install(
+            f"{self.manager.default_provider}:{skill_name}"
+        )
         return installed.manifest
 
     def ensure_hub(self, hub_url: str) -> SkillManifest:

@@ -7,7 +7,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, HistoryPolicy, StateSchema, ToolRegistry
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    HistoryPolicy,
+    StateSchema,
+    ToolRegistry,
+)
 from qitos.kit import (
     CodingToolSet,
     ReActTextParser,
@@ -36,7 +43,9 @@ class CodeSecurityAuditAgent(AgentModule[SecurityAuditState, dict[str, Any], Act
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
         registry.register_toolset(
-            SecurityAuditToolSet(workspace_root=workspace_root, include_external=False, max_matches=80),
+            SecurityAuditToolSet(
+                workspace_root=workspace_root, include_external=False, max_matches=80
+            ),
             namespace="",
         )
         registry.register_toolset(
@@ -52,14 +61,23 @@ class CodeSecurityAuditAgent(AgentModule[SecurityAuditState, dict[str, Any], Act
             ),
             namespace="codebase",
         )
-        registry.register_toolset(TaskToolSet(workspace_root=workspace_root), namespace="")
-        super().__init__(tool_registry=registry, llm=llm, model_parser=ReActTextParser())
+        registry.register_toolset(
+            TaskToolSet(workspace_root=workspace_root), namespace=""
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> SecurityAuditState:
-        return SecurityAuditState(task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS)))
+        return SecurityAuditState(
+            task=task, max_steps=int(kwargs.get("max_steps", MAX_STEPS))
+        )
 
     def build_system_prompt(self, state: SecurityAuditState) -> str | None:
-        return render_prompt(SECURITY_AUDIT_SYSTEM_PROMPT, {"tool_schema": self.tool_registry.get_tool_descriptions()})
+        return render_prompt(
+            SECURITY_AUDIT_SYSTEM_PROMPT,
+            {"tool_schema": self.tool_registry.get_tool_descriptions()},
+        )
 
     def prepare(self, state: SecurityAuditState) -> str:
         lines = [
@@ -73,8 +91,17 @@ class CodeSecurityAuditAgent(AgentModule[SecurityAuditState, dict[str, Any], Act
             lines.extend(state.scratchpad[-10:])
         return "\n".join(lines)
 
-    def reduce(self, state: SecurityAuditState, observation: dict[str, Any], decision: Decision[Action]) -> SecurityAuditState:
-        results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: SecurityAuditState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> SecurityAuditState:
+        results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -83,7 +110,11 @@ class CodeSecurityAuditAgent(AgentModule[SecurityAuditState, dict[str, Any], Act
             first = results[0]
             state.scratchpad.append(f"Observation: {first}")
             if isinstance(first, dict):
-                data = first.get("data", {}) if isinstance(first.get("data", {}), dict) else {}
+                data = (
+                    first.get("data", {})
+                    if isinstance(first.get("data", {}), dict)
+                    else {}
+                )
                 for item in list(data.get("findings", []) or [])[:3]:
                     title = str(item.get("title", "finding"))
                     location = f"{item.get('file', '?')}:{item.get('line', '?')}"
@@ -98,7 +129,9 @@ class CodeSecurityAuditAgent(AgentModule[SecurityAuditState, dict[str, Any], Act
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

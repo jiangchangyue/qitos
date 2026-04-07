@@ -9,11 +9,7 @@ from typing import Any, Dict
 
 from qitos import AgentModule, Decision, StateSchema, StopReason, ToolRegistry
 from qitos.kit import (
-    TERMINUS_JSON_SYSTEM_PROMPT,
-    TERMINUS_XML_SYSTEM_PROMPT,
     SendTerminalKeys,
-    TerminusJsonParser,
-    TerminusXmlParser,
     TokenBudgetSummaryHistory,
     TmuxEnv,
 )
@@ -22,11 +18,28 @@ from qitos.models import OpenAICompatibleModel
 TASK = "Inspect this workspace with terminal commands, determine whether todo.txt exists, and summarize what notes.txt contains."
 WORKSPACE = Path("../../playground/terminus_2")
 SESSION_NAME = "qitos_terminus_2"
-PARSER_FORMAT = os.getenv("QITOS_TERMINUS_FORMAT", "json").strip().lower()
+PARSER_FORMAT = os.getenv("QITOS_TERMINUS_FORMAT", "").strip().lower()
 MODEL_NAME = os.getenv("QITOS_MODEL", "MiniMax-M2.5")
-MODEL_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+MODEL_BASE_URL = os.getenv(
+    "OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+)
 MAX_STEPS = 20
 MAX_TERMINAL_BYTES = 10000
+
+TERMINUS_BASE_PROMPT = """You are an AI assistant solving command-line tasks in a Linux terminal.
+
+You will be given:
+- the task description
+- the latest terminal state
+- optional parser feedback from the previous response
+
+Your job is to control the terminal safely and efficiently.
+
+Rules:
+- Prefer short, incremental commands.
+- Use only the active protocol format when calling tools or marking completion.
+- If the task is complete, signal completion in the active protocol format.
+"""
 
 
 @dataclass
@@ -48,9 +61,20 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
     def __init__(self, llm: Any):
         registry = ToolRegistry()
         registry.register(SendTerminalKeys())
-        parser = TerminusJsonParser() if PARSER_FORMAT == "json" else TerminusXmlParser()
-        history = TokenBudgetSummaryHistory(llm=llm, max_tokens=12000, keep_last=8, hard_window=64)
-        super().__init__(tool_registry=registry, llm=llm, model_parser=parser, history=history)
+        protocol_override = None
+        if PARSER_FORMAT == "json":
+            protocol_override = "terminus_json_v1"
+        elif PARSER_FORMAT == "xml":
+            protocol_override = "terminus_xml_v1"
+        history = TokenBudgetSummaryHistory(
+            llm=llm, max_tokens=12000, keep_last=8, hard_window=64
+        )
+        super().__init__(
+            tool_registry=registry,
+            llm=llm,
+            model_protocol=protocol_override,
+            history=history,
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> TerminusState:
         return TerminusState(
@@ -60,8 +84,10 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
         )
 
     def build_system_prompt(self, state: TerminusState) -> str | None:
-        base = TERMINUS_JSON_SYSTEM_PROMPT if state.parser_format == "json" else TERMINUS_XML_SYSTEM_PROMPT
-        return f"{base}\n\nAvailable tools:\n{self.tool_registry.get_tool_descriptions()}"
+        _ = state
+        return self.compose_system_prompt(
+            TERMINUS_BASE_PROMPT, protocol=self.active_protocol()
+        )
 
     def prepare(self, state: TerminusState) -> str:
         observation = getattr(self, "_runtime_observation", None)
@@ -70,8 +96,12 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
             "screen": state.terminal_screen,
             "timestamp": None,
         }
-        terminal_output = self._limit_output_length(terminal.get("output") or terminal.get("screen") or state.terminal_output)
-        terminal_screen = self._limit_output_length(terminal.get("screen") or terminal_output)
+        terminal_output = self._limit_output_length(
+            terminal.get("output") or terminal.get("screen") or state.terminal_output
+        )
+        terminal_screen = self._limit_output_length(
+            terminal.get("screen") or terminal_output
+        )
 
         if state.pending_completion:
             confirmation_target = terminal_output or terminal_screen
@@ -87,14 +117,24 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
             f"Current terminal state:\n{terminal_output or terminal_screen}",
         ]
         if state.parser_feedback:
-            lines.extend(["", f"Parser feedback from previous response:\n{state.parser_feedback}"])
+            lines.extend(
+                [
+                    "",
+                    f"Parser feedback from previous response:\n{state.parser_feedback}",
+                ]
+            )
         if state.timeout_feedback:
             lines.extend(["", f"Timeout feedback:\n{state.timeout_feedback}"])
         if state.last_plan:
             lines.extend(["", f"Previous plan:\n{state.last_plan}"])
         return "\n".join(lines)
 
-    def reduce(self, state: TerminusState, observation: dict[str, Any], decision: Decision[dict[str, Any]]) -> TerminusState:
+    def reduce(
+        self,
+        state: TerminusState,
+        observation: dict[str, Any],
+        decision: Decision[dict[str, Any]],
+    ) -> TerminusState:
         terminal = self._extract_terminal_payload(observation) or {}
         latest_output = str(terminal.get("output") or terminal.get("screen") or "")
         latest_screen = str(terminal.get("screen") or latest_output)
@@ -102,7 +142,9 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
         state.terminal_screen = self._limit_output_length(latest_screen)
 
         meta = decision.meta if isinstance(decision.meta, dict) else {}
-        state.last_analysis = str(meta.get("analysis") or decision.rationale or state.last_analysis)
+        state.last_analysis = str(
+            meta.get("analysis") or decision.rationale or state.last_analysis
+        )
         state.last_plan = str(meta.get("plan") or state.last_plan)
 
         parser_feedback = str(meta.get("parser_feedback") or "").strip()
@@ -117,7 +159,9 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
 
         if meta.get("task_complete_requested"):
             if state.pending_completion:
-                final_result = state.last_analysis or "Task marked complete from terminal state."
+                final_result = (
+                    state.last_analysis or "Task marked complete from terminal state."
+                )
                 state.set_stop(StopReason.SUCCESS, final_result=final_result)
             else:
                 state.pending_completion = True
@@ -155,7 +199,9 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
         terminal = data.get("terminal")
         return terminal if isinstance(terminal, dict) else {}
 
-    def _limit_output_length(self, output: str, max_bytes: int = MAX_TERMINAL_BYTES) -> str:
+    def _limit_output_length(
+        self, output: str, max_bytes: int = MAX_TERMINAL_BYTES
+    ) -> str:
         encoded = output.encode("utf-8", errors="ignore")
         if len(encoded) <= max_bytes:
             return output
@@ -166,7 +212,11 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
         return f"{first}\n[... output limited to {max_bytes} bytes; {omitted} interior bytes omitted ...]\n{last}"
 
     def _extract_timeout_feedback(self, observation: dict[str, Any]) -> str:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         for item in action_results:
             if isinstance(item, dict):
                 message = str(item.get("error") or item.get("message") or "")
@@ -178,7 +228,9 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,
@@ -194,18 +246,21 @@ def bootstrap_workspace(root: Path) -> None:
         "QiTOS terminal demo workspace.\nThe project goal is to build a modular agent framework.\n",
         encoding="utf-8",
     )
-    (root / "README.txt").write_text("Use terminal commands to inspect this folder.\n", encoding="utf-8")
+    (root / "README.txt").write_text(
+        "Use terminal commands to inspect this folder.\n", encoding="utf-8"
+    )
 
 
 def main() -> None:
     bootstrap_workspace(WORKSPACE)
-    env = TmuxEnv(workspace_root=str(WORKSPACE), session_name=SESSION_NAME, auto_kill=True)
+    env = TmuxEnv(
+        workspace_root=str(WORKSPACE), session_name=SESSION_NAME, auto_kill=True
+    )
     agent = Terminus2Agent(llm=build_model())
     result = agent.run(
         task=TASK,
         workspace=str(WORKSPACE),
         env=env,
-        parser=agent.model_parser,
         max_steps=MAX_STEPS,
         parser_format=PARSER_FORMAT,
         return_state=True,

@@ -29,26 +29,36 @@ class DynamicTreeSearch(Search[StateT, ObsT, ActionT]):
         self.exploration_bonus = exploration_bonus
         self._frontier: List[Decision[ActionT]] = []
 
-    def expand(self, state: StateT, obs: ObsT, seed_decision: Decision[ActionT]) -> List[Decision[ActionT]]:
+    def expand(
+        self, state: StateT, obs: ObsT, seed_decision: Decision[ActionT]
+    ) -> List[Decision[ActionT]]:
         fresh = list(seed_decision.candidates)
         combined = self._frontier + fresh
         self._frontier = []
         return combined
 
-    def score(self, state: StateT, obs: ObsT, candidates: List[Decision[ActionT]]) -> List[float]:
+    def score(
+        self, state: StateT, obs: ObsT, candidates: List[Decision[ActionT]]
+    ) -> List[float]:
         scores: List[float] = []
         visit_map = self._visit_counts(state)
         for idx, candidate in enumerate(candidates):
-            base = self._read_base_score(candidate, default=float(len(candidates) - idx))
+            base = self._read_base_score(
+                candidate, default=float(len(candidates) - idx)
+            )
             key = self._candidate_key(candidate, idx)
             visits = visit_map.get(key, 0)
             novelty = self.exploration_bonus / float(1 + visits)
             scores.append(base + novelty)
         return scores
 
-    def prune(self, candidates: List[Decision[ActionT]], scores: List[float]) -> List[Decision[ActionT]]:
+    def prune(
+        self, candidates: List[Decision[ActionT]], scores: List[float]
+    ) -> List[Decision[ActionT]]:
         if len(candidates) != len(scores):
-            raise ValueError("DynamicTreeSearch.prune requires aligned candidates/scores")
+            raise ValueError(
+                "DynamicTreeSearch.prune requires aligned candidates/scores"
+            )
         ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
         kept = [c for _, c in ranked[: self.top_k]]
         rest = [c for _, c in ranked[self.top_k :]]
@@ -58,11 +68,15 @@ class DynamicTreeSearch(Search[StateT, ObsT, ActionT]):
                 self._frontier = self._frontier[: self.max_frontier]
         return kept
 
-    def select(self, candidates: List[Decision[ActionT]], scores: List[float]) -> Decision[ActionT]:
+    def select(
+        self, candidates: List[Decision[ActionT]], scores: List[float]
+    ) -> Decision[ActionT]:
         if not candidates:
             raise ValueError("DynamicTreeSearch.select requires candidates")
         if len(candidates) != len(scores):
-            raise ValueError("DynamicTreeSearch.select requires aligned candidates/scores")
+            raise ValueError(
+                "DynamicTreeSearch.select requires aligned candidates/scores"
+            )
         best = max(range(len(candidates)), key=lambda i: scores[i])
         return candidates[best]
 

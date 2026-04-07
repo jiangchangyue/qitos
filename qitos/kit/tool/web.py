@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import warnings
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
@@ -43,7 +42,9 @@ class HTTPRequest(BaseTool):
             status=max_retries,
             backoff_factor=backoff_factor,
             status_forcelist=[408, 409, 429, 500, 502, 503, 504],
-            allowed_methods=frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}),
+            allowed_methods=frozenset(
+                {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+            ),
             raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry)
@@ -70,7 +71,9 @@ class HTTPRequest(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute an HTTP request and return a structured response payload.
 
@@ -195,8 +198,15 @@ class HTTPGet(BaseTool):
     status codes without browser-style stateful navigation.
     """
 
-    def __init__(self, headers: Optional[Dict[str, str]] = None, timeout: int = 30, max_retries: int = 2):
-        self._request = HTTPRequest(headers=headers, timeout=timeout, max_retries=max_retries)
+    def __init__(
+        self,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: int = 30,
+        max_retries: int = 2,
+    ):
+        self._request = HTTPRequest(
+            headers=headers, timeout=timeout, max_retries=max_retries
+        )
         super().__init__(
             ToolSpec(
                 name="http_get",
@@ -214,7 +224,9 @@ class HTTPGet(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute one HTTP GET request.
 
@@ -244,8 +256,15 @@ class HTTPPost(BaseTool):
     needs direct control over request bodies and headers.
     """
 
-    def __init__(self, headers: Optional[Dict[str, str]] = None, timeout: int = 30, max_retries: int = 2):
-        self._request = HTTPRequest(headers=headers, timeout=timeout, max_retries=max_retries)
+    def __init__(
+        self,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: int = 30,
+        max_retries: int = 2,
+    ):
+        self._request = HTTPRequest(
+            headers=headers, timeout=timeout, max_retries=max_retries
+        )
         super().__init__(
             ToolSpec(
                 name="http_post",
@@ -264,7 +283,9 @@ class HTTPPost(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute one HTTP POST request.
 
@@ -307,7 +328,9 @@ class HTMLExtractText(BaseTool):
             )
         )
 
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Extract readable text from raw HTML.
 
@@ -327,11 +350,18 @@ class HTMLExtractText(BaseTool):
             text, title = self._to_text(html, keep_links=keep_links)
             if max_chars > 0 and len(text) > max_chars:
                 text = text[:max_chars] + "\n... [truncated]"
-            return {"status": "success", "content": text, "length": len(text), "title": title}
+            return {
+                "status": "success",
+                "content": text,
+                "length": len(text),
+                "title": title,
+            }
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def _to_text(self, html: str, keep_links: bool = False) -> tuple[str, Optional[str]]:
+    def _to_text(
+        self, html: str, keep_links: bool = False
+    ) -> tuple[str, Optional[str]]:
         if BeautifulSoup is not None:
             # Prefer the stdlib parser to avoid third-party parser deprecation noise
             # in the supported extraction path while preserving extraction behavior.
@@ -365,72 +395,4 @@ class HTMLExtractText(BaseTool):
         return data.strip(), title
 
 
-class WebFetch(BaseTool):
-    """Fetch a web page and optionally return extracted readable text."""
-
-    def __init__(
-        self,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: int = 30,
-        max_retries: int = 2,
-    ):
-        warnings.warn(
-            "WebFetch is deprecated; use CodingToolSet.web_fetch or coding_tools() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._http = HTTPGet(headers=headers, timeout=timeout, max_retries=max_retries)
-        self._extract = HTMLExtractText()
-        super().__init__(
-            ToolSpec(
-                name="web_fetch",
-                description="Fetch a web page and optionally return extracted readable text.",
-                parameters={
-                    "url": {"type": "string"},
-                    "extract_text": {"type": "boolean"},
-                    "keep_links": {"type": "boolean"},
-                    "max_chars": {"type": "integer"},
-                    "timeout": {"type": "integer"},
-                },
-                required=["url"],
-                permissions=ToolPermission(network=True),
-            )
-        )
-
-    def execute(self, args: Dict[str, Any], runtime_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Fetch a web page and optionally extract readable text from it.
-
-        :param url: Absolute URL to fetch.
-        :param extract_text: Whether HTML should be converted into readable text.
-        :param keep_links: Whether extracted text should preserve anchor URLs.
-        :param max_chars: Maximum number of extracted characters to keep.
-        :param timeout: Optional timeout override in seconds.
-
-        Combines one HTTP GET with optional HTML-to-text extraction.
-        """
-        _ = runtime_context
-        url = str(args.get("url", ""))
-        extract_text = bool(args.get("extract_text", True))
-        keep_links = bool(args.get("keep_links", False))
-        max_chars = int(args.get("max_chars", 20_000))
-        timeout = args.get("timeout")
-        response = self._http.run(url=url, timeout=timeout)
-        if response.get("status") != "success":
-            return response
-        if not extract_text:
-            return response
-        extracted = self._extract.run(
-            html=str(response.get("content", "")),
-            keep_links=keep_links,
-            max_chars=max_chars,
-        )
-        return {
-            "status": "success",
-            "url": response.get("url", url),
-            "title": extracted.get("title", ""),
-            "content": extracted.get("content", ""),
-        }
-
-
-__all__ = ["HTTPRequest", "HTTPGet", "HTTPPost", "HTMLExtractText", "WebFetch"]
+__all__ = ["HTTPRequest", "HTTPGet", "HTTPPost", "HTMLExtractText"]

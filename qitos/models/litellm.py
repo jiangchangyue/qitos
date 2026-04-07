@@ -50,10 +50,10 @@ class LiteLLMModel(Model):
     def _call_api(self, messages: List[Dict[str, str]]) -> str:
         try:
             import litellm
-        except ImportError as exc:
+        except ImportError:
             return (
                 "Error: LiteLLM is not installed. "
-                "Install optional model dependencies with `pip install \"qitos[models]\"`."
+                'Install optional model dependencies with `pip install "qitos[models]"`.'
             )
 
         kwargs: Dict[str, Any] = {
@@ -135,7 +135,11 @@ class LiteLLMModel(Model):
         items = list(tool_calls or [])
         parts: List[str] = []
         for index, call in enumerate(items):
-            function = call.get("function") if isinstance(call, dict) else getattr(call, "function", None)
+            function = (
+                call.get("function")
+                if isinstance(call, dict)
+                else getattr(call, "function", None)
+            )
             name = ""
             raw_args: Any = {}
             if isinstance(function, dict):
@@ -145,7 +149,11 @@ class LiteLLMModel(Model):
                 name = str(getattr(function, "name", ""))
                 raw_args = getattr(function, "arguments", "{}")
             try:
-                args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args or {})
+                args = (
+                    json.loads(raw_args)
+                    if isinstance(raw_args, str)
+                    else dict(raw_args or {})
+                )
             except Exception:
                 args = {"raw_args": raw_args}
             prefix = f"Action {index + 1}: " if len(items) > 1 else "Action: "

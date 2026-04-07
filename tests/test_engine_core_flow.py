@@ -1,13 +1,24 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, Engine, HistoryPolicy, StateSchema, ToolRegistry, tool
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    Engine,
+    HistoryPolicy,
+    ModelResponse,
+    StateSchema,
+    ToolRegistry,
+    tool,
+)
 from qitos.core.history import History, HistoryMessage
 from qitos.kit.memory import WindowMemory
 from qitos.kit.history import WindowHistory
 from qitos.kit.parser import ReActTextParser
 from qitos.core.memory import Memory, MemoryRecord
 from qitos.engine import RuntimeBudget
+from qitos.trace import runtime_step_to_trace
 
 
 @dataclass
@@ -31,7 +42,10 @@ class DemoAgent(AgentModule[DemoState, dict[str, Any], Action]):
 
     def decide(self, state: DemoState, observation: dict[str, Any]) -> Decision[Action]:
         if state.current_step == 0:
-            return Decision.act(actions=[Action(name="add", args={"a": 19, "b": 23})], rationale="use tool")
+            return Decision.act(
+                actions=[Action(name="add", args={"a": 19, "b": 23})],
+                rationale="use tool",
+            )
         return Decision.final("42")
 
     def reduce(
@@ -40,7 +54,11 @@ class DemoAgent(AgentModule[DemoState, dict[str, Any], Action]):
         observation: dict[str, Any],
         decision: Decision[Action],
     ) -> DemoState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if action_results:
             state.logs.append(str(action_results[0]))
         return state
@@ -131,7 +149,9 @@ def test_engine_default_model_decide_with_prepare():
                 return None
             return Decision.final("42")
 
-    result = Engine(agent=LLMDrivenDemo(), budget=RuntimeBudget(max_steps=3)).run("compute")
+    result = Engine(agent=LLMDrivenDemo(), budget=RuntimeBudget(max_steps=3)).run(
+        "compute"
+    )
     assert result.state.final_result == "42"
     assert len(seen_messages) == 2
     assert seen_messages[0]["role"] == "system"
@@ -178,6 +198,211 @@ def test_engine_uses_history_messages_for_next_llm_call():
     assert len(calls[1]) >= 4
     assert calls[1][1]["role"] == "user"
     assert calls[1][2]["role"] == "assistant"
+
+
+def test_engine_emits_parser_events_and_records_step_diagnostics():
+    class _DummyModel:
+        def __init__(self):
+            self.outputs = [
+                "Thought only without action",
+                "Action: add(a=20, b=22)",
+                "Final Answer: 42",
+            ]
+
+        def __call__(self, messages):
+            return self.outputs.pop(0)
+
+    class ParserDiagDemo(DemoAgent):
+        def __init__(self):
+            super().__init__()
+            self.llm = _DummyModel()
+            self.model_parser = ReActTextParser()
+
+        def build_system_prompt(self, state: DemoState) -> str | None:
+            return "System prompt"
+
+        def prepare(self, state: DemoState) -> str:
+            return f"Task={state.task} Step={state.current_step}"
+
+        def decide(self, state: DemoState, observation: dict[str, Any]):
+            if state.current_step < 3:
+                return None
+            return Decision.final("42")
+
+    result = Engine(agent=ParserDiagDemo(), budget=RuntimeBudget(max_steps=5)).run(
+        "compute"
+    )
+    assert result.state.final_result == "42"
+    parser_result_events = [
+        e
+        for e in result.events
+        if getattr(e.phase, "value", e.phase) == "DECIDE"
+        and (e.payload or {}).get("stage") == "parser_result"
+    ]
+    parser_diag_events = [
+        e
+        for e in result.events
+        if getattr(e.phase, "value", e.phase) == "DECIDE"
+        and (e.payload or {}).get("stage") == "parser_diagnostics"
+    ]
+    assert parser_result_events
+    assert parser_diag_events
+    assert result.records[0].parser_diagnostics["code"] == "missing_action_or_final"
+    assert result.records[0].parser_contract == "react_text_v1"
+    assert result.records[0].parser_salvage_applied is False
+
+
+def test_engine_interpret_model_response_bypasses_parser_and_records_summary():
+    seen: list[ModelResponse] = []
+
+    class _ResponseModel:
+        model = "demo-model"
+        provider = "demo-provider"
+
+        def __call__(self, messages):
+            _ = messages
+            return {
+                "content": "model said to use the add tool",
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 5,
+                    "total_tokens": 17,
+                },
+                "finish_reason": "stop",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "add", "arguments": '{"a": 20, "b": 22}'},
+                    }
+                ],
+            }
+
+    class _NeverParser:
+        def parse(self, raw_output, context=None):
+            _ = raw_output
+            _ = context
+            raise AssertionError(
+                "parser should not be called when interpret_model_response returns Decision"
+            )
+
+    class _InterpretAgent(DemoAgent):
+        def __init__(self):
+            super().__init__()
+            self.llm = _ResponseModel()
+            self.model_parser = _NeverParser()
+
+        def decide(self, state: DemoState, observation: dict[str, Any]):
+            _ = observation
+            if state.current_step > 0:
+                return Decision.final("42")
+            return None
+
+        def interpret_model_response(
+            self,
+            state: DemoState,
+            observation: dict[str, Any],
+            response: ModelResponse,
+        ) -> Decision[Action] | None:
+            _ = state
+            _ = observation
+            seen.append(response)
+            return Decision.act(
+                actions=[Action(name="add", args={"a": 20, "b": 22})],
+                rationale=response.text,
+            )
+
+    result = Engine(agent=_InterpretAgent(), budget=RuntimeBudget(max_steps=3)).run(
+        "compute"
+    )
+    assert result.state.final_result == "42"
+    assert seen
+    response = seen[0]
+    assert response.text == "model said to use the add tool"
+    assert response.usage == {
+        "prompt_tokens": 12,
+        "completion_tokens": 5,
+        "total_tokens": 17,
+    }
+    assert response.finish_reason == "stop"
+    assert response.model_name == "demo-model"
+    assert response.provider == "demo-provider"
+    assert result.records[0].model_response["text"] == "model said to use the add tool"
+    assert "raw" not in result.records[0].model_response
+    model_output_events = [
+        e
+        for e in result.events
+        if getattr(e.phase, "value", e.phase) == "DECIDE"
+        and (e.payload or {}).get("stage") == "model_output"
+    ]
+    assert model_output_events
+    assert (
+        model_output_events[0].payload["raw_output"] == "model said to use the add tool"
+    )
+    assert model_output_events[0].payload["model_response"]["finish_reason"] == "stop"
+    traced = runtime_step_to_trace(result.records[0]).to_dict()
+    assert traced["model_response"]["model_name"] == "demo-model"
+    assert "raw" not in traced["model_response"]
+
+
+def test_engine_interpret_model_response_can_fall_back_to_parser():
+    seen: list[ModelResponse] = []
+
+    class _ResponseModel:
+        model = "demo-model"
+
+        def __call__(self, messages):
+            _ = messages
+            return {
+                "content": "Final Answer: 42",
+                "usage": {
+                    "prompt_tokens": 9,
+                    "completion_tokens": 3,
+                    "total_tokens": 12,
+                },
+                "finish_reason": "stop",
+            }
+
+    class _TrackingParser(ReActTextParser):
+        def __init__(self):
+            super().__init__()
+            self.calls: list[Any] = []
+
+        def parse(self, raw_output: Any, context=None):
+            self.calls.append(raw_output)
+            return super().parse(raw_output, context=context)
+
+    parser = _TrackingParser()
+
+    class _InterpretAgent(DemoAgent):
+        def __init__(self):
+            super().__init__()
+            self.llm = _ResponseModel()
+            self.model_parser = parser
+
+        def decide(self, state: DemoState, observation: dict[str, Any]):
+            _ = state
+            _ = observation
+            return None
+
+        def interpret_model_response(
+            self,
+            state: DemoState,
+            observation: dict[str, Any],
+            response: ModelResponse,
+        ) -> Decision[Action] | None:
+            _ = state
+            _ = observation
+            seen.append(response)
+            return None
+
+    result = Engine(agent=_InterpretAgent(), budget=RuntimeBudget(max_steps=2)).run(
+        "compute"
+    )
+    assert result.state.final_result == "42"
+    assert seen and isinstance(seen[0], ModelResponse)
+    assert parser.calls == ["Final Answer: 42"]
+    assert result.records[0].model_response["usage"]["total_tokens"] == 12
 
 
 def test_engine_uses_history_retrieve_contract():
@@ -324,7 +549,9 @@ def test_memory_and_history_streams_are_strictly_separated():
     assert result.state.stop_reason == "final"
 
     mem_roles = {r.role for r in mem.records}
-    assert {"task", "state", "decision", "next_state", "observation"}.issubset(mem_roles)
+    assert {"task", "state", "decision", "next_state", "observation"}.issubset(
+        mem_roles
+    )
     assert "message" not in mem_roles
 
     hist_roles = [m.role for m in hist.messages]

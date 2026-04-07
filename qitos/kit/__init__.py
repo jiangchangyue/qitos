@@ -1,14 +1,40 @@
 """Curated practical building blocks for common QiTOS agent authoring."""
 
-from . import critic, env, evaluate, history, memory, metric, parser, planning, prompts, state, tool
+from . import (
+    critic,
+    env,
+    evaluate,
+    history,
+    memory,
+    metric,
+    parser,
+    planning,
+    prompts,
+    state,
+    tool,
+)
 from .critic import ReActSelfReflectionCritic
 from .env import HostEnv, RepoEnv, TextWebEnv, TmuxEnv
-from .history import CompactConfig, CompactHistory, TokenBudgetSummaryHistory, WindowHistory, compact_history
+from .history import (
+    CompactConfig,
+    CompactHistory,
+    TokenBudgetSummaryHistory,
+    WindowHistory,
+    compact_history,
+)
 from .memory import MarkdownFileMemory, WindowMemory
-from .parser import JsonDecisionParser, ReActTextParser, TerminusJsonParser, TerminusXmlParser, XmlDecisionParser
+from .parser import (
+    JsonDecisionParser,
+    MiniMaxToolCallParser,
+    ReActTextParser,
+    TerminusJsonParser,
+    TerminusXmlParser,
+    XmlDecisionParser,
+)
 from .planning import DynamicTreeSearch, NumberedPlanBuilder, format_action
 from .prompts import (
     JSON_DECISION_SYSTEM_PROMPT,
+    MINIMAX_TOOL_CALL_SYSTEM_PROMPT,
     PLAN_DRAFT_PROMPT,
     PLAN_EXEC_SYSTEM_PROMPT,
     REACT_SYSTEM_PROMPT,
@@ -23,16 +49,14 @@ from .prompts import (
 from .tool import (
     CodingToolSet,
     EpubToolSet,
-    EditorToolSet,
     HTMLExtractText,
     HTTPGet,
     ReportToolSet,
-    ReadFile,
-    RunCommand,
     SendTerminalKeys,
+    SecurityAuditToolSet,
     TaskToolSet,
-    WriteFile,
     coding_tools,
+    security_audit_tools,
 )
 
 __all__ = [
@@ -49,6 +73,7 @@ __all__ = [
     "tool",
     "ReActTextParser",
     "JsonDecisionParser",
+    "MiniMaxToolCallParser",
     "XmlDecisionParser",
     "TerminusJsonParser",
     "TerminusXmlParser",
@@ -57,24 +82,23 @@ __all__ = [
     "PLAN_EXEC_SYSTEM_PROMPT",
     "XML_DECISION_SYSTEM_PROMPT",
     "JSON_DECISION_SYSTEM_PROMPT",
+    "MINIMAX_TOOL_CALL_SYSTEM_PROMPT",
     "SWE_AGENT_SYSTEM_PROMPT",
     "SECURITY_AUDIT_SYSTEM_PROMPT",
     "TERMINUS_JSON_SYSTEM_PROMPT",
     "TERMINUS_XML_SYSTEM_PROMPT",
     "TERMINUS_TIMEOUT_PROMPT",
     "render_prompt",
-    "EditorToolSet",
     "CodingToolSet",
-    "RunCommand",
     "SendTerminalKeys",
+    "SecurityAuditToolSet",
     "HTTPGet",
     "HTMLExtractText",
     "ReportToolSet",
-    "ReadFile",
-    "WriteFile",
     "EpubToolSet",
     "TaskToolSet",
     "coding_tools",
+    "security_audit_tools",
     "MarkdownFileMemory",
     "WindowMemory",
     "WindowHistory",

@@ -7,8 +7,25 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from qitos import Action, AgentModule, Decision, EnvSpec, StateSchema, Task, TaskBudget, TaskResource, ToolRegistry
-from qitos.kit import DynamicTreeSearch, EditorToolSet, RepoEnv, RunCommand, XmlDecisionParser, format_action, render_prompt
+from qitos import (
+    Action,
+    AgentModule,
+    Decision,
+    EnvSpec,
+    StateSchema,
+    Task,
+    TaskBudget,
+    TaskResource,
+    ToolRegistry,
+)
+from qitos.kit import (
+    CodingToolSet,
+    DynamicTreeSearch,
+    RepoEnv,
+    XmlDecisionParser,
+    format_action,
+    render_prompt,
+)
 from qitos.kit.planning import parse_numbered_plan
 from qitos.models import OpenAICompatibleModel
 
@@ -76,9 +93,19 @@ class SWEPlanState(StateSchema):
 class SWEDynamicPlanningAgent(AgentModule[SWEPlanState, dict[str, Any], Action]):
     def __init__(self, llm: Any, workspace_root: str):
         registry = ToolRegistry()
-        registry.include(EditorToolSet(workspace_root=workspace_root))
-        registry.register(RunCommand(cwd=workspace_root))
-        super().__init__(tool_registry=registry, llm=llm, model_parser=XmlDecisionParser())
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=XmlDecisionParser()
+        )
 
     def init_state(self, task: str, **kwargs: Any) -> SWEPlanState:
         return SWEPlanState(
@@ -169,10 +196,21 @@ class SWEDynamicPlanningAgent(AgentModule[SWEPlanState, dict[str, Any], Action])
 
         if not candidates:
             return None
-        return Decision.branch(candidates=candidates, rationale=f"dynamic_plan_step_{state.cursor}")
+        return Decision.branch(
+            candidates=candidates, rationale=f"dynamic_plan_step_{state.cursor}"
+        )
 
-    def reduce(self, state: SWEPlanState, observation: dict[str, Any], decision: Decision[Action]) -> SWEPlanState:
-        action_results = observation.get("action_results", []) if isinstance(observation, dict) else []
+    def reduce(
+        self,
+        state: SWEPlanState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> SWEPlanState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
         if decision.rationale:
             state.scratchpad.append(f"Thought: {decision.rationale}")
         if decision.actions:
@@ -212,7 +250,11 @@ class SWEDynamicPlanningAgent(AgentModule[SWEPlanState, dict[str, Any], Action])
                     "role": "user",
                     "content": render_prompt(
                         PLAN_PROMPT,
-                        {"task": state.task, "file": state.target_file, "test_command": state.test_command},
+                        {
+                            "task": state.task,
+                            "file": state.target_file,
+                            "test_command": state.test_command,
+                        },
                     ),
                 },
             ]
@@ -253,7 +295,9 @@ class SWEDynamicPlanningAgent(AgentModule[SWEPlanState, dict[str, Any], Action])
 def build_model() -> OpenAICompatibleModel:
     api_key = (os.getenv("OPENAI_API_KEY") or os.getenv("QITOS_API_KEY") or "").strip()
     if not api_key:
-        raise ValueError("Set OPENAI_API_KEY or QITOS_API_KEY before running this example.")
+        raise ValueError(
+            "Set OPENAI_API_KEY or QITOS_API_KEY before running this example."
+        )
     return OpenAICompatibleModel(
         model=MODEL_NAME,
         api_key=api_key,

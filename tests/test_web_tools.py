@@ -7,7 +7,14 @@ from qitos.kit.tool.web import HTMLExtractText, HTTPGet, HTTPPost, HTTPRequest
 
 
 class _Resp:
-    def __init__(self, url: str, status_code: int = 200, text: str = "", headers=None, json_value=None):
+    def __init__(
+        self,
+        url: str,
+        status_code: int = 200,
+        text: str = "",
+        headers=None,
+        json_value=None,
+    ):
         self.url = url
         self.status_code = status_code
         self.text = text
@@ -56,7 +63,12 @@ def test_http_get_and_post_delegate(monkeypatch):
 
     def _fake_get_run(**kwargs):
         calls.append(kwargs)
-        return {"status": "success", "method": kwargs["method"], "url": kwargs["url"], "content": "ok"}
+        return {
+            "status": "success",
+            "method": kwargs["method"],
+            "url": kwargs["url"],
+            "content": "ok",
+        }
 
     monkeypatch.setattr(get_tool._request, "run", _fake_get_run)
     monkeypatch.setattr(post_tool._request, "run", _fake_get_run)
