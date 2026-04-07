@@ -1,6 +1,6 @@
 # QitOS
 
-![QitOS Logo](assets/logo.png)
+<img src="assets/logo.png" alt="QitOS Logo" width="75%">
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-3776AB)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)

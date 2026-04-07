@@ -13,6 +13,7 @@ from .history import History
 from .memory import Memory
 from .model_response import ModelResponse
 from .task import Task, TaskBudget
+from ..prompting import PromptBuildResult, PromptBuilder, PromptSpec
 
 
 StateT = TypeVar("StateT")
@@ -49,7 +50,42 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
 
     def build_system_prompt(self, state: StateT) -> str | None:
         """Optional dynamic system prompt hook."""
-        return None
+        return self._build_default_prompt_bundle(state).system_prompt or None
+
+    def base_persona_prompt(self, state: StateT) -> str:
+        """Lightweight default authoring hook for agent persona and role."""
+        _ = state
+        return ""
+
+    def task_policy_prompt(self, state: StateT) -> str:
+        """Optional task-policy section appended after persona."""
+        _ = state
+        return ""
+
+    def extra_instructions_prompt(self, state: StateT) -> str:
+        """Optional extra instructions section appended near the end."""
+        _ = state
+        return ""
+
+    def tool_usage_hint_prompt(self, state: StateT) -> str:
+        """Optional lightweight tool-usage hint without overriding tool schema."""
+        _ = state
+        return ""
+
+    def build_prompt_spec(self, state: StateT) -> PromptSpec:
+        """Optional structured prompt hook used by the default prompt builder."""
+        return PromptSpec(
+            persona_prompt=self.base_persona_prompt(state),
+            task_policy=self.task_policy_prompt(state),
+            tool_usage_hint=self.tool_usage_hint_prompt(state),
+            extra_instructions=self.extra_instructions_prompt(state),
+            parser_feedback=self._state_prompt_attr(state, "parser_feedback"),
+            continuation_feedback=self._state_prompt_attr(state, "timeout_feedback"),
+            metadata={
+                "agent_name": self.name,
+                "prompt_authoring_mode": "default",
+            },
+        )
 
     def prepare(self, state: StateT) -> str:
         """Convert current state into model-ready text."""
@@ -98,6 +134,10 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
             return runtime_protocol
         return self.model_protocol
 
+    def prompt_builder(self) -> PromptBuilder:
+        """Return the prompt builder instance used for default prompt assembly."""
+        return PromptBuilder()
+
     def render_tool_schema(self, protocol: Any = None) -> str:
         if self.tool_registry is None:
             return ""
@@ -109,11 +149,72 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
     def compose_system_prompt(self, base_prompt: str, protocol: Any = None) -> str:
         resolved = protocol if protocol is not None else self.active_protocol()
         try:
-            from ..protocols import render_protocol_prompt
-
-            return render_protocol_prompt(base_prompt, resolved, self.tool_registry)
+            spec = PromptSpec(persona_prompt=str(base_prompt or ""))
+            result = self.prompt_builder().build(
+                spec=spec,
+                protocol=resolved,
+                tool_registry=self.tool_registry,
+                llm=self.llm,
+                resolution_source="compose_system_prompt",
+            )
+            return result.system_prompt
         except Exception:
             return str(base_prompt or "")
+
+    def build_prompt_bundle(self, state: StateT) -> PromptBuildResult:
+        """Build the protocol-aware prompt bundle for the current model step."""
+        if getattr(self, "_prompt_bundle_reentry_guard", False):
+            return self._build_default_prompt_bundle(state)
+        custom_system_prompt = (
+            type(self).build_system_prompt is not AgentModule.build_system_prompt
+        )
+        if custom_system_prompt:
+            setattr(self, "_prompt_bundle_reentry_guard", True)
+            try:
+                manual_prompt = type(self).build_system_prompt(self, state)
+            finally:
+                delattr(self, "_prompt_bundle_reentry_guard")
+            return PromptBuildResult(
+                system_prompt_static=str(manual_prompt or "").strip(),
+                metadata={
+                    "protocol": getattr(self.active_protocol(), "id", None),
+                    "protocol_resolution_source": "agent_override",
+                    "prompt_builder": "manual_build_system_prompt",
+                    "prompt_builder_version": "manual",
+                    "sections_used": ["manual_override"]
+                    if str(manual_prompt or "").strip()
+                    else [],
+                    "tool_schema_style": getattr(
+                        self.active_protocol(), "id", None
+                    ),
+                    "tool_schema_delivery": str(
+                        getattr(
+                            self.active_protocol(),
+                            "tool_schema_delivery",
+                            "prompt_injection",
+                        )
+                    ),
+                    "repair_injected": False,
+                    "continuation_injected": False,
+                },
+            )
+        return self._build_default_prompt_bundle(state)
+
+    def _build_default_prompt_bundle(self, state: StateT) -> PromptBuildResult:
+        spec = self.build_prompt_spec(state)
+        resolution_source = getattr(self, "_runtime_protocol_source", None)
+        return self.prompt_builder().build(
+            spec=spec,
+            protocol=self.active_protocol(),
+            tool_registry=self.tool_registry,
+            llm=self.llm,
+            state=state,
+            resolution_source=str(resolution_source or "agent_default"),
+        )
+
+    def _state_prompt_attr(self, state: StateT, name: str) -> str:
+        value = getattr(state, name, "")
+        return str(value or "").strip() if value is not None else ""
 
     def run(
         self,

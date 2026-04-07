@@ -119,8 +119,10 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         setattr(engine.agent, "_runtime_observation", observation)
         setattr(engine.agent, "_runtime_step_id", record.step_id)
         setattr(engine.agent, "_runtime_protocol", protocol)
+        setattr(engine.agent, "_runtime_protocol_source", engine._resolved_protocol_source)
         try:
-            system_prompt = engine.agent.build_system_prompt(state)
+            prompt_bundle = engine.agent.build_prompt_bundle(state)
+            system_prompt = prompt_bundle.system_prompt
             prepared = engine.agent.prepare(state)
         finally:
             if hasattr(engine.agent, "_runtime_observation"):
@@ -129,6 +131,22 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 delattr(engine.agent, "_runtime_step_id")
             if hasattr(engine.agent, "_runtime_protocol"):
                 delattr(engine.agent, "_runtime_protocol")
+            if hasattr(engine.agent, "_runtime_protocol_source"):
+                delattr(engine.agent, "_runtime_protocol_source")
+        prompt_metadata = dict(getattr(prompt_bundle, "metadata", {}) or {})
+        engine._last_prompt_metadata = dict(prompt_metadata)
+        if engine.trace_writer is not None:
+            engine.trace_writer.metadata.update(
+                {
+                    "prompt_hash": prompt_metadata.get("prompt_hash_full", "unknown"),
+                    "prompt_hash_static": prompt_metadata.get(
+                        "prompt_hash_static", "unknown"
+                    ),
+                    "prompt_builder": prompt_metadata.get("prompt_builder"),
+                    "protocol": prompt_metadata.get("protocol"),
+                }
+            )
+        prompt_messages = list(getattr(prompt_bundle, "message_injections", []) or [])
         context_runtime = engine._context_runtime
         pre_context = context_runtime.build_pre_request(
             llm=engine.agent.llm,
@@ -215,10 +233,24 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             raise ContextOverflowError(
                 f"context overflow: input_tokens={pre_context.input_tokens_total} budget={pre_context.available_input_budget}"
             )
-        current_user = {"role": "user", "content": str(prepared)}
+        injection_prefixes: List[str] = []
         messages.extend(history)
+        for item in prompt_messages:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role") or "user")
+            content = str(item.get("content") or "").strip()
+            if not content:
+                continue
+            if role == "user":
+                injection_prefixes.append(content)
+                continue
+            messages.append({"role": role, "content": content})
+        current_user_content = "\n\n".join(injection_prefixes + [str(prepared)])
+        current_user = {"role": "user", "content": current_user_content}
         messages.append(current_user)
         record.context = context_runtime.telemetry_dict(pre_context)
+        record.prompt_metadata = prompt_metadata
         engine._last_context_telemetry = dict(record.context)
         engine._emit(
             record.step_id,
@@ -226,17 +258,23 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             payload={
                 "stage": "model_input",
                 "prepared": str(prepared),
+                "prepared_full": current_user_content,
                 "history_message_count": len(history),
                 "history_messages_meta": history_metadata,
                 "messages": messages,
                 "context": dict(record.context),
                 "state_stats": self._state_stats(observation, record.context),
+                "prompt": prompt_metadata,
             },
         )
         engine._history_append(
             "user", str(prepared), record.step_id, metadata={"source": "engine"}
         )
-        raw_decision = engine.agent.llm(messages)
+        request_options = self._build_model_request_options(
+            prompt_bundle=prompt_bundle,
+            protocol=protocol,
+        )
+        raw_decision = self._call_llm(engine.agent.llm, messages, request_options)
         response = self._normalize_model_response(raw_decision)
         post_context = context_runtime.finalize_output(
             llm=engine.agent.llm,
@@ -254,12 +292,42 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 "raw_output": response.text,
                 "model_response": dict(record.model_response),
                 "context": dict(record.context),
+                "prompt": prompt_metadata,
             },
         )
         engine._history_append(
             "assistant", response.text, record.step_id, metadata={"source": "engine"}
         )
         return response
+
+    def _build_model_request_options(
+        self, *, prompt_bundle: Any, protocol: Any
+    ) -> Dict[str, Any]:
+        metadata = dict(getattr(prompt_bundle, "metadata", {}) or {})
+        delivery = str(metadata.get("tool_schema_delivery") or "prompt_injection")
+        payload = getattr(prompt_bundle, "tool_schema_payload", None)
+        llm = getattr(self.engine.agent, "llm", None)
+        if llm is None or delivery not in {"api_parameter", "hybrid"}:
+            return {}
+        build_options = getattr(llm, "build_tool_schema_request_options", None)
+        if callable(build_options):
+            try:
+                return dict(
+                    build_options(payload, protocol=protocol, delivery=delivery) or {}
+                )
+            except Exception:
+                return {}
+        return {}
+
+    def _call_llm(
+        self, llm: Any, messages: List[Dict[str, str]], request_options: Dict[str, Any]
+    ) -> Any:
+        if not request_options:
+            return llm(messages)
+        try:
+            return llm(messages, **request_options)
+        except TypeError:
+            return llm(messages)
 
     def _state_stats(
         self, observation: ObservationT, context: Dict[str, Any]

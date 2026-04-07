@@ -74,7 +74,7 @@ class OpenAIModel(Model):
                 "OPENAI_API_KEY not set. Please set environment variable or pass api_key parameter."
             )
 
-    def _call_api(self, messages: List[Dict[str, str]]) -> str:
+    def _call_api(self, messages: List[Dict[str, str]], **kwargs: Any) -> str:
         """
         Call OpenAI API
 
@@ -96,6 +96,7 @@ class OpenAIModel(Model):
                 messages=cast(Any, messages),
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
+                **kwargs,
             )
             self._set_last_usage(self._usage_from_response(response))
 
@@ -184,6 +185,30 @@ class OpenAIModel(Model):
 
         return "\n".join(parts)
 
+    def supports_tool_schema_delivery(
+        self, delivery: str, protocol: Any = None
+    ) -> bool:
+        _ = protocol
+        return str(delivery or "prompt_injection") in {
+            "prompt_injection",
+            "api_parameter",
+            "hybrid",
+        }
+
+    def build_tool_schema_request_options(
+        self,
+        tool_schema_payload: Optional[List[Dict[str, Any]]],
+        *,
+        protocol: Any = None,
+        delivery: str = "prompt_injection",
+    ) -> Dict[str, Any]:
+        _ = protocol
+        if str(delivery or "prompt_injection") not in {"api_parameter", "hybrid"}:
+            return {}
+        if not tool_schema_payload:
+            return {}
+        return {"tools": tool_schema_payload}
+
 
 class OpenAICompatibleModel(Model):
     """
@@ -245,7 +270,7 @@ class OpenAICompatibleModel(Model):
                 "OPENAI_BASE_URL not set. Please set environment variable or pass base_url parameter."
             )
 
-    def _call_api(self, messages: List[Dict[str, str]]) -> str:
+    def _call_api(self, messages: List[Dict[str, str]], **kwargs: Any) -> str:
         """
         Call OpenAI compatible API
 
@@ -267,6 +292,7 @@ class OpenAICompatibleModel(Model):
                 messages=cast(Any, messages),
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
+                **kwargs,
             )
             self._set_last_usage(self._usage_from_response(response))
 
@@ -291,6 +317,30 @@ class OpenAICompatibleModel(Model):
             return message.content.strip()
 
         return ""
+
+    def supports_tool_schema_delivery(
+        self, delivery: str, protocol: Any = None
+    ) -> bool:
+        _ = protocol
+        return str(delivery or "prompt_injection") in {
+            "prompt_injection",
+            "api_parameter",
+            "hybrid",
+        }
+
+    def build_tool_schema_request_options(
+        self,
+        tool_schema_payload: Optional[List[Dict[str, Any]]],
+        *,
+        protocol: Any = None,
+        delivery: str = "prompt_injection",
+    ) -> Dict[str, Any]:
+        _ = protocol
+        if str(delivery or "prompt_injection") not in {"api_parameter", "hybrid"}:
+            return {}
+        if not tool_schema_payload:
+            return {}
+        return {"tools": tool_schema_payload}
 
     def _format_tool_calls(self, tool_calls) -> str:
         """

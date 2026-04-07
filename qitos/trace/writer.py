@@ -143,6 +143,7 @@ def runtime_step_to_trace(step: Any) -> TraceStep:
         critic_outputs=_normalize(list(getattr(step, "critic_outputs", []) or [])),
         state_diff=_normalize(dict(getattr(step, "state_diff", {}) or {})),
         context=_normalize(dict(getattr(step, "context", {}) or {})),
+        prompt_metadata=_normalize(dict(getattr(step, "prompt_metadata", {}) or {})),
         protocol_id=getattr(step, "protocol_id", None),
         parser_selected=getattr(step, "parser_selected", None),
         parser_fallback_used=bool(getattr(step, "parser_fallback_used", False)),

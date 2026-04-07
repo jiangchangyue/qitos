@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional
 
 
 ToolSchemaRenderer = Callable[[Any], str]
+ContractRenderer = Callable[[Any], str]
+FeedbackRenderer = Callable[[str], str]
 
 
 @dataclass(frozen=True)
@@ -15,7 +17,15 @@ class ModelProtocol:
     display_name: str
     parser_factory: Callable[[], Any]
     prompt_renderer: Callable[[str, Any], str]
+    contract_renderer: ContractRenderer
     tool_schema_renderer: ToolSchemaRenderer
+    tool_schema_delivery: str = "prompt_injection"
+    repair_renderer: Optional[FeedbackRenderer] = None
+    continuation_renderer: Optional[FeedbackRenderer] = None
+    prompt_builder_policy: Dict[str, Any] = field(default_factory=dict)
+    repair_injection_mode: str = "message_injection"
+    continuation_injection_mode: str = "message_injection"
+    contract_version: str = "v1"
     supports_multi_action: bool = False
     supports_native_tool_call_markup: bool = False
     diagnostic_style: str = "structured"
@@ -103,6 +113,34 @@ def render_minimax_tool_schema(tool_registry: Any) -> str:
             lines.append(f'  <parameter name="{name}" type="{kind}">value</parameter>')
         lines.append("</invoke>")
     return "\n".join(lines).strip()
+
+
+def _render_simple_contract(contract: str) -> str:
+    return str(contract or "").strip()
+
+
+def _render_repair_message(feedback: str) -> str:
+    text = str(feedback or "").strip()
+    if not text:
+        return ""
+    return (
+        "Parser feedback from previous response:\n"
+        f"{text}\n\n"
+        "Previous response did not satisfy the required output contract.\n"
+        "Return one corrected response in the active protocol format."
+    )
+
+
+def _render_continuation_message(feedback: str) -> str:
+    text = str(feedback or "").strip()
+    if not text:
+        return ""
+    return (
+        "Timeout feedback:\n"
+        f"{text}\n\n"
+        "Continue from the current run state.\n"
+        "Do not repeat unnecessary prior actions."
+    )
 
 
 _REACT_CONTRACT = """Output contract:
@@ -248,28 +286,42 @@ def _protocol_table() -> Dict[str, ModelProtocol]:
             display_name="ReAct Text",
             parser_factory=ReActTextParser,
             prompt_renderer=_react_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(_REACT_CONTRACT),
             tool_schema_renderer=render_react_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
         ),
         "json_decision_v1": ModelProtocol(
             id="json_decision_v1",
             display_name="JSON Decision",
             parser_factory=JsonDecisionParser,
             prompt_renderer=_json_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(_JSON_CONTRACT),
             tool_schema_renderer=render_json_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
         ),
         "xml_decision_v1": ModelProtocol(
             id="xml_decision_v1",
             display_name="XML Decision",
             parser_factory=XmlDecisionParser,
             prompt_renderer=_xml_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(_XML_CONTRACT),
             tool_schema_renderer=render_xml_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
         ),
         "terminus_json_v1": ModelProtocol(
             id="terminus_json_v1",
             display_name="Terminus JSON",
             parser_factory=TerminusJsonParser,
             prompt_renderer=_terminus_json_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(
+                _TERMINUS_JSON_CONTRACT
+            ),
             tool_schema_renderer=render_json_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
             supports_multi_action=True,
             fallback_protocols=("terminus_xml_v1", "json_decision_v1"),
         ),
@@ -278,7 +330,12 @@ def _protocol_table() -> Dict[str, ModelProtocol]:
             display_name="Terminus XML",
             parser_factory=TerminusXmlParser,
             prompt_renderer=_terminus_xml_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(
+                _TERMINUS_XML_CONTRACT
+            ),
             tool_schema_renderer=render_xml_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
             supports_multi_action=True,
             fallback_protocols=("terminus_json_v1", "xml_decision_v1"),
         ),
@@ -287,7 +344,12 @@ def _protocol_table() -> Dict[str, ModelProtocol]:
             display_name="MiniMax Tool Call",
             parser_factory=MiniMaxToolCallParser,
             prompt_renderer=_minimax_prompt,
+            contract_renderer=lambda _protocol: _render_simple_contract(
+                _MINIMAX_CONTRACT
+            ),
             tool_schema_renderer=render_minimax_tool_schema,
+            repair_renderer=_render_repair_message,
+            continuation_renderer=_render_continuation_message,
             supports_multi_action=True,
             supports_native_tool_call_markup=True,
             fallback_protocols=(
@@ -370,6 +432,13 @@ def render_protocol_tool_schema(
     return resolved.tool_schema_renderer(tool_registry)
 
 
+def render_protocol_contract(protocol: str | ModelProtocol | None) -> str:
+    resolved = get_protocol(protocol)
+    if resolved is None:
+        return ""
+    return str(resolved.contract_renderer(resolved) or "").strip()
+
+
 def protocol_summary(protocol: str | ModelProtocol | None) -> Dict[str, Any]:
     resolved = get_protocol(protocol)
     if resolved is None:
@@ -377,6 +446,10 @@ def protocol_summary(protocol: str | ModelProtocol | None) -> Dict[str, Any]:
     return {
         "id": resolved.id,
         "display_name": resolved.display_name,
+        "tool_schema_delivery": resolved.tool_schema_delivery,
+        "repair_injection_mode": resolved.repair_injection_mode,
+        "continuation_injection_mode": resolved.continuation_injection_mode,
+        "contract_version": resolved.contract_version,
         "supports_multi_action": resolved.supports_multi_action,
         "supports_native_tool_call_markup": resolved.supports_native_tool_call_markup,
         "fallback_protocols": list(resolved.fallback_protocols),
@@ -391,6 +464,7 @@ __all__ = [
     "resolve_protocol_chain",
     "render_protocol_prompt",
     "render_protocol_tool_schema",
+    "render_protocol_contract",
     "render_react_tool_schema",
     "render_json_tool_schema",
     "render_xml_tool_schema",

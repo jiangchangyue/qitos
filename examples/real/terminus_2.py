@@ -83,11 +83,9 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
             parser_format=str(kwargs.get("parser_format", PARSER_FORMAT)),
         )
 
-    def build_system_prompt(self, state: TerminusState) -> str | None:
+    def base_persona_prompt(self, state: TerminusState) -> str:
         _ = state
-        return self.compose_system_prompt(
-            TERMINUS_BASE_PROMPT, protocol=self.active_protocol()
-        )
+        return TERMINUS_BASE_PROMPT
 
     def prepare(self, state: TerminusState) -> str:
         observation = getattr(self, "_runtime_observation", None)
@@ -116,15 +114,6 @@ class Terminus2Agent(AgentModule[TerminusState, dict[str, Any], dict[str, Any]])
             "",
             f"Current terminal state:\n{terminal_output or terminal_screen}",
         ]
-        if state.parser_feedback:
-            lines.extend(
-                [
-                    "",
-                    f"Parser feedback from previous response:\n{state.parser_feedback}",
-                ]
-            )
-        if state.timeout_feedback:
-            lines.extend(["", f"Timeout feedback:\n{state.timeout_feedback}"])
         if state.last_plan:
             lines.extend(["", f"Previous plan:\n{state.last_plan}"])
         return "\n".join(lines)

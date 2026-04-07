@@ -554,6 +554,30 @@ class ClaudeStyleHook(RenderStreamHook):
                 if isinstance(syntax, Syntax):
                     self.console.print(Text("┃", style=color), end=" ")
                     self.console.print(syntax)
+                secondary = obs.get("secondary")
+                if isinstance(secondary, dict):
+                    secondary_title = str(
+                        secondary.get("title", "Tool Observation")
+                    ).strip() or "Tool Observation"
+                    secondary_body = str(secondary.get("body", "")).strip()
+                    secondary_url = str(secondary.get("url", "")).strip()
+                    secondary_table = secondary.get("table")
+                    secondary_syntax = secondary.get("syntax")
+                    self._rail(
+                        "blue",
+                        "📎 [bold blue]Tool Observation[/bold blue] "
+                        f"[bold italic]Title:[/bold italic] {secondary_title}",
+                    )
+                    if secondary_url:
+                        self._rail("blue", f"[dim]URL: {secondary_url}[/dim]")
+                    if secondary_body:
+                        self._rail("blue", secondary_body)
+                    if secondary_table is not None:
+                        self.console.print(Text("┃", style="blue"), end=" ")
+                        self.console.print(secondary_table)
+                    if isinstance(secondary_syntax, Syntax):
+                        self.console.print(Text("┃", style="blue"), end=" ")
+                        self.console.print(secondary_syntax)
                 self._observation_steps.add(event.step_id)
             return
 
@@ -635,6 +659,7 @@ class ClaudeStyleHook(RenderStreamHook):
         history_name = self._history_name(engine)
         model_name = self._model_name(engine)
         protocol_name = self._protocol_name(engine)
+        prompt_name = self._prompt_name(engine)
         planning_name = self._planning_name(engine)
         tools = self._tool_list(engine)
         tools_desc = ", ".join(tools[:8]) if tools else "none"
@@ -645,6 +670,7 @@ class ClaudeStyleHook(RenderStreamHook):
             ("history", history_name),
             ("base_model", model_name),
             ("protocol", protocol_name),
+            ("prompt", prompt_name),
             ("context", self._context_row(engine)),
             ("planning", planning_name),
             ("tools", f"{tools_desc} ({len(tools)})"),
@@ -732,6 +758,14 @@ class ClaudeStyleHook(RenderStreamHook):
             else "off"
         )
         return f"{window} window · {counting} counting · {reserve_text} · compact={compact}"
+
+    def _prompt_name(self, engine: "Engine") -> str:
+        meta = dict(getattr(engine, "_last_prompt_metadata", {}) or {})
+        builder = str(meta.get("prompt_builder") or "default")
+        delivery = str(meta.get("tool_schema_delivery") or "prompt_injection")
+        sections = meta.get("sections_used") or []
+        section_text = ",".join(str(item) for item in sections[:4]) if sections else "-"
+        return f"{builder} · delivery={delivery} · sections={section_text}"
 
     def _composition_row(self, key: str, value: str) -> str:
         key_w = 12

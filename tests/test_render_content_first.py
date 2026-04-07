@@ -57,6 +57,39 @@ def test_content_first_renderer_core_blocks() -> None:
     assert obs.get("title") == "Search Results"
 
 
+def test_content_first_renderer_prioritizes_terminal_observation() -> None:
+    renderer = ContentFirstRenderer(max_preview_chars=200)
+    obs_evt = RenderEvent(
+        channel="observation",
+        node="action_results",
+        step_id=0,
+        payload={
+            "action_results": [
+                {"status": "success", "path": ".", "count": 4},
+                {
+                    "env": {
+                        "observation": {
+                            "data": {
+                                "terminal": {
+                                    "output": "New Terminal Output:\napp.py\nrequirements.txt\n$ ",
+                                    "screen": "Current Terminal Screen:\napp.py\nrequirements.txt\n$ ",
+                                }
+                            }
+                        }
+                    }
+                },
+            ]
+        },
+    )
+    obs = renderer.observation_summary(obs_evt)
+    assert isinstance(obs, dict)
+    assert obs.get("title") == "Terminal Output"
+    assert "app.py" in str(obs.get("body"))
+    assert str(obs.get("primary_kind")) == "terminal_output"
+    assert isinstance(obs.get("secondary"), dict)
+    assert obs["secondary"]["title"] == "Tool Observation"
+
+
 def test_claude_style_hook_shows_context_state_without_dumping_messages() -> None:
     hook = ClaudeStyleHook(max_preview_chars=200)
     hook.console = Console(record=True, width=120)

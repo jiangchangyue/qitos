@@ -7,8 +7,9 @@ from qitos import AgentModule, Decision, StateSchema, ToolRegistry
 from qitos.core.tool import tool
 from qitos.engine import Engine
 from qitos.kit import MiniMaxToolCallParser
+from qitos.kit.parser import ReActTextParser
 from qitos.models.profile_registry import infer_default_protocol, infer_model_profile
-from qitos.protocols import get_protocol
+from qitos.protocols import ModelProtocol, get_protocol
 
 
 def test_model_profile_registry_infers_minimax_protocol() -> None:
@@ -53,6 +54,24 @@ Done."""
     assert decision.mode == "act"
     assert decision.actions[0]["name"] == "send_terminal_keys"
     assert decision.meta["parser_diagnostics"]["salvage_applied"] is True
+    assert "I will call the tool now." in decision.meta["analysis"]
+
+
+def test_minimax_parser_salvages_reasoning_and_completion_markup() -> None:
+    parser = MiniMaxToolCallParser()
+    decision = parser.parse(
+        """Analysis: We found a likely command execution path and should finish with the confirmed result.
+Plan: Mark the audit as complete with the confirmed report.
+<minimax:response>
+  <task_complete>true</task_complete>
+  <final_answer>Report written to security_report.md</final_answer>
+</minimax:response>
+"""
+    )
+    assert decision.mode == "final"
+    assert decision.final_answer == "Report written to security_report.md"
+    assert "command execution path" in decision.meta["analysis"]
+    assert "Mark the audit as complete" in decision.meta["plan"]
 
 
 @dataclass
@@ -123,3 +142,141 @@ def test_get_protocol_returns_builtin_protocol() -> None:
     assert protocol is not None
     assert protocol.id == "minimax_tool_call_v1"
     assert protocol.supports_native_tool_call_markup is True
+
+
+def test_default_prompt_builder_supplies_contract_and_tool_schema() -> None:
+    registry = ToolRegistry()
+
+    @tool(name="lookup")
+    def lookup(query: str) -> dict[str, Any]:
+        """
+        Look up a string.
+
+        :param query: Query text.
+        """
+
+        return {"ok": True}
+
+    registry.register(lookup)
+
+    class _CaptureModel:
+        model = "gpt-4o-mini"
+
+        def __init__(self) -> None:
+            self.calls: list[list[dict[str, str]]] = []
+
+        def __call__(self, messages):
+            self.calls.append(list(messages))
+            return '{"thought":"done","final_answer":"ok"}'
+
+    class _DefaultPromptAgent(AgentModule[_ProtocolState, dict[str, Any], dict[str, Any]]):
+        name = "default_prompt_agent"
+
+        def __init__(self, llm: Any) -> None:
+            super().__init__(tool_registry=registry, llm=llm)
+
+        def init_state(self, task: str, **kwargs: Any) -> _ProtocolState:
+            return _ProtocolState(task=task, max_steps=int(kwargs.get("max_steps", 2)))
+
+        def base_persona_prompt(self, state: _ProtocolState) -> str:
+            _ = state
+            return "You are a careful assistant."
+
+        def reduce(
+            self,
+            state: _ProtocolState,
+            observation: dict[str, Any],
+            decision: Decision[dict[str, Any]],
+        ) -> _ProtocolState:
+            _ = observation
+            state.final_result = decision.final_answer or "ok"
+            state.stop_reason = "success"
+            return state
+
+    llm = _CaptureModel()
+    result = Engine(agent=_DefaultPromptAgent(llm=llm)).run("help")
+    assert result.state.final_result == "ok"
+    system_message = llm.calls[0][0]["content"]
+    assert "You are a careful assistant." in system_message
+    assert "Available tools:" in system_message
+    assert '"final_answer"' in system_message
+
+
+def test_api_parameter_tool_schema_delivery_reaches_supported_model() -> None:
+    registry = ToolRegistry()
+
+    @tool(name="lookup")
+    def lookup(query: str) -> dict[str, Any]:
+        """
+        Look up a string.
+
+        :param query: Query text.
+        """
+
+        return {"ok": True}
+
+    registry.register(lookup)
+
+    custom_protocol = ModelProtocol(
+        id="api_tool_protocol_v1",
+        display_name="API Tool Protocol",
+        parser_factory=ReActTextParser,
+        prompt_renderer=lambda base_prompt, _tools: str(base_prompt or ""),
+        contract_renderer=lambda _protocol: "Output contract:\nFinal Answer: <answer>",
+        tool_schema_renderer=lambda _registry: "",
+        tool_schema_delivery="api_parameter",
+        repair_renderer=lambda text: text,
+        continuation_renderer=lambda text: text,
+    )
+
+    class _ApiModel:
+        model = "custom-api-model"
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+
+        def supports_tool_schema_delivery(self, delivery: str, protocol: Any = None) -> bool:
+            _ = protocol
+            return delivery == "api_parameter"
+
+        def build_tool_schema_request_options(
+            self,
+            tool_schema_payload: list[dict[str, Any]] | None,
+            *,
+            protocol: Any = None,
+            delivery: str = "prompt_injection",
+        ) -> dict[str, Any]:
+            _ = protocol
+            return {"tools": list(tool_schema_payload or []), "tool_choice": "auto", "delivery": delivery}
+
+        def __call__(self, messages, **kwargs):
+            self.calls.append((list(messages), dict(kwargs)))
+            return "Final Answer: ok"
+
+    class _ApiAgent(AgentModule[_ProtocolState, dict[str, Any], dict[str, Any]]):
+        name = "api_protocol_agent"
+
+        def __init__(self, llm: Any) -> None:
+            super().__init__(tool_registry=registry, llm=llm, model_protocol=custom_protocol)
+
+        def init_state(self, task: str, **kwargs: Any) -> _ProtocolState:
+            return _ProtocolState(task=task, max_steps=int(kwargs.get("max_steps", 2)))
+
+        def reduce(
+            self,
+            state: _ProtocolState,
+            observation: dict[str, Any],
+            decision: Decision[dict[str, Any]],
+        ) -> _ProtocolState:
+            _ = observation
+            state.final_result = decision.final_answer or "ok"
+            state.stop_reason = "success"
+            return state
+
+    llm = _ApiModel()
+    result = Engine(agent=_ApiAgent(llm=llm)).run("help")
+    assert result.state.final_result == "ok"
+    _messages, kwargs = llm.calls[0]
+    assert kwargs["tool_choice"] == "auto"
+    assert kwargs["delivery"] == "api_parameter"
+    assert kwargs["tools"][0]["function"]["name"] == "lookup"

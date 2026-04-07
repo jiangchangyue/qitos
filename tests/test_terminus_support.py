@@ -115,6 +115,22 @@ def test_send_terminal_keys_tool_uses_terminal_ops() -> None:
     assert terminal.waits == [0.25]
 
 
+def test_send_terminal_keys_submit_appends_newline_once() -> None:
+    terminal = FakeTerminal()
+    tool = SendTerminalKeys()
+    result = tool.execute(
+        {
+            "keystrokes": "pwd",
+            "duration_sec": 0.1,
+            "submit": True,
+        },
+        runtime_context={"ops": {"terminal": terminal}},
+    )
+    assert result["status"] == "success"
+    assert result["submit"] is True
+    assert terminal.sent == ["pwd\n"]
+
+
 def test_tmux_env_can_wrap_custom_terminal_backend(tmp_path: Path) -> None:
     terminal = FakeTerminal()
     env = TmuxEnv(

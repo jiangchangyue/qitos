@@ -17,7 +17,7 @@ from ..core.state import StateSchema
 from ..core.task import Task, TaskResult, TaskValidationIssue
 from ..trace import TraceWriter
 from ..protocols import get_protocol, infer_protocol_from_parser
-from ..models.profile_registry import infer_default_protocol
+from ..models.profile_registry import infer_default_protocol, infer_model_profile
 from ._action_runtime import _ActionRuntime
 from ._context_runtime import _ContextRuntime
 from ._control_runtime import _ControlRuntime
@@ -148,6 +148,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self.parser = parser
         self.protocol = protocol
         self._resolved_protocol: Any = None
+        self._resolved_protocol_source: str = ""
         self.branch_selector = branch_selector or FirstCandidateSelector()
         self.search = search
         self.critics = critics or []
@@ -184,6 +185,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self._active_run_id: str = ""
         self._runtime_history: History = _EngineWindowHistory(window_size=24)
         self._last_system_prompt: str = ""
+        self._last_prompt_metadata: Dict[str, Any] = {}
         self._last_context_telemetry: Dict[str, Any] = {}
         self._model_runtime: _ModelRuntime[StateT, ObservationT, ActionT] = (
             _ModelRuntime(self)
@@ -205,21 +207,29 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         explicit = self.protocol
         if explicit is not None:
             self._resolved_protocol = get_protocol(explicit)
+            self._resolved_protocol_source = "run_protocol"
             return self._resolved_protocol
         agent_protocol = getattr(self.agent, "model_protocol", None)
         if agent_protocol is not None:
             self._resolved_protocol = get_protocol(agent_protocol)
+            self._resolved_protocol_source = "agent_model_protocol"
             return self._resolved_protocol
         parser = self.parser or getattr(self.agent, "model_parser", None)
         if parser is not None:
             inferred = infer_protocol_from_parser(parser)
             if inferred is not None:
                 self._resolved_protocol = inferred
+                self._resolved_protocol_source = "parser_inferred"
                 return self._resolved_protocol
         llm = getattr(self.agent, "llm", None)
         model_name = getattr(llm, "model", None) or getattr(llm, "model_name", None)
         default_protocol = infer_default_protocol(model_name, fallback="react_text_v1")
         self._resolved_protocol = get_protocol(default_protocol)
+        self._resolved_protocol_source = (
+            "model_profile"
+            if infer_model_profile(model_name) is not None
+            else "framework_default"
+        )
         return self._resolved_protocol
 
     def register_hook(self, hook: Any) -> None:
@@ -257,6 +267,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             else ""
         ) or f"run_{uuid4().hex[:12]}"
         self._last_system_prompt = ""
+        self._last_prompt_metadata = {}
         task_obj, task_text = self._normalize_task(task)
         self._apply_task_budget(task_obj)
         self._token_usage = 0
@@ -935,6 +946,8 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _reset_run_state(self) -> None:
         self._trace_runtime.reset_run_state()
         self._resolved_protocol = None
+        self._resolved_protocol_source = ""
+        self._last_prompt_metadata = {}
 
     def _clear_active_context(self) -> None:
         self._trace_runtime.clear_active_context()

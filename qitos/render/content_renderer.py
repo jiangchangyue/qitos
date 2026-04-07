@@ -114,61 +114,18 @@ class ContentFirstRenderer:
         )
         if data is None:
             return None
-        if isinstance(data, list) and data:
-            item = data[0]
-        else:
-            item = data
-        if not isinstance(item, dict):
-            return {
-                "status": "neutral",
-                "title": "Observation",
-                "body": self._truncate(self._to_text(item), 220),
-            }
 
-        cleaned = self._strip_noise(item)
-        rows = self._extract_search_rows(cleaned)
-        if rows:
-            table = Table(
-                show_header=True, header_style="bold", box=box.SIMPLE, show_edge=False
-            )
-            table.add_column("Title")
-            table.add_column("URL")
-            for title, short_url in rows[:6]:
-                table.add_row(self._truncate(title, 80), short_url)
-            return {"status": "success", "title": "Search Results", "table": table}
+        items = data if isinstance(data, list) else [data]
+        primary = self._select_primary_observation(items)
+        if primary is None:
+            return None
 
-        syntax = self._extract_syntax(cleaned)
-        if syntax is not None:
-            return {"status": "success", "title": "Structured Output", "syntax": syntax}
-
-        title = str(
-            cleaned.get("title")
-            or cleaned.get("name")
-            or cleaned.get("status")
-            or "Observation"
+        secondary = self._select_secondary_observation(
+            items, primary_kind=str(primary.get("primary_kind") or "")
         )
-        url = str(
-            cleaned.get("url")
-            or cleaned.get("source_url")
-            or cleaned.get("target_url")
-            or ""
-        )
-        err = cleaned.get("error")
-        if err:
-            return {
-                "status": "error",
-                "title": self._truncate(str(err), 120),
-                "url": self._short_url(url) if url else "",
-                "body": self._truncate(self._to_text(cleaned.get("content", "")), 180),
-            }
-
-        body = self._best_body(cleaned)
-        return {
-            "status": "success",
-            "title": self._truncate(title, 120),
-            "url": self._short_url(url) if url else "",
-            "body": self._truncate(body, 220) if body else "",
-        }
+        if secondary:
+            primary["secondary"] = secondary
+        return primary
 
     def state_summary(self, event: RenderEvent) -> Optional[Dict[str, Any]]:
         """Extract compact state stats from state snapshot payload."""
@@ -369,6 +326,170 @@ class ContentFirstRenderer:
             rows.append((title, self._short_url(url)))
         return rows
 
+    def _select_primary_observation(
+        self, items: List[Any]
+    ) -> Optional[Dict[str, Any]]:
+        terminal_output: Optional[Dict[str, Any]] = None
+        terminal_screen: Optional[Dict[str, Any]] = None
+        tool_error: Optional[Dict[str, Any]] = None
+        rich_tool: Optional[Dict[str, Any]] = None
+        generic: Optional[Dict[str, Any]] = None
+
+        for item in items:
+            terminal = self._extract_terminal_observation(item)
+            if terminal:
+                summary = self._summarize_terminal_observation(terminal)
+                kind = str(summary.get("primary_kind") or "")
+                if kind == "terminal_output" and terminal_output is None:
+                    terminal_output = summary
+                elif kind == "terminal_screen" and terminal_screen is None:
+                    terminal_screen = summary
+                continue
+
+            summary = self._summarize_tool_observation(item)
+            if summary is None:
+                continue
+            status = str(summary.get("status") or "neutral")
+            kind = str(summary.get("primary_kind") or "")
+            if status == "error" and tool_error is None:
+                tool_error = summary
+            elif kind in {"search_results", "tool_syntax", "tool_result"} and rich_tool is None:
+                rich_tool = summary
+            elif generic is None:
+                generic = summary
+
+        return terminal_output or terminal_screen or tool_error or rich_tool or generic
+
+    def _select_secondary_observation(
+        self, items: List[Any], primary_kind: str
+    ) -> Optional[Dict[str, Any]]:
+        if primary_kind.startswith("terminal_"):
+            for item in items:
+                if self._extract_terminal_observation(item):
+                    continue
+                summary = self._summarize_tool_observation(item, secondary=True)
+                if summary is not None:
+                    return summary
+            return None
+
+        for item in items:
+            terminal = self._extract_terminal_observation(item)
+            if terminal:
+                return self._summarize_terminal_observation(terminal, secondary=True)
+        return None
+
+    def _extract_terminal_observation(self, item: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(item, dict):
+            return None
+        if isinstance(item.get("terminal"), dict):
+            return item.get("terminal")
+
+        data = item.get("data")
+        if isinstance(data, dict) and isinstance(data.get("terminal"), dict):
+            return data.get("terminal")
+
+        env = item.get("env")
+        if not isinstance(env, dict):
+            return None
+        observation = env.get("observation")
+        if not isinstance(observation, dict):
+            return None
+        payload = observation.get("data")
+        if not isinstance(payload, dict):
+            return None
+        terminal = payload.get("terminal")
+        if isinstance(terminal, dict):
+            return terminal
+        return None
+
+    def _summarize_terminal_observation(
+        self, terminal: Dict[str, Any], secondary: bool = False
+    ) -> Dict[str, Any]:
+        output = self._clean_terminal_text(terminal.get("output"))
+        screen = self._clean_terminal_text(terminal.get("screen"))
+        body = output or screen
+        title = "Terminal Output" if output else "Terminal Screen"
+        return {
+            "status": "success",
+            "title": title,
+            "body": self._truncate(body, 2000) if body else "",
+            "primary_kind": "terminal_output" if output else "terminal_screen",
+            "secondary_only": secondary,
+        }
+
+    def _summarize_tool_observation(
+        self, item: Any, secondary: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(item, dict):
+            return {
+                "status": "neutral",
+                "title": "Observation",
+                "body": self._truncate(self._to_text(item), 220),
+                "primary_kind": "tool_result",
+                "secondary_only": secondary,
+            }
+
+        cleaned = self._strip_noise(item)
+        rows = self._extract_search_rows(cleaned)
+        if rows:
+            table = Table(
+                show_header=True, header_style="bold", box=box.SIMPLE, show_edge=False
+            )
+            table.add_column("Title")
+            table.add_column("URL")
+            for title, short_url in rows[:6]:
+                table.add_row(self._truncate(title, 80), short_url)
+            return {
+                "status": "success",
+                "title": "Search Results" if not secondary else "Tool Observation",
+                "table": table,
+                "primary_kind": "search_results",
+                "secondary_only": secondary,
+            }
+
+        syntax = self._extract_syntax(cleaned)
+        if syntax is not None:
+            return {
+                "status": "success",
+                "title": "Tool Observation" if secondary else "Structured Output",
+                "syntax": syntax,
+                "primary_kind": "tool_syntax",
+                "secondary_only": secondary,
+            }
+
+        title = str(
+            cleaned.get("title")
+            or cleaned.get("name")
+            or ("Tool Observation" if secondary else cleaned.get("status"))
+            or ("Tool Observation" if secondary else "Observation")
+        )
+        url = str(
+            cleaned.get("url")
+            or cleaned.get("source_url")
+            or cleaned.get("target_url")
+            or ""
+        )
+        err = cleaned.get("error")
+        if err:
+            return {
+                "status": "error",
+                "title": self._truncate(str(err), 120),
+                "url": self._short_url(url) if url else "",
+                "body": self._truncate(self._to_text(cleaned.get("content", "")), 180),
+                "primary_kind": "error",
+                "secondary_only": secondary,
+            }
+
+        body = self._best_body(cleaned)
+        return {
+            "status": "success",
+            "title": self._truncate(title, 120),
+            "url": self._short_url(url) if url else "",
+            "body": self._truncate(body, 220) if body else "",
+            "primary_kind": "tool_result",
+            "secondary_only": secondary,
+        }
+
     def _extract_syntax(self, data: Dict[str, Any]) -> Optional[Syntax]:
         for key in ("content", "file_content", "source", "text"):
             value = data.get(key)
@@ -380,6 +501,19 @@ class ContentFirstRenderer:
                 self._truncate(value, 2000), self._guess_language(data), word_wrap=True
             )
         return None
+
+    def _clean_terminal_text(self, value: Any) -> str:
+        text = str(value or "")
+        if not text.strip():
+            return ""
+        prefixes = (
+            "New Terminal Output:\n",
+            "Current Terminal Screen:\n",
+        )
+        for prefix in prefixes:
+            if text.startswith(prefix):
+                return text[len(prefix) :].lstrip("\n")
+        return text
 
     def _best_body(self, data: Dict[str, Any]) -> str:
         for key in ("content", "summary", "message", "observation", "text"):

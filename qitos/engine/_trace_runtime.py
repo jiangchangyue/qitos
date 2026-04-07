@@ -136,6 +136,7 @@ class _TraceRuntime(Generic[StateT]):
             "parser": run_meta.get("parser"),
             "model_name": run_meta.get("model_name"),
             "tool_count": run_meta.get("tool_count"),
+            "protocol": run_meta.get("protocol"),
         }
         prompt_hash = hashlib.sha256(
             json.dumps(prompt_seed, sort_keys=True).encode("utf-8")
@@ -162,6 +163,9 @@ class _TraceRuntime(Generic[StateT]):
                 "run_config_hash": run_cfg_hash,
                 "task_hash": task_meta.get("input_hash"),
                 "env_fingerprint": run_meta.get("env"),
+                "prompt_builder": (engine._last_prompt_metadata or {}).get(
+                    "prompt_builder"
+                ),
             }
         )
 
@@ -195,11 +199,15 @@ class _TraceRuntime(Generic[StateT]):
         return {
             "model_name": model_name,
             "protocol": getattr(protocol, "id", None) if protocol is not None else None,
+            "protocol_resolution_source": getattr(
+                engine, "_resolved_protocol_source", ""
+            ),
             "parser": parser_name,
             "tool_count": len(tools),
             "tools": tools,
             "env": env_info,
             "context": engine._context_runtime.run_meta(llm),
+            "prompt": dict(getattr(engine, "_last_prompt_metadata", {}) or {}),
         }
 
     def record_parser_diagnostics(self, diagnostics: Dict[str, Any]) -> None:

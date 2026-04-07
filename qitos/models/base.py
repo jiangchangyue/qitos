@@ -73,7 +73,7 @@ class Model(ABC):
         self._last_usage: Optional[Dict[str, Any]] = None
 
     @abstractmethod
-    def _call_api(self, messages: List[Dict[str, str]]) -> str:
+    def _call_api(self, messages: List[Dict[str, str]], **kwargs: Any) -> str:
         """
         Actually call the model API
 
@@ -87,7 +87,7 @@ class Model(ABC):
         """
         pass
 
-    def __call__(self, messages: List[Dict[str, str]]) -> str:
+    def __call__(self, messages: List[Dict[str, str]], **kwargs: Any) -> str:
         """
         Call model to generate response
 
@@ -99,7 +99,27 @@ class Model(ABC):
             Text that can be parsed by parse_tool_calls()
         """
         self._last_usage = None
-        return self._call_api(messages)
+        return self._call_api(messages, **kwargs)
+
+    def supports_tool_schema_delivery(
+        self, delivery: str, protocol: Any = None
+    ) -> bool:
+        """Return whether the model adapter supports the requested tool delivery mode."""
+        _ = protocol
+        return str(delivery or "prompt_injection") == "prompt_injection"
+
+    def build_tool_schema_request_options(
+        self,
+        tool_schema_payload: Optional[List[Dict[str, Any]]],
+        *,
+        protocol: Any = None,
+        delivery: str = "prompt_injection",
+    ) -> Dict[str, Any]:
+        """Return model-call kwargs for native tool schema delivery when supported."""
+        _ = tool_schema_payload
+        _ = protocol
+        _ = delivery
+        return {}
 
     def count_tokens(self, messages_or_text: Any) -> Optional[int]:
         """

@@ -14,7 +14,7 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
 
     def parse(self, raw_output: Any, context: Optional[Dict[str, Any]] = None) -> Decision[dict[str, Any]]:
         text = str(raw_output or "")
-        payload, warnings = self._extract_payload(text)
+        payload, warnings, extraction_mode, before, after = self._extract_payload(text)
         if not payload:
             return parser_wait_decision(
                 parser=self,
@@ -24,11 +24,18 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
                 details=self._format_feedback("No <invoke> or <minimax:response> block found.", warnings),
                 repair_instruction="Return MiniMax tool-call markup with <invoke name=\"tool_name\"> or a completion response block.",
                 expected_shape='<minimax:tool_call><invoke name="tool_name"><parameter name="key">value</parameter></invoke></minimax:tool_call>',
+                extraction_mode=extraction_mode,
             )
 
+        analysis = self._extract_section(payload, "analysis") or self._salvage_reasoning(
+            before, after, kind="analysis"
+        )
+        plan = self._extract_section(payload, "plan") or self._salvage_reasoning(
+            before, after, kind="plan"
+        )
         meta: Dict[str, Any] = {
-            "analysis": self._extract_section(payload, "analysis") or "",
-            "plan": self._extract_section(payload, "plan") or "",
+            "analysis": analysis or "",
+            "plan": plan or "",
             "output_format": "minimax_tool_call",
         }
         if warnings:
@@ -40,6 +47,7 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
                 raw_output=text,
                 details=self._format_feedback("Parser warnings.", warnings),
                 expected_shape='<minimax:tool_call><invoke name="tool_name"><parameter name="key">value</parameter></invoke></minimax:tool_call>',
+                extraction_mode=extraction_mode,
                 salvage_applied=True,
                 salvage_summary=self._format_feedback("Parser warnings.", warnings),
             )
@@ -55,14 +63,22 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
                 repair_instruction="Return one or more <invoke name=\"tool_name\"> blocks with named <parameter> children.",
                 expected_shape='<minimax:tool_call><invoke name="tool_name"><parameter name="key">value</parameter></invoke></minimax:tool_call>',
                 rationale=meta.get("analysis") or action_error,
+                extraction_mode=extraction_mode,
                 extra_meta=meta,
             )
         if actions:
             return Decision.act(actions=actions, rationale=str(meta.get("analysis") or ""), meta=meta)
 
-        is_complete = self._as_bool(self._extract_section(payload, "task_complete") or False)
-        final_answer = self._extract_section(payload, "final_answer")
+        is_complete = self._as_bool(
+            self._extract_section(payload, "task_complete")
+            or self._extract_section(text, "task_complete")
+            or False
+        )
+        final_answer = self._extract_section(payload, "final_answer") or self._extract_section(
+            text, "final_answer"
+        )
         if final_answer:
+            meta["task_complete_requested"] = True
             return Decision.final(answer=final_answer, rationale=str(meta.get("analysis") or ""), meta=meta)
         if is_complete:
             meta["task_complete_requested"] = True
@@ -77,10 +93,11 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
             repair_instruction="Return either one or more <invoke> blocks, a <final_answer>, or <task_complete>true</task_complete>.",
             expected_shape='<minimax:tool_call><invoke name="tool_name"><parameter name="key">value</parameter></invoke></minimax:tool_call>',
             rationale=str(meta.get("analysis") or ""),
+            extraction_mode=extraction_mode,
             extra_meta=meta,
         )
 
-    def _extract_payload(self, text: str) -> Tuple[str, List[str]]:
+    def _extract_payload(self, text: str) -> Tuple[str, List[str], str, str, str]:
         warnings: List[str] = []
         invoke_match = re.search(r"(<(?:minimax:tool_call|tool_call)[^>]*>.*?</(?:minimax:tool_call|tool_call)>)", text, re.DOTALL)
         if invoke_match:
@@ -90,7 +107,8 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
                 warnings.append("Extra text detected before MiniMax tool-call block.")
             if after:
                 warnings.append("Extra text detected after MiniMax tool-call block.")
-            return invoke_match.group(1), warnings
+            extraction_mode = "direct" if not before and not after else "extracted"
+            return invoke_match.group(1), warnings, extraction_mode, before, after
         response_match = re.search(r"(<(?:minimax:response|response)[^>]*>.*?</(?:minimax:response|response)>)", text, re.DOTALL)
         if response_match:
             before = text[: response_match.start()].strip()
@@ -99,11 +117,12 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
                 warnings.append("Extra text detected before MiniMax response block.")
             if after:
                 warnings.append("Extra text detected after MiniMax response block.")
-            return response_match.group(1), warnings
+            extraction_mode = "direct" if not before and not after else "extracted"
+            return response_match.group(1), warnings, extraction_mode, before, after
         if "<invoke" in text:
             warnings.append("AUTO-CORRECTED: extracted bare <invoke> block without explicit MiniMax wrapper.")
-            return text, warnings
-        return "", warnings
+            return text, warnings, "extracted", "", ""
+        return "", warnings, "", "", ""
 
     def _parse_invocations(self, payload: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         matches = re.findall(r"<invoke([^>]*)>(.*?)</invoke>", payload, re.DOTALL)
@@ -134,6 +153,43 @@ class MiniMaxToolCallParser(BaseParser[dict[str, Any]]):
         if match:
             return match.group(1).strip()
         return None
+
+    def _salvage_reasoning(self, before: str, after: str, *, kind: str) -> str:
+        if kind == "plan":
+            explicit = self._extract_labeled_text(before, "plan") or self._extract_labeled_text(after, "plan")
+            if explicit:
+                return explicit
+        if kind == "analysis":
+            explicit = self._extract_labeled_text(before, "analysis") or self._extract_labeled_text(after, "analysis")
+            if explicit:
+                return explicit
+
+        fallback = self._clean_reasoning_text(before) or self._clean_reasoning_text(after)
+        if not fallback:
+            return ""
+        if kind == "plan":
+            return fallback
+        return fallback
+
+    def _extract_labeled_text(self, text: str, label: str) -> str:
+        if not text.strip():
+            return ""
+        patterns = (
+            rf"{label}\s*:\s*(.+)",
+            rf"{label}\s*-\s*(.+)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return self._clean_reasoning_text(match.group(1))
+        return ""
+
+    def _clean_reasoning_text(self, text: str) -> str:
+        if not text.strip():
+            return ""
+        cleaned = re.sub(r"</?[^>]+>", " ", text)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned[:400]
 
     def _as_bool(self, value: Any) -> bool:
         if isinstance(value, bool):

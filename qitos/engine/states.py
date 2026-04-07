@@ -88,6 +88,7 @@ class StepRecord:
     critic_outputs: List[Any] = field(default_factory=list)
     state_diff: Dict[str, Any] = field(default_factory=dict)
     context: Dict[str, Any] = field(default_factory=dict)
+    prompt_metadata: Dict[str, Any] = field(default_factory=dict)
     protocol_id: Optional[str] = None
     parser_selected: Optional[str] = None
     parser_fallback_used: bool = False

@@ -247,6 +247,9 @@ def _discover_runs(logdir: Path) -> List[Dict[str, Any]]:
                     "schema_version": manifest.get("schema_version"),
                     "model_id": manifest.get("model_id"),
                     "prompt_hash": manifest.get("prompt_hash"),
+                    "prompt_builder": ((summary.get("run_meta") or {}).get("prompt") or {}).get("prompt_builder"),
+                    "protocol": (summary.get("run_meta") or {}).get("protocol"),
+                    "protocol_resolution_source": (summary.get("run_meta") or {}).get("protocol_resolution_source"),
                     "run_config_hash": manifest.get("run_config_hash"),
                     "seed": manifest.get("seed"),
                     "summary_steps": summary.get("steps"),
@@ -448,6 +451,8 @@ function paint(){
         <div class="meta">model=${m.model_id||''}</div>
         <div class="meta">schema=${m.schema_version||''} seed=${m.seed===null?'null':(m.seed||'')}</div>
         <div class="meta">prompt_hash=${m.prompt_hash||''}</div>
+        <div class="meta">protocol=${m.protocol||''} builder=${m.prompt_builder||''}</div>
+        <div class="meta">resolution=${m.protocol_resolution_source||''}</div>
         <div class="meta">tokens=${(m.token_usage||0)} peak_ctx=${ctxPeak(m.context)}</div>
         <div class="meta">parser_err=${((m.parser||{}).error_count||0)} salvage=${((m.parser||{}).salvage_count||0)}</div>
         <details class="manifest-meta-tree">
@@ -814,6 +819,88 @@ function renderSearchTable(rows){{
   h += '</tbody></table>';
   return h;
 }}
+function cleanTerminalText(text){{
+  const value = String(text || '');
+  if(!value.trim()) return '';
+  const prefixes = ['New Terminal Output:\\n', 'Current Terminal Screen:\\n'];
+  for(const prefix of prefixes){{
+    if(value.startsWith(prefix)) return value.slice(prefix.length).replace(/^\\n+/, '');
+  }}
+  return value;
+}}
+function extractTerminalObservation(item){{
+  if(!item || typeof item !== 'object') return null;
+  if(item.terminal && typeof item.terminal === 'object') return item.terminal;
+  if(item.data && typeof item.data === 'object' && item.data.terminal && typeof item.data.terminal === 'object') return item.data.terminal;
+  const env = item.env;
+  if(!env || typeof env !== 'object') return null;
+  const observation = env.observation;
+  if(!observation || typeof observation !== 'object') return null;
+  const data = observation.data;
+  if(!data || typeof data !== 'object') return null;
+  return (data.terminal && typeof data.terminal === 'object') ? data.terminal : null;
+}}
+function summarizeToolObservation(item){{
+  if(!item || typeof item !== 'object') return {{kind: 'tool_result', title: 'Observation', body: truncateText(String(item), 220), raw: item}};
+  const flat = flattenResults([item]);
+  const rows = [];
+  for(const it of flat){{
+    if(!it || typeof it !== 'object') continue;
+    const title = it.title || it.name || '';
+    const url = it.url || it.link || it.href || '';
+    if(title && url) rows.push({{title:String(title), url:String(url)}});
+  }}
+  if(rows.length) return {{kind: 'search_results', title: 'Search Results', table: renderSearchTable(rows), raw: item}};
+  if('error' in item && item.error) return {{kind: 'error', title: String(item.error), body: truncateText(String(item.content || ''), 220), raw: item}};
+  return {{
+    kind: 'tool_result',
+    title: String(item.title || item.name || item.status || 'Tool Observation'),
+    body: truncateText(JSON.stringify(item, null, 2), 1200),
+    raw: item,
+  }};
+}}
+function pickObservation(actionResults){{
+  const ars = Array.isArray(actionResults) ? actionResults : [];
+  if(!ars.length) return null;
+  let terminalOutput = null;
+  let terminalScreen = null;
+  let toolError = null;
+  let toolResult = null;
+  for(const item of ars){{
+    const terminal = extractTerminalObservation(item);
+    if(terminal){{
+      const output = cleanTerminalText(terminal.output);
+      const screen = cleanTerminalText(terminal.screen);
+      if(output && !terminalOutput) terminalOutput = {{kind: 'terminal_output', title: 'Terminal Output', body: truncateText(output, 2000), raw: terminal}};
+      else if(!output && screen && !terminalScreen) terminalScreen = {{kind: 'terminal_screen', title: 'Terminal Screen', body: truncateText(screen, 2000), raw: terminal}};
+      continue;
+    }}
+    const summary = summarizeToolObservation(item);
+    if(!summary) continue;
+    if(summary.kind === 'error' && !toolError) toolError = summary;
+    else if(!toolResult) toolResult = summary;
+  }}
+  const primary = terminalOutput || terminalScreen || toolError || toolResult;
+  if(!primary) return null;
+  let secondary = null;
+  if(String(primary.kind || '').startsWith('terminal_')){{
+    secondary = toolError || toolResult;
+  }} else {{
+    secondary = terminalOutput || terminalScreen;
+  }}
+  return {{
+    primary,
+    secondary,
+    primary_kind: String(primary.kind || 'tool_result'),
+  }};
+}}
+function renderObservationBlock(summary, label){{
+  if(!summary || typeof summary !== 'object') return '';
+  const title = summary.title ? ('<div style="font-weight:600;margin-bottom:6px">' + esc(String(label || summary.title)) + ' · ' + esc(String(summary.title)) + '</div>') : '';
+  if(summary.table) return '<div style="margin-bottom:12px">' + title + summary.table + '</div>';
+  if(summary.kind === 'error') return '<div style="margin-bottom:12px;color:#ff8a8a">' + title + '<div>' + esc(String(summary.title || summary.body || 'Error')) + '</div></div>';
+  return '<div style="margin-bottom:12px">' + title + '<pre>' + esc(String(summary.body || '')) + '</pre></div>';
+}}
 function renderState(obs){{
   if(!obs || typeof obs !== 'object') return '<div class="muted">No state.</div>';
   const observeOut = (obs.observe_output && typeof obs.observe_output === 'object') ? obs.observe_output : {{}};
@@ -836,21 +923,12 @@ function renderState(obs){{
 function renderDirectObservation(actionResults){{
   const ars = Array.isArray(actionResults) ? actionResults : [];
   if(!ars.length) return '<div class="muted">No direct observation from action.</div>';
-  const flat = flattenResults(ars);
-  const rows = [];
-  for(const it of flat){{
-    if(!it || typeof it !== 'object') continue;
-    const title = it.title || it.name || '';
-    const url = it.url || it.link || it.href || '';
-    if(title && url) rows.push({{title:String(title), url:String(url)}});
-  }}
-  const table = renderSearchTable(rows);
-  if(table) return table;
-  const first = ars[0];
-  if(first && typeof first === 'object' && 'error' in first){{
-    return '<div style="color:#ff8a8a"><b>[✘] Error:</b> ' + esc(truncateText(first.error, 220)) + '</div>';
-  }}
-  return '<pre>' + esc(JSON.stringify(first, null, 2).slice(0, 1200)) + (JSON.stringify(first).length > 1200 ? '\\n... (truncated)' : '') + '</pre>';
+  const picked = pickObservation(actionResults);
+  if(!picked) return '<div class="muted">No direct observation from action.</div>';
+  const blocks = [];
+  blocks.push(renderObservationBlock(picked.primary, picked.primary_kind.startsWith('terminal_') ? 'Terminal Observation' : 'Direct Observation'));
+  if(picked.secondary) blocks.push(renderObservationBlock(picked.secondary, 'Tool Observation'));
+  return blocks.join('');
 }}
 function renderThought(decision, events){{
   const thought = extractThought(decision, events);
@@ -1201,6 +1279,22 @@ function buildParserTimeline(items){{
   }}
   parserTimelineRoot.innerHTML = rows.length ? ('<div class="compact-list">' + rows.join('') + '</div>') : '<div class="muted">No parser diagnostics recorded.</div>';
 }}
+function renderPromptMetadata(meta){{
+  if(!meta || typeof meta !== 'object' || !Object.keys(meta).length){{
+    return '<div class="muted">No prompt metadata recorded.</div>';
+  }}
+  const rows = [];
+  if(meta.protocol) rows.push(kvRow('protocol', meta.protocol));
+  if(meta.protocol_resolution_source) rows.push(kvRow('resolution', meta.protocol_resolution_source));
+  if(meta.prompt_builder) rows.push(kvRow('builder', meta.prompt_builder));
+  if(meta.tool_schema_delivery) rows.push(kvRow('tool schema delivery', meta.tool_schema_delivery));
+  if(Array.isArray(meta.sections_used) && meta.sections_used.length) rows.push(kvRow('sections', meta.sections_used.join(', ')));
+  if(meta.prompt_hash_static) rows.push(kvRow('static hash', meta.prompt_hash_static));
+  if(meta.prompt_hash_full) rows.push(kvRow('full hash', meta.prompt_hash_full));
+  if(meta.repair_injected !== undefined) rows.push(kvRow('repair injected', String(!!meta.repair_injected)));
+  if(meta.continuation_injected !== undefined) rows.push(kvRow('continuation injected', String(!!meta.continuation_injected)));
+  return rows.length ? rows.join('') : '<div class="muted">No prompt metadata recorded.</div>';
+}}
 function render(){{
   const q = (document.getElementById('q').value||'').toLowerCase();
   const eventFilter = document.getElementById('eventFilter').value;
@@ -1228,6 +1322,7 @@ function render(){{
     card.id = 'step-' + it.sid;
     let h = '<div class="card-head"><div class="step">STEP ' + it.sid + '</div><div class="muted">events ' + it.events.length + '</div></div>';
     if(showObs) h += sectionHtml('State', renderState(obsInput), obsInput, 'state', collapsedAll);
+    h += sectionHtml('Prompt', renderPromptMetadata(it.step.prompt_metadata || {{}}), it.step.prompt_metadata || {{}}, 'prompt', collapsedAll);
     h += sectionHtml('Thought', renderThought(d, it.events), d, 'thought', collapsedAll);
     h += sectionHtml('Parser Diagnostics', renderParserDiagnostics(it.step.parser_diagnostics || {{}}), it.step.parser_diagnostics || {{}}, 'parser', collapsedAll);
     h += sectionHtml('Action', renderAction(it.step.actions||[]), it.step.actions||[], 'action', collapsedAll);
@@ -1508,18 +1603,13 @@ function stateSummary(observation){{
   return keep.length ? keep.join(' · ') : 'No scalar state fields.';
 }}
 function observationSummary(actionResults){{
-  if(!Array.isArray(actionResults) || !actionResults.length) return 'No observation.';
-  const first = actionResults[0];
-  if(first && typeof first === 'object'){{
-    if(Array.isArray(first.results) && first.results.length){{
-      const r = first.results[0] || {{}};
-      const t = r.title || r.name || '';
-      const u = r.url || r.link || r.href || '';
-      if(t || u) return truncateText((t ? t + ' · ' : '') + u, 180);
-    }}
-    if('error' in first) return 'error: ' + truncateText(first.error, 180);
-  }}
-  return truncateText(JSON.stringify(first), 180);
+  const picked = pickObservation(actionResults);
+  if(!picked || !picked.primary) return 'No observation.';
+  const p = picked.primary;
+  if(p.kind === 'terminal_output') return 'terminal output: ' + truncateText(p.body || '', 180);
+  if(p.kind === 'terminal_screen') return 'terminal screen: ' + truncateText(p.body || '', 180);
+  if(p.kind === 'error') return 'error: ' + truncateText(p.title || p.body || '', 180);
+  return truncateText(p.title || p.body || JSON.stringify(p.raw || {{}}), 180);
 }}
 function criticSummary(cs){{
   if(!Array.isArray(cs) || !cs.length) return 'No critic output.';
