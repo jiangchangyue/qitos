@@ -20,13 +20,13 @@ QitOS gives you a clean `AgentModule + Engine` kernel, benchmark-ready workflows
   <img src="demo.gif" alt="QitOS long-running agent demo" width="92%">
 </p>
 
-## Who QitOS Is For
+## Who QitOS is For
 
 - **Researchers**: prototype ReAct, PlanAct, ToT, Reflexion, and new agent methods with reproducible runs.
 - **Agent builders**: build tool-using agents on a stable execution loop instead of framework glue code.
 - **Evaluators**: run GAIA, Tau-Bench, and CyBench style workflows with the same kernel you use in product agents.
 
-## Run In 2 Minutes
+## Run in 2 Minutes
 
 From the repository root:
 
@@ -189,7 +189,7 @@ QitOS is currently **Alpha**.
 - If you are evaluating adoption, start from the kernel and examples, not assumptions about frozen surface area.
 - For ongoing project evolution and upgrade notes, see [CHANGELOG.md](CHANGELOG.md).
 
-## Installation And Versions
+## Installation and Versions
 
 - Supported Python version: **3.9+**
 - User install: `pip install qitos`
