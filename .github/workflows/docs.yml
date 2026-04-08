@@ -1,44 +1,83 @@
 name: docs
 
 on:
+  pull_request:
   push:
     branches:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          enablement: true
+          python-version: "3.11"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: gh-pages-redirect
+      - name: Validate Mintlify navigation targets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          docs_root = Path("docs")
+          config = json.loads((docs_root / "docs.json").read_text(encoding="utf-8"))
+
+          missing: list[str] = []
+
+          for language in config.get("navigation", {}).get("languages", []):
+              for tab in language.get("tabs", []):
+                  for group in tab.get("groups", []):
+                      root = group.get("root")
+                      if root:
+                          root_path = docs_root / f"{root}.mdx"
+                          if not root_path.exists():
+                              missing.append(str(root_path))
+
+                      for page in group.get("pages", []):
+                          page_path = docs_root / f"{page}.mdx"
+                          if not page_path.exists():
+                              missing.append(str(page_path))
+
+          if missing:
+              print("Missing docs pages referenced by docs/docs.json:")
+              for item in missing:
+                  print(f" - {item}")
+              raise SystemExit(1)
+
+          print("Mintlify navigation targets are valid.")
+          PY
+
+      - name: Validate bilingual tutorial parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          docs_root = Path("docs")
+          english = {
+              path.relative_to(docs_root).as_posix()
+              for path in docs_root.rglob("*.mdx")
+              if "zh/" not in path.relative_to(docs_root).as_posix()
+              and "blog/" not in path.relative_to(docs_root).as_posix()
+              and path.parent.name != "images"
+          }
+
+          missing_zh: list[str] = []
+          for rel in sorted(english):
+              zh_path = docs_root / "zh" / rel
+              if not zh_path.exists():
+                  missing_zh.append(str(zh_path))
+
+          if missing_zh:
+              print("Missing Chinese mirror pages:")
+              for item in missing_zh:
+                  print(f" - {item}")
+              raise SystemExit(1)
+
+          print("Chinese docs mirror covers all English docs pages.")
+          PY
