@@ -16,6 +16,7 @@ def test_canonical_examples_exist_and_parse() -> None:
         "examples/patterns/reflexion.py",
         "examples/patterns/tot.py",
         "examples/real/coding_agent.py",
+        "examples/real/research_harness_agent.py",
         "examples/real/claude_code_agent.py",
         "examples/real/swe_agent.py",
         "examples/real/computer_use_agent.py",

@@ -16,6 +16,7 @@ from examples.real.coding_agent import CodingMemoryReactAgent
 from examples.real.computer_use_agent import ComputerUseReActAgent
 from examples.real.epub_reader_agent import EpubTreeOfThoughtAgent
 from examples.real.react_compact_agent import CompactReactAgent
+from examples.real.research_harness_agent import ResearchHarnessAgent
 from examples.real.skillhub_github_agent import GitHubSkillAgent
 from examples.real.swe_agent import SWEDynamicPlanningAgent
 from examples.real.terminus_2 import Terminus2Agent
@@ -215,6 +216,30 @@ def test_swe_claude_security_and_skill_examples_smoke(tmp_path: Path) -> None:
         return_state=True,
     )
     assert swe_result.state.stop_reason == "final"
+
+    research_workspace = tmp_path / "research"
+    _seed_buggy_module(research_workspace)
+    research = ResearchHarnessAgent(
+        llm=SequenceModel(
+            [
+                '{"thought":"inspect file","action":{"name":"view","args":{"path":"buggy_module.py"}}}',
+                '{"thought":"patch file","action":{"name":"replace_lines","args":{"path":"buggy_module.py","start_line":2,"end_line":2,"replacement":"    return a + b"}}}',
+                f'{{"thought":"verify patch","action":{{"name":"run_command","args":{{"command":"{VERIFY_COMMAND}"}}}}}}',
+                '{"thought":"done","final_answer":"Fixed and verified."}',
+            ]
+        ),
+        workspace_root=str(research_workspace),
+        protocol="json_decision_v1",
+    )
+    research_result = research.run(
+        task="fix",
+        workspace=str(research_workspace),
+        max_steps=6,
+        render=False,
+        trace=False,
+        return_state=True,
+    )
+    assert research_result.state.stop_reason == "final"
 
     claude_workspace = tmp_path / "claude"
     _seed_buggy_module(claude_workspace)

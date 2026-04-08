@@ -29,6 +29,25 @@ All teaching-first examples follow the same shape:
 Pattern examples change one design axis at a time.
 Real examples add capability on top of the same authoring path instead of inventing a different structure.
 
+## Two authoring paths
+
+QitOS intentionally keeps two equally valid authoring paths:
+
+- `Research-first`: handwrite the system prompt, parser, protocol, transport, and tool surface so you can study the kernel directly.
+- `Preset-first`: use family presets and preset tool builders when you want a stable baseline or fast multi-family switching.
+
+If you want the most torch-like, research-facing starting point, read:
+
+```bash
+python examples/real/research_harness_agent.py --protocol json_decision_v1
+```
+
+If you want the v0.4 multi-family showcase, read:
+
+```bash
+python examples/real/claude_code_agent.py --model-family qwen
+```
+
 ## Recommended first run order
 
 ```bash
@@ -37,6 +56,7 @@ qit demo minimal
 python examples/quickstart/minimal_agent.py
 python examples/patterns/react.py
 python examples/patterns/planact.py
+python examples/real/research_harness_agent.py
 python examples/real/coding_agent.py
 python examples/real/claude_code_agent.py
 python examples/real/code_security_audit_agent.py
@@ -100,6 +120,7 @@ python examples/real/claude_code_agent.py \
 - `examples/real/epub_reader_agent.py` expects a local EPUB at `./playground/epub_reader_agent/book.epub`.
 - `examples/real/code_security_audit_agent.py` shows the new composition-first path: pass `toolset=[...]` and let QiTOS flatten `SecurityAuditToolSet + CodingToolSet + TaskToolSet` automatically.
 - `examples/real/react_compact_agent.py` shows the smallest opt-in path for `CompactHistory`: keep the same agent shape and only swap the history preset.
+- `examples/real/research_harness_agent.py` is the bare research-first authoring path: handwritten system prompt, parser, protocol, transport, and manual tool surface.
 - `examples/real/claude_code_agent.py` is the fuller Claude Code-style coding example and now doubles as the v0.4 multi-family preset showcase.
 - `examples/real/skillhub_github_agent.py` is an advanced third-party skill example. Read it after the core canonical path.
 - benchmark runners may require dataset download or local benchmark assets before full runs.
