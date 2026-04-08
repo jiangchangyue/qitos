@@ -16,6 +16,8 @@ from qitos.models.profile_registry import infer_default_protocol, infer_model_pr
 
 def test_resolve_family_preset_for_gold_families() -> None:
     assert resolve_family_preset("Qwen/Qwen3-8B").id == "qwen"
+    assert resolve_family_preset("qwen-plus").id == "qwen"
+    assert resolve_family_preset("qwen-max").id == "qwen"
     assert resolve_family_preset("moonshot-v1-128k").id == "kimi"
     assert resolve_family_preset("MiniMax-M2.5").id == "minimax"
     assert resolve_family_preset("gpt-oss-120b").id == "gpt-oss"
@@ -54,6 +56,9 @@ def test_build_model_for_preset_attaches_harness_metadata() -> None:
     assert metadata["family_preset"] == "qwen"
     assert metadata["protocol"] == "json_decision_v1"
     assert metadata["adapter_kind"] == "openai-compatible"
+    assert metadata["native_tool_call_preferred"] is True
+    assert metadata["decision_lane_preference"] == "native_tool_calls"
+    assert metadata["effective_tool_delivery"] == "api_parameter"
 
 
 def test_claude_code_runtime_config_prefers_cli_over_env() -> None:

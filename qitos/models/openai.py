@@ -5,8 +5,8 @@ OpenAI API-based model calling implementation.
 Supports environment variable configuration: OPENAI_API_KEY, OPENAI_BASE_URL
 """
 
-import os
 import json
+import os
 from typing import Any, Dict, List, Optional, cast
 
 from .base import Model
@@ -91,15 +91,7 @@ class OpenAIModel(Model):
                 api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
             )
 
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=cast(Any, messages),
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                **kwargs,
-            )
-            self._set_last_usage(self._usage_from_response(response))
-
+            response = self._chat_completion(client, messages, **kwargs)
             return self._parse_response(response)
 
         except openai.APIError as e:
@@ -129,6 +121,26 @@ class OpenAIModel(Model):
             return message.content.strip()
 
         return ""
+
+    def _chat_completion(self, client: Any, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=cast(Any, messages),
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **kwargs,
+        )
+        self._set_last_usage(self._usage_from_response(response))
+        return response
+
+    def call_raw(self, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
+        import openai
+
+        self._last_usage = None
+        client = openai.OpenAI(
+            api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
+        )
+        return self._chat_completion(client, messages, **kwargs)
 
     def _usage_from_response(self, response: Any) -> Optional[Dict[str, Any]]:
         usage = getattr(response, "usage", None)
@@ -287,15 +299,7 @@ class OpenAICompatibleModel(Model):
                 api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
             )
 
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=cast(Any, messages),
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                **kwargs,
-            )
-            self._set_last_usage(self._usage_from_response(response))
-
+            response = self._chat_completion(client, messages, **kwargs)
             return self._parse_response(response)
 
         except openai.APIError as e:
@@ -373,6 +377,26 @@ class OpenAICompatibleModel(Model):
                 parts[-1] += f"({args_str})"
 
         return "\n".join(parts)
+
+    def _chat_completion(self, client: Any, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=cast(Any, messages),
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **kwargs,
+        )
+        self._set_last_usage(self._usage_from_response(response))
+        return response
+
+    def call_raw(self, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
+        import openai
+
+        self._last_usage = None
+        client = openai.OpenAI(
+            api_key=self.api_key, base_url=self.base_url, timeout=self.timeout
+        )
+        return self._chat_completion(client, messages, **kwargs)
 
     def _usage_from_response(self, response: Any) -> Optional[Dict[str, Any]]:
         usage = getattr(response, "usage", None)

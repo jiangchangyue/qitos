@@ -100,7 +100,7 @@ def _make_run(root: Path, run_id: str) -> Path:
         encoding="utf-8",
     )
     (run / "steps.jsonl").write_text(
-        '{"step_id":0,"observation":{},"decision":{},"model_response":{"text":"Thought: inspect the run","usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14},"finish_reason":"stop","tool_calls":[{"id":"call_1","type":"function","function":{"name":"visit_url","arguments":"{\\"url\\":\\"https://example.com\\"}"}}],"model_name":"demo-model","provider":"demo-provider","metadata":{}},"actions":[],"action_results":[],"tool_invocations":[],"critic_outputs":[],"state_diff":{},"context":{"context_window":8192,"input_tokens_total":3200,"history_tokens":1800,"output_tokens":240,"occupancy_ratio":0.74,"compact_events":[{"stage":"warning","before_tokens":3200,"after_tokens":3200,"saved_tokens":0},{"stage":"microcompact_applied","before_tokens":3200,"after_tokens":2400,"saved_tokens":800}]},"parser_diagnostics":{"parser":"TerminusJsonParser","contract":"terminus_json_v1","severity":"error","code":"missing_required_field","summary":"Missing required field: tools","extraction_mode":"extracted","repair_instruction":"Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.","raw_output_preview":"{\\"analysis\\":\\"x\\",\\"plan\\":\\"y\\"}"},"parser_contract":"terminus_json_v1","parser_salvage_applied":false}\n',
+        '{"step_id":0,"observation":{},"decision":{},"model_response":{"text":"Thought: inspect the run","usage":{"prompt_tokens":10,"completion_tokens":4,"total_tokens":14},"finish_reason":"stop","tool_calls":[{"id":"call_1","type":"function","function":{"name":"visit_url","arguments":"{\\"url\\":\\"https://example.com\\"}"}}],"model_name":"demo-model","provider":"demo-provider","metadata":{}},"actions":[],"action_results":[],"tool_invocations":[],"critic_outputs":[],"state_diff":{},"context":{"context_window":8192,"input_tokens_total":3200,"history_tokens":1800,"output_tokens":240,"occupancy_ratio":0.74,"compact_events":[{"stage":"warning","before_tokens":3200,"after_tokens":3200,"saved_tokens":0},{"stage":"microcompact_applied","before_tokens":3200,"after_tokens":2400,"saved_tokens":800}]},"prompt_metadata":{"tool_schema_delivery":"api_parameter"},"parser_diagnostics":{"parser":"TerminusJsonParser","contract":"terminus_json_v1","severity":"error","code":"missing_required_field","summary":"Missing required field: tools","extraction_mode":"extracted","repair_instruction":"Return valid JSON with analysis, plan, and either commands, tools, or task_complete=true.","raw_output_preview":"{\\"analysis\\":\\"x\\",\\"plan\\":\\"y\\"}"},"parser_contract":"terminus_json_v1","parser_salvage_applied":false,"decision_source":"native_tool_calls","native_tool_call_used":true,"native_tool_call_fallback_reason":null}\n',
         encoding="utf-8",
     )
     return run
@@ -155,6 +155,9 @@ def test_render_pages(tmp_path: Path):
     assert "extracted" in view
     assert "finish_reason" in view
     assert "tool_calls" in view
+    assert "decision_source" in view
+    assert "native_tool_call_used" in view
+    assert "tool_delivery" in view
     marker = '<script id="payload" type="application/json">'
     start = view.index(marker) + len(marker)
     end = view.index("</script>", start)

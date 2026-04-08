@@ -126,6 +126,13 @@ class HarnessPolicy:
             "parser": self.parser_name,
             "tool_policy": self.tool_policy.to_dict(),
             "context_policy": self.context_policy.to_dict(),
+            "native_tool_call_preferred": self.tool_policy.native_tool_call_preferred,
+            "effective_tool_delivery": self.protocol.tool_schema_delivery,
+            "decision_lane_preference": (
+                "native_tool_calls"
+                if self.tool_policy.native_tool_call_preferred
+                else "parser"
+            ),
             "resolution_source": self.resolution_source,
         }
 

@@ -114,6 +114,16 @@ python examples/real/claude_code_agent.py \
   --base-url https://api.moonshot.ai/v1
 ```
 
+For Qwen-family testing, `qwen-plus` is now the recommended native tool-call path:
+
+```bash
+export OPENAI_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+python examples/real/claude_code_agent.py \
+  --model-family qwen \
+  --model-name qwen-plus \
+  --print-harness
+```
+
 ## Notes
 
 - `examples/quickstart/minimal_agent.py` now wraps the packaged `qit demo minimal` flow, so the README quickstart and example path stay aligned around the same minimal coding agent.
@@ -121,6 +131,6 @@ python examples/real/claude_code_agent.py \
 - `examples/real/code_security_audit_agent.py` shows the new composition-first path: pass `toolset=[...]` and let QiTOS flatten `SecurityAuditToolSet + CodingToolSet + TaskToolSet` automatically.
 - `examples/real/react_compact_agent.py` shows the smallest opt-in path for `CompactHistory`: keep the same agent shape and only swap the history preset.
 - `examples/real/research_harness_agent.py` is the bare research-first authoring path: handwritten system prompt, parser, protocol, transport, and manual tool surface.
-- `examples/real/claude_code_agent.py` is the fuller Claude Code-style coding example and now doubles as the v0.4 multi-family preset showcase.
+- `examples/real/claude_code_agent.py` is the fuller Claude Code-style coding example and now doubles as the v0.4 multi-family preset showcase, including the Qwen native tool-call lane.
 - `examples/real/skillhub_github_agent.py` is an advanced third-party skill example. Read it after the core canonical path.
 - benchmark runners may require dataset download or local benchmark assets before full runs.

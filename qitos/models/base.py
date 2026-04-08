@@ -6,7 +6,7 @@ Unified LLM calling interface.
 Design Principles:
 1. All model implementations are callable objects
 2. Input: OpenAI-style messages list
-3. Output: Text that can be parsed by execution_engine.parse_tool_calls()
+3. Output: Text by default, with optional raw-response access for structured runtimes
 """
 
 import os
@@ -26,6 +26,7 @@ class Model(ABC):
     Interface Contract:
     - Input: OpenAI-style messages list
     - Output: Text format that can be parsed by parse_tool_calls()
+    - Advanced runtimes may call `call_raw(...)` to preserve provider-native structure
 
     Output Format Specification:
     ```
@@ -100,6 +101,15 @@ class Model(ABC):
         """
         self._last_usage = None
         return self._call_api(messages, **kwargs)
+
+    def call_raw(self, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
+        """
+        Advanced runtime entrypoint that may return a provider-native response object.
+
+        The default implementation preserves the historic text-only behavior.
+        Concrete adapters can override this to avoid flattening tool calls too early.
+        """
+        return self(messages, **kwargs)
 
     def supports_tool_schema_delivery(
         self, delivery: str, protocol: Any = None

@@ -286,6 +286,13 @@ def main(argv: list[str] | None = None) -> None:
         print("protocol:", harness.protocol.id)
         print("parser:", harness.parser_name)
         print("tool_delivery:", harness.tool_policy.primary_delivery)
+        print("native_tool_call_preferred:", harness.tool_policy.native_tool_call_preferred)
+        print(
+            "decision_lane_preference:",
+            "native_tool_calls"
+            if harness.tool_policy.native_tool_call_preferred
+            else "parser",
+        )
         print("context_window_hint:", harness.context_policy.context_window_hint)
 
     workspace.mkdir(parents=True, exist_ok=True)
@@ -316,6 +323,8 @@ def main(argv: list[str] | None = None) -> None:
     print("model_name:", config["model_name"])
     print("protocol:", harness.protocol.id)
     print("parser:", harness.parser_name)
+    print("tool_delivery:", harness.tool_policy.primary_delivery)
+    print("native_tool_call_preferred:", harness.tool_policy.native_tool_call_preferred)
     print("final_result:", result.state.final_result)
     print("todos:", result.state.todos)
     print("mode:", result.state.mode)

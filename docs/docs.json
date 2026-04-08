@@ -71,6 +71,7 @@
                   "guides/build-your-first-agent",
                   "guides/agent-patterns",
                   "guides/add-a-family-preset",
+                  "guides/qwen-family-best-practice",
                   "guides/memory-and-history",
                   "guides/critics-and-stop-criteria",
                   "guides/observability"
@@ -170,6 +171,7 @@
                   "zh/guides/build-your-first-agent",
                   "zh/guides/agent-patterns",
                   "zh/guides/add-a-family-preset",
+                  "zh/guides/qwen-family-best-practice",
                   "zh/guides/memory-and-history",
                   "zh/guides/critics-and-stop-criteria",
                   "zh/guides/observability"

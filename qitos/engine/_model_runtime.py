@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Generic, List, TypeVar
+import json
+from typing import Any, Dict, Generic, List, TypeVar, cast
 
+from ..core.action import Action
 from ..core.decision import Decision
 from ..core.errors import ErrorCategory, ParseExecutionError, RuntimeErrorInfo
 from ..core.model_response import ModelResponse
@@ -107,7 +109,7 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 ),
             ),
         )
-        return decision
+        return cast(Decision[ActionT], decision)
 
     def _run_llm_decide(
         self, state: StateT, observation: ObservationT, record: StepRecord
@@ -322,6 +324,14 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
     def _call_llm(
         self, llm: Any, messages: List[Dict[str, str]], request_options: Dict[str, Any]
     ) -> Any:
+        call_raw = getattr(llm, "call_raw", None)
+        if callable(call_raw):
+            if not request_options:
+                return call_raw(messages)
+            try:
+                return call_raw(messages, **request_options)
+            except TypeError:
+                return call_raw(messages)
         if not request_options:
             return llm(messages)
         try:
@@ -390,9 +400,18 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         self, raw_decision: Any, step: int, record: StepRecord | None = None
     ) -> Decision[ActionT]:
         if isinstance(raw_decision, Decision):
+            if record is not None and not record.decision_source:
+                record.decision_source = "agent"
             return raw_decision
 
         response = raw_decision if isinstance(raw_decision, ModelResponse) else None
+        native_decision = self._decision_from_native_tool_calls(
+            response=response,
+            step=step,
+            record=record,
+        )
+        if native_decision is not None:
+            return native_decision
         parser_input = response.text if response is not None else raw_decision
         parse_outcome = self._parse_with_protocol_chain(
             parser_input=parser_input,
@@ -603,6 +622,7 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 "model_response": dict(record.model_response),
             },
         )
+        record.decision_source = "agent_interpretation"
         return decision
 
     def _record_parser_observability(
@@ -686,6 +706,7 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             record.parser_salvage_applied = bool(
                 (normalized or {}).get("salvage_applied")
             )
+            record.decision_source = "parser"
 
     def _normalize_model_response(self, raw_output: Any) -> ModelResponse:
         if isinstance(raw_output, ModelResponse):
@@ -746,6 +767,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
                 value = raw_output.get(key)
                 if isinstance(value, str):
                     return value
+            tool_calls = raw_output.get("tool_calls")
+            if isinstance(tool_calls, list) and tool_calls:
+                return ""
             choices = raw_output.get("choices")
             if isinstance(choices, list) and choices:
                 return self._extract_response_text(choices[0])
@@ -758,6 +782,9 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             return self._extract_response_text(choices[0])
         message = getattr(raw_output, "message", None)
         if message is not None:
+            tool_calls = getattr(message, "tool_calls", None)
+            if isinstance(tool_calls, list) and tool_calls:
+                return ""
             content = getattr(message, "content", None)
             if isinstance(content, str):
                 return content
@@ -894,3 +921,108 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             if value is not None:
                 metadata[key] = value
         return metadata
+
+    def _decision_from_native_tool_calls(
+        self,
+        *,
+        response: ModelResponse | None,
+        step: int,
+        record: StepRecord | None,
+    ) -> Decision[ActionT] | None:
+        if response is None or not isinstance(response.tool_calls, list) or not response.tool_calls:
+            return None
+        if not self._native_tool_call_preferred():
+            if record is not None and not record.decision_source:
+                record.decision_source = "parser"
+            return None
+        actions: List[Action] = []
+        for item in response.tool_calls:
+            normalized = self._action_from_tool_call(item)
+            if normalized is None:
+                reason = "tool_call_arguments_invalid"
+                if record is not None:
+                    record.native_tool_call_used = False
+                    record.native_tool_call_fallback_reason = reason
+                self.engine._emit(
+                    step,
+                    RuntimePhase.DECIDE,
+                    payload={
+                        "stage": "native_tool_call_fallback",
+                        "reason": reason,
+                        "tool_call": item,
+                    },
+                )
+                return None
+            actions.append(normalized)
+        decision: Decision[ActionT] = cast(
+            Decision[ActionT],
+            Decision.act(
+                actions=actions,
+                rationale=(response.text or "").strip() or None,
+                meta={
+                    "decision_source": "native_tool_calls",
+                    "native_tool_call_count": len(actions),
+                    "tool_calls": [dict(item) for item in response.tool_calls],
+                },
+            ),
+        )
+        self.engine._emit(
+            step,
+            RuntimePhase.DECIDE,
+            payload={
+                "stage": "native_tool_calls_decision",
+                "tool_call_count": len(actions),
+                "tool_calls": [dict(item) for item in response.tool_calls],
+            },
+        )
+        if record is not None:
+            record.decision_source = "native_tool_calls"
+            record.native_tool_call_used = True
+            record.native_tool_call_fallback_reason = None
+        return decision
+
+    def _native_tool_call_preferred(self) -> bool:
+        llm = getattr(self.engine.agent, "llm", None)
+        metadata = dict(getattr(llm, "qitos_harness_metadata", {}) or {}) if llm is not None else {}
+        tool_policy = metadata.get("tool_policy")
+        if isinstance(tool_policy, dict) and tool_policy.get("native_tool_call_preferred") is True:
+            return True
+        protocol = self.engine.resolve_protocol()
+        if protocol is not None and getattr(protocol, "supports_native_tool_call_markup", False):
+            return True
+        return False
+
+    def _action_from_tool_call(self, tool_call: Dict[str, Any]) -> Action | None:
+        if not isinstance(tool_call, dict):
+            return None
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            return None
+        name = str(function.get("name") or "").strip()
+        if not name:
+            return None
+        arguments = function.get("arguments")
+        args: Dict[str, Any] = {}
+        if isinstance(arguments, dict):
+            args = dict(arguments)
+        elif isinstance(arguments, str):
+            text = arguments.strip()
+            if text:
+                try:
+                    parsed = json.loads(text)
+                except json.JSONDecodeError:
+                    return None
+                if not isinstance(parsed, dict):
+                    return None
+                args = dict(parsed)
+        elif arguments is not None:
+            return None
+        return Action(
+            name=name,
+            args=args,
+            action_id=(str(tool_call.get("id")) if tool_call.get("id") is not None else None),
+            metadata={
+                "tool_call_type": tool_call.get("type"),
+                "decision_source": "native_tool_calls",
+            },
+        )

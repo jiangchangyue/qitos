@@ -184,6 +184,11 @@ def runtime_step_to_trace(step: Any) -> TraceStep:
         ),
         parser_contract=getattr(step, "parser_contract", None),
         parser_salvage_applied=bool(getattr(step, "parser_salvage_applied", False)),
+        decision_source=getattr(step, "decision_source", None),
+        native_tool_call_used=bool(getattr(step, "native_tool_call_used", False)),
+        native_tool_call_fallback_reason=getattr(
+            step, "native_tool_call_fallback_reason", None
+        ),
     )
 
 

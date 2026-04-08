@@ -78,6 +78,16 @@ For example:
 - Qwen, Kimi, `gpt-oss`, and Gemma 4 default to `json_decision_v1`
 - MiniMax keeps `minimax_tool_call_v1`
 
+That protocol default is not always the full story.
+
+Qwen now prefers a **native tool-call lane** when an OpenAI-compatible endpoint returns structured `tool_calls`.
+
+So for Qwen:
+
+- `json_decision_v1` is still the default text protocol
+- but native tool calls are preferred before the text parser chain
+- and `xml_decision_v1 -> react_text_v1` remain the stable fallback path
+
 That difference matters because QitOS now treats "model family" and "transport" as separate concerns.
 
 ## Why not just instantiate `OpenAICompatibleModel(...)` directly?
@@ -107,6 +117,8 @@ That means `qita` can show:
 - protocol
 - parser
 - tool delivery mode
+- decision source
+- native tool-call usage
 - context policy
 
 without inventing a second trace format.

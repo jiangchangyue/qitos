@@ -73,6 +73,16 @@ QitOS v0.4 首批内建的 gold presets 是：
 - Qwen、Kimi、`gpt-oss`、Gemma 4 默认走 `json_decision_v1`
 - MiniMax 保留 `minimax_tool_call_v1`
 
+但 “默认 protocol” 并不总能完整描述模型侧行为。
+
+现在 Qwen 在 OpenAI-compatible endpoint 返回结构化 `tool_calls` 时，会优先命中 **native tool-call lane**。
+
+也就是说，对 Qwen 来说：
+
+- `json_decision_v1` 仍然是默认文本协议
+- 但 native tool calls 会在文本 parser chain 之前优先尝试
+- `xml_decision_v1 -> react_text_v1` 则继续作为稳定 fallback
+
 这正是 v0.4 的关键设计点：**模型家族** 和 **底层 transport** 被正式拆开了。
 
 ## 为什么不直接手写 `OpenAICompatibleModel(...)`
@@ -110,6 +120,8 @@ QitOS 通过 `RunSpec.metadata` 把 preset / harness 信息写进 trace。
 - protocol
 - parser
 - tool delivery mode
+- decision source
+- native tool-call usage
 - context policy
 
 而不需要引入第二套 trace 格式。

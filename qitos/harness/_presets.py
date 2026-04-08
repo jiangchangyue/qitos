@@ -18,15 +18,16 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         tool_policy=ToolPolicy(
             primary_delivery="api_parameter",
             fallback_delivery="prompt_injection",
-            notes="Prefer OpenAI-compatible tool parameters; fall back to prompt rendering.",
+            native_tool_call_preferred=True,
+            notes="Prefer OpenAI-compatible tool parameters and use native tool calls when the backend returns them.",
         ),
         context_policy=ContextPolicy(
             context_window_hint=128_000,
             fallback_context_window=128_000,
             notes="Use explicit provider settings when available, otherwise default to a conservative 128k window.",
         ),
-        notes="Research default for Qwen served through OpenAI-compatible endpoints.",
-        recommended_models=("Qwen/Qwen3-8B", "Qwen/Qwen3-32B"),
+        notes="Research default for Qwen served through OpenAI-compatible endpoints, with native tool calls preferred before text parsing.",
+        recommended_models=("Qwen/Qwen3-8B", "qwen-plus", "Qwen/Qwen3-32B"),
     ),
     FamilyPreset(
         id="kimi",

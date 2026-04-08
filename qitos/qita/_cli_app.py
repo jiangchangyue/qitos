@@ -1093,13 +1093,19 @@ function latestModelResponse(events){{
   }}
   return null;
 }}
-function renderModelResponseSummary(response){{
+function renderModelResponseSummary(response, step){{
   if(!response || typeof response !== 'object') return '';
   const rows = [];
+  const st = (step && typeof step === 'object') ? step : {{}};
   if(response.provider) rows.push(kvRow('provider', response.provider));
   if(response.model_name) rows.push(kvRow('model', response.model_name));
   if(response.finish_reason) rows.push(kvRow('finish_reason', response.finish_reason));
   if(Array.isArray(response.tool_calls) && response.tool_calls.length) rows.push(kvRow('tool_calls', response.tool_calls.length));
+  if(st.decision_source) rows.push(kvRow('decision_source', st.decision_source));
+  if(st.native_tool_call_used !== undefined) rows.push(kvRow('native_tool_call_used', st.native_tool_call_used));
+  if(st.native_tool_call_fallback_reason) rows.push(kvRow('native_fallback', st.native_tool_call_fallback_reason));
+  const promptMeta = (st.prompt_metadata && typeof st.prompt_metadata === 'object') ? st.prompt_metadata : {{}};
+  if(promptMeta.tool_schema_delivery) rows.push(kvRow('tool_delivery', promptMeta.tool_schema_delivery));
   const usage = response.usage;
   if(usage && typeof usage === 'object'){{
     if(usage.prompt_tokens !== undefined) rows.push(kvRow('prompt_tokens', usage.prompt_tokens));
@@ -1257,9 +1263,9 @@ function renderDirectObservation(actionResults){{
   if(picked.secondary) blocks.push(renderObservationBlock(picked.secondary, 'Tool Observation'));
   return blocks.join('');
 }}
-function renderThought(decision, events){{
+function renderThought(decision, events, step){{
   const thought = extractThought(decision, events);
-  const summary = renderModelResponseSummary(latestModelResponse(events));
+  const summary = renderModelResponseSummary(latestModelResponse(events), step);
   if(!thought) return (summary || '<div class="muted">No explicit thought.</div>');
   return '<div style="white-space:pre-wrap;line-height:1.6;background:#0b1220;border:1px solid #1c2b44;border-radius:8px;padding:10px;color:#cfe6ff">'+esc(thought)+'</div>' + summary;
 }}
@@ -1460,6 +1466,8 @@ function paintOverview(items){{
     ['model', m.model_id || '-'],
     ['model family', m.model_family || rs.model_family || '-'],
     ['family preset', ((rs.metadata || {{}}).family_preset) || (((s.run_meta || {{}}).harness || {{}}).family_preset) || '-'],
+    ['decision lane', (((rs.metadata || {{}}).harness_policy || {{}}).decision_lane_preference) || ((((s.run_meta || {{}}).harness || {{}}).decision_lane_preference)) || '-'],
+    ['tool delivery', (((rs.metadata || {{}}).harness_policy || {{}}).effective_tool_delivery) || (((((s.run_meta || {{}}).harness || {{}}).effective_tool_delivery))) || '-'],
     ['git SHA', m.git_sha || rs.git_sha || '-'],
     ['package', m.package_version || rs.package_version || '-'],
     ['seed', m.seed === null ? 'null' : (m.seed || rs.seed || '-')],
@@ -1661,7 +1669,7 @@ function render(){{
     let h = '<div class="card-head"><div class="step">STEP ' + it.sid + '</div><div class="muted">events ' + it.events.length + '</div></div>';
     if(showObs) h += sectionHtml('State', renderState(obsInput), obsInput, 'state', collapsedAll);
     h += sectionHtml('Prompt', renderPromptMetadata(it.step.prompt_metadata || {{}}), it.step.prompt_metadata || {{}}, 'prompt', collapsedAll);
-    h += sectionHtml('Thought', renderThought(d, it.events), d, 'thought', collapsedAll);
+    h += sectionHtml('Thought', renderThought(d, it.events, it.step), d, 'thought', collapsedAll);
     h += sectionHtml('Parser Diagnostics', renderParserDiagnostics(it.step.parser_diagnostics || {{}}), it.step.parser_diagnostics || {{}}, 'parser', collapsedAll);
     h += sectionHtml('Action', renderAction(it.step.actions||[]), it.step.actions||[], 'action', collapsedAll);
     h += sectionHtml('Direct Observation', renderDirectObservation(it.step.action_results||[]), it.step.action_results||[], 'direct_observation', collapsedAll);

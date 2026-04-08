@@ -96,3 +96,6 @@ class StepRecord:
     parser_diagnostics: Dict[str, Any] = field(default_factory=dict)
     parser_contract: Optional[str] = None
     parser_salvage_applied: bool = False
+    decision_source: Optional[str] = None
+    native_tool_call_used: bool = False
+    native_tool_call_fallback_reason: Optional[str] = None

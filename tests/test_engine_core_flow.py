@@ -635,3 +635,140 @@ def test_engine_prefers_provider_usage_for_context_totals():
     assert ctx["input_tokens_total"] == 123
     assert ctx["output_tokens"] == 17
     assert ctx["tokens_total"] == 140
+
+
+def test_engine_uses_native_tool_call_lane_before_parser():
+    class _RawResponseModel:
+        model = "qwen-plus"
+        provider = "openai-compatible"
+
+        def __init__(self):
+            self.qitos_harness_metadata = {
+                "family_preset": "qwen",
+                "tool_policy": {
+                    "primary_delivery": "api_parameter",
+                    "fallback_delivery": "prompt_injection",
+                    "native_tool_call_preferred": True,
+                },
+            }
+
+        def call_raw(self, messages):
+            _ = messages
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "add",
+                                        "arguments": '{"a": 20, "b": 22}',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 4,
+                    "total_tokens": 14,
+                },
+                "model": "qwen-plus",
+            }
+
+    class _NeverParser:
+        def parse(self, raw_output, context=None):
+            _ = raw_output
+            _ = context
+            raise AssertionError("parser should be bypassed when native tool calls are used")
+
+    class _Agent(DemoAgent):
+        def __init__(self):
+            super().__init__()
+            self.llm = _RawResponseModel()
+            self.model_parser = _NeverParser()
+
+        def decide(self, state: DemoState, observation: dict[str, Any]):
+            _ = observation
+            if state.current_step > 0:
+                return Decision.final("42")
+            return None
+
+    result = Engine(agent=_Agent(), budget=RuntimeBudget(max_steps=3)).run("compute")
+    assert result.state.final_result == "42"
+    record = result.records[0]
+    assert record.decision_source == "native_tool_calls"
+    assert record.native_tool_call_used is True
+    assert record.native_tool_call_fallback_reason is None
+    assert record.actions[0].name == "add"
+    assert record.actions[0].args == {"a": 20, "b": 22}
+    assert record.model_response["tool_calls"][0]["function"]["name"] == "add"
+    native_events = [
+        e
+        for e in result.events
+        if getattr(e.phase, "value", e.phase) == "DECIDE"
+        and (e.payload or {}).get("stage") == "native_tool_calls_decision"
+    ]
+    assert native_events
+    traced = runtime_step_to_trace(record).to_dict()
+    assert traced["decision_source"] == "native_tool_calls"
+    assert traced["native_tool_call_used"] is True
+
+
+def test_engine_native_tool_call_lane_falls_back_to_parser_on_bad_arguments():
+    class _BadArgsModel:
+        model = "qwen-plus"
+
+        def __init__(self):
+            self.qitos_harness_metadata = {
+                "family_preset": "qwen",
+                "tool_policy": {
+                    "primary_delivery": "api_parameter",
+                    "fallback_delivery": "prompt_injection",
+                    "native_tool_call_preferred": True,
+                },
+            }
+
+        def call_raw(self, messages):
+            _ = messages
+            return {
+                "content": "Final Answer: recovered",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "add", "arguments": "{not-json"},
+                    }
+                ],
+            }
+
+    class _Agent(DemoAgent):
+        def __init__(self):
+            super().__init__()
+            self.llm = _BadArgsModel()
+            self.model_parser = ReActTextParser()
+
+        def decide(self, state: DemoState, observation: dict[str, Any]):
+            _ = observation
+            if state.current_step > 0:
+                return Decision.final("done")
+            return None
+
+    result = Engine(agent=_Agent(), budget=RuntimeBudget(max_steps=3)).run("compute")
+    assert result.state.final_result == "recovered"
+    record = result.records[0]
+    assert record.decision_source == "parser"
+    assert record.native_tool_call_used is False
+    assert record.native_tool_call_fallback_reason == "tool_call_arguments_invalid"
+    fallback_events = [
+        e
+        for e in result.events
+        if getattr(e.phase, "value", e.phase) == "DECIDE"
+        and (e.payload or {}).get("stage") == "native_tool_call_fallback"
+    ]
+    assert fallback_events

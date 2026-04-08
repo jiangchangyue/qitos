@@ -82,6 +82,16 @@ def build_model_for_preset(
     )
     metadata = dict(getattr(llm, "qitos_harness_metadata", {}) or {})
     metadata.update(harness.to_dict())
+    metadata.setdefault(
+        "decision_lane_preference",
+        "native_tool_calls"
+        if harness.tool_policy.native_tool_call_preferred
+        else "parser",
+    )
+    metadata.setdefault(
+        "native_tool_call_preferred", harness.tool_policy.native_tool_call_preferred
+    )
+    metadata.setdefault("effective_tool_delivery", harness.protocol.tool_schema_delivery)
     setattr(llm, "qitos_harness_metadata", metadata)
     setattr(llm, "qitos_family_preset", harness.family_preset.id)
     setattr(llm, "qitos_protocol", harness.protocol.id)
