@@ -159,6 +159,8 @@ qitos.egg-info/
 references/
 examples/data/
 data/
+!qitos/benchmark/desktop/data/
+!qitos/benchmark/desktop/data/starter_tasks.json
 runs/
 playground/
 examples/runs/
