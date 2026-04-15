@@ -1,0 +1,189 @@
+---
+title: "CyberGym"
+description: "使用 `qitos.benchmark.cybergym`、外部同步的 `cybergym_agent` 和 QitOS trace，在 CyberGym 上运行安全漏洞 PoC benchmark。"
+---
+
+CyberGym 是一个面向漏洞触发与 PoC 生成的安全 benchmark。任务通常会提供漏洞版本代码、描述信息和一个 `submit.sh`，agent 需要构造输入，让 vulnerable 版本触发异常，并最终通过 patched 版本验证。
+
+这次集成把 CyberGym 放进了 QitOS 的正式 benchmark 结构里：
+
+- `qitos.benchmark.cybergym`
+- `qitos.recipes.benchmarks.cybergym`
+- `examples/benchmarks/cybergym_eval.py`
+
+同时把运行产物统一放到 `runs/cybergym/` 下，便于直接用 `qita` 查看轨迹。
+
+注意：这个 PR 不直接提交 `cybergym_agent` 代码。运行前需要维护者手动把 `cybergym_agent` 仓库同步到 `qitos/benchmark/cybergym/agent/`。
+
+## 集成结构
+
+QitOS 侧的主要文件：
+
+- `qitos/benchmark/cybergym/adapter.py`
+- `qitos/benchmark/cybergym/runtime.py`
+- `qitos/benchmark/cybergym/evaluator.py`
+- `qitos/benchmark/cybergym/scorer.py`
+- `qitos/benchmark/cybergym/runner.py`
+- `qitos/recipes/benchmarks/cybergym.py`
+- `examples/benchmarks/cybergym_eval.py`
+
+职责划分：
+
+- `adapter.py`：把 CyberGym 的 `task_id` 转成 QitOS `Task`
+- `runtime.py`：生成 task 目录并附加运行时元信息
+- `runner.py`：调起外部同步进来的 `cybergym_agent`、写 trace、返回标准结果
+- `recipe`：可复现 baseline
+- `example`：最薄的一层命令入口
+
+## 同步 `cybergym_agent`
+
+运行前，需要先把 `cybergym_agent` 仓库同步到 QitOS 里。下面命令在 QitOS 仓库根目录执行：
+
+```bash
+mkdir -p qitos/benchmark/cybergym/agent
+rsync -a \
+  --exclude .git \
+  --exclude __pycache__ \
+  --exclude test_agent.py \
+  ../cybergym_agent/ \
+  qitos/benchmark/cybergym/agent/
+```
+
+如果没有这一步，`qitos.benchmark.cybergym.runner` 会在运行时直接报错，提示先复制 `cybergym_agent`。
+
+## 准备工作
+
+<Steps>
+  <Step title="准备 CyberGym 数据目录">
+    确保可以访问 `cybergym_data/data`，例如放在 QitOS 同级目录的 `../cybergym/cybergym_data/data`。
+  </Step>
+  <Step title="启动 CyberGym server">
+    需要一台能运行 Docker 镜像的 CyberGym server。示例：
+
+    ```bash
+    cd ../cybergym
+    python -m cybergym.server \
+      --host 127.0.0.1 \
+      --port 8669 \
+      --log_dir ../qitos/runs/cybergym/server_poc \
+      --db_path ../qitos/runs/cybergym/server_poc/poc.db
+    ```
+  </Step>
+  <Step title="设置模型与 verify key">
+    ```bash
+    export CYBERGYM_CLAUDE_AUTH_TOKEN="your-model-key"
+    export CYBERGYM_API_KEY="your-verify-key"
+    ```
+  </Step>
+</Steps>
+
+## 单任务运行
+
+从 QitOS 仓库根目录运行：
+
+```bash
+python examples/benchmarks/cybergym_eval.py \
+  --task-id arvo:1065 \
+  --data-dir ../cybergym/cybergym_data/data \
+  --out-dir runs/cybergym/workspace/arvo_1065 \
+  --server http://127.0.0.1:8669 \
+  --difficulty level1 \
+  --model-name GLM-5.1-sii \
+  --api-key "$CYBERGYM_CLAUDE_AUTH_TOKEN" \
+  --base-url https://your-openai-compatible-endpoint/v1 \
+  --max-steps 30 \
+  --trace-logdir runs/cybergym/traces
+```
+
+## 批量跑 100 个任务
+
+假设 `tasks.txt` 每行一个 `task_id`：
+
+```text
+arvo:1065
+arvo:3938
+oss-fuzz:42535201
+...
+```
+
+从 QitOS 仓库根目录顺序跑：
+
+```bash
+export TASKS_FILE=./tasks.txt
+export SERVER=http://your-cybergym-server:8669
+
+while read -r TASK_ID; do
+  [ -z "$TASK_ID" ] && continue
+  SLUG="${TASK_ID/:/_}"
+  echo "===== START $TASK_ID ====="
+  python examples/benchmarks/cybergym_eval.py \
+    --task-id "$TASK_ID" \
+    --data-dir ../cybergym/cybergym_data/data \
+    --out-dir "runs/cybergym/workspace/$SLUG" \
+    --server "$SERVER" \
+    --difficulty level1 \
+    --model-name GLM-5.1-sii \
+    --api-key "$CYBERGYM_CLAUDE_AUTH_TOKEN" \
+    --base-url https://your-openai-compatible-endpoint/v1 \
+    --max-steps 30 \
+    --trace-logdir runs/cybergym/traces
+  echo "===== END $TASK_ID ====="
+done < "$TASKS_FILE" | tee runs/cybergym/run-100.log
+```
+
+小并发时可以自行改成 `xargs -P 2` 或 `xargs -P 4`，但建议先验证模型端和 server 端的稳定性。
+
+## 批量 verify
+
+CyberGym 的 public `/submit-vul` 只返回 vulnerable 侧结果。完整 benchmark 判定还需要 fix 侧 verify。
+
+在 `cybergym` 仓库根目录运行：
+
+```bash
+python scripts/verify_batch_results.py \
+  --logs_dir ../qitos/runs/cybergym/logs \
+  --server http://your-cybergym-server:8669 \
+  --pocdb_path ../qitos/runs/cybergym/server_poc/poc.db \
+  --summary_json ../qitos/runs/cybergym/verify-summary.json
+```
+
+只看当前数据库状态、不真正发 verify：
+
+```bash
+python scripts/verify_batch_results.py \
+  --logs_dir ../qitos/runs/cybergym/logs \
+  --server http://your-cybergym-server:8669 \
+  --pocdb_path ../qitos/runs/cybergym/server_poc/poc.db \
+  --skip_verify
+```
+
+## trace 与产物
+
+运行后主要产物在：
+
+- `runs/cybergym/workspace/`
+- `runs/cybergym/server_poc/`
+- `runs/cybergym/traces/`
+
+查看轨迹：
+
+```bash
+qita board --logdir runs/cybergym/traces
+```
+
+QitOS trace 会写出：
+
+- `manifest.json`
+- `events.jsonl`
+- `steps.jsonl`
+
+## 当前状态
+
+这次集成已经验证了：
+
+- CyberGym task 能转成 QitOS `Task`
+- benchmark family 已注册到 `qitos.benchmark`
+- recipe 和 thin example 能正常调用同一条 runner
+- 真实 smoke 可以生成 task、初始化 `GLM-5.1-sii`、写出 QitOS trace
+
+当前已知限制是模型协议还没有完全对齐。`GLM-5.1-sii` 目前更倾向输出 `<tool_call>...` 风格内容，而当前 agent 还走 `JsonDecisionParser` 期望纯 JSON，因此在短 smoke 里会停在 parser error。这是下一步要处理的模型协议适配问题，不是 CyberGym benchmark 结构接入问题。

@@ -202,7 +202,8 @@
                   "zh/benchmarks/osworld",
                   "zh/benchmarks/gaia",
                   "zh/benchmarks/tau-bench",
-                  "zh/benchmarks/cybench"
+                  "zh/benchmarks/cybench",
+                  "zh/benchmarks/cybergym"
                 ]
               },
               {
