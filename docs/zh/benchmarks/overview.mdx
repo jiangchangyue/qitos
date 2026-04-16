@@ -1,6 +1,6 @@
 ---
 title: "基准测试"
-description: "通过统一的官方 QitOS benchmark 路径运行 desktop-starter、OSWorld、GAIA、Tau-Bench 与 CyBench，并产出统一结果与 trace artifacts。"
+description: "通过统一的官方 QitOS benchmark 路径运行 desktop-starter、OSWorld、GAIA、Tau-Bench、CyBench 与 CyberGym，并产出统一结果与 trace artifacts。"
 ---
 
 在 QitOS 里，benchmark 不是另一套平行 runtime，而是同一条 agent runtime 叙事的延伸。
@@ -23,6 +23,7 @@ description: "通过统一的官方 QitOS benchmark 路径运行 desktop-starter
 | [GAIA](/zh/benchmarks/gaia) | 通用 AI assistant 任务 | Exact match |
 | [Tau-Bench](/zh/benchmarks/tau-bench) | Tool-agent-user 交互 | Reward / pass^k |
 | [CyBench](/zh/benchmarks/cybench) | CTF 风格安全评测 | Guided subtask score |
+| [CyberGym](/zh/benchmarks/cybergym) | 漏洞 PoC 生成与 differential verify | `vul_exit_code != 0` 且 `fix_exit_code == 0` |
 
 ## 官方 benchmark 入口
 
