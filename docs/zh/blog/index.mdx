@@ -1,6 +1,6 @@
 ---
 title: "QitOS 博客"
-description: "记录 QitOS 在真实研究与 agent 工作流中的设计思考、实践经验与方法复盘。"
+description: "记录 QitOS 在真实研究与智能体工作流中的设计思考、实践经验与方法复盘。"
 ---
 
 QitOS 博客是文档之外的另一条内容线。
@@ -8,27 +8,27 @@ QitOS 博客是文档之外的另一条内容线。
 文档主要解释 QitOS **是什么、怎么用**；博客则更适合回答：
 
 - 为什么框架会这样设计
-- 哪些方法在真实 runs 中有效
-- 哪些 benchmark 或长时运行中的失败值得被总结
-- prompt、parser、tools、memory 与 observability 在实践里如何相互作用
+- 哪些方法在真实运行中有效
+- 哪些基准测试或长时运行中的失败值得被总结
+- 提示词、解析器、工具、记忆与可观测性在实践里如何相互作用
 
 ## 这里会写什么
 
 我们希望后续博客主要围绕这些主题扩展：
 
 - **设计笔记**：为什么框架采用现在的结构
-- **实战复盘**：长时 coding / audit agents 的经验与坑
+- **实战复盘**：长时编码与审计智能体的经验与坑
 - **基准测试观察**：GAIA、Tau-Bench、CyBench 的实践结论
-- **可观测性**：`qita` 如何把 trace（运行记录）变成研究 artifact（持久化的输出文件）
+- **可观测性**：`qita` 如何把追踪记录变成研究产物
 
 ## 从这里开始
 
 <CardGroup cols={2}>
   <Card title="为什么 QitOS 坚持单一内核" icon="cpu" href="/zh/blog/single-kernel">
-    从 AgentModule + Engine 划分出发，解释为什么我们避免隐藏的第二个 runtime。
+    从 AgentModule + Engine 划分出发，解释为什么我们避免隐藏的第二个运行时。
   </Card>
-  <Card title="为什么 reproducible runs 很重要" icon="flask" href="/zh/blog/reproducible-runs">
-    一篇关于 official run、统一 benchmark output 与 best-effort replay 的简短设计笔记。
+  <Card title="为什么可复现运行很重要" icon="flask" href="/zh/blog/reproducible-runs">
+    一篇关于官方运行、统一基准测试输出与尽力回放为什么重要的简短设计笔记。
   </Card>
   <Card title="教程课程" icon="graduation-cap" href="/zh/tutorials">
     如果你更想先上手，可以先走四节课程式教程。

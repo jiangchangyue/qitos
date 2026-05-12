@@ -1,9 +1,9 @@
 ---
 title: "CyBench"
-description: "使用 `CyBenchAdapter`、Docker 隔离和 guided subtask scoring，在 QitOS 上运行 CTF 风格安全评测。"
+description: "使用 `CyBenchAdapter`、Docker 隔离和引导子任务评分，在 QitOS 上运行 CTF 风格安全评测。"
 ---
 
-CyBench 是一个 capture-the-flag（CTF）风格 benchmark，用来评测 agent 在安全分析任务上的表现，包括逆向、Web 利用、取证和密码学。任务运行在隔离环境中，得分通过比较 agent 提交的答案与已知 flag 计算。
+CyBench 是一个夺旗赛（CTF）风格基准测试，用来评测智能体在安全分析任务上的表现，包括逆向工程、Web 利用、取证和密码学。任务运行在隔离环境中，得分通过比较智能体提交的答案与已知 flag 计算。
 
 QitOS 提供：
 
@@ -11,19 +11,19 @@ QitOS 提供：
 - `CyBenchRuntime`
 - `score_cybench_submission`
 
-因此你可以在 QitOS 执行内核（kernel）上直接运行完整评测流程。
+因此你可以在 QitOS 执行内核上直接运行完整评测流程。
 
 ## 评分模式
 
 | 模式 | 工作方式 | 主指标 |
 |---|---|---|
-| **Guided**（默认） | agent 按子任务逐步求解，并获得子任务级提示 | `guided_subtask_score` |
-| **Unguided** | agent 只收到最终 hard prompt，需要直接拿到 flag | `unguided_success` |
+| **Guided**（默认） | 智能体按子任务逐步求解，并获得子任务级提示 | `guided_subtask_score` |
+| **Unguided** | 智能体只收到最终硬提示，需要直接拿到 flag | `unguided_success` |
 
 ## 准备工作
 
 <Steps>
-  <Step title="安装 benchmark 依赖">
+  <Step title="安装基准测试依赖">
     ```bash
     pip install "qitos[benchmarks]"
     ```
@@ -34,7 +34,7 @@ QitOS 提供：
     ```
   </Step>
   <Step title="安装 Docker">
-    大多数 CyBench 任务都需要 Docker 启动 challenge services。
+    大多数 CyBench 任务都需要 Docker 启动挑战服务。
   </Step>
   <Step title="设置模型 API key">
     ```bash
@@ -56,7 +56,7 @@ records = adapter.load_records(limit=5)
 tasks = adapter.to_tasks(records, split="guided")
 ```
 
-一行式 loader：
+一行式加载器：
 
 ```python
 from qitos.benchmark.cybench.adapter import load_cybench_tasks
@@ -70,7 +70,7 @@ tasks = load_cybench_tasks(
 
 ## 运行评测
 
-优先使用官方 CLI：
+优先使用官方命令行：
 
 ```bash
 qit bench run \
@@ -89,9 +89,9 @@ qit bench eval --input results/cybench_guided.jsonl --json
 qita board --logdir runs
 ```
 
-`cybench_eval.py` 依然保留，但它现在主要承担 benchmark 专用参考 agent wrapper 的角色。
+`cybench_eval.py` 依然保留，但它现在主要承担基准测试专用参考智能体封装器的角色。
 
-运行单个 guided 任务：
+运行单个引导任务：
 
 ```bash
 python examples/benchmarks/cybench_eval.py \
@@ -102,7 +102,7 @@ python examples/benchmarks/cybench_eval.py \
   --api-key "$OPENAI_API_KEY"
 ```
 
-运行 unguided：
+运行非引导模式：
 
 ```bash
 python examples/benchmarks/cybench_eval.py \
@@ -113,7 +113,7 @@ python examples/benchmarks/cybench_eval.py \
   --api-key "$OPENAI_API_KEY"
 ```
 
-完整 benchmark：
+完整基准测试：
 
 ```bash
 python examples/benchmarks/cybench_eval.py \
@@ -127,15 +127,15 @@ python examples/benchmarks/cybench_eval.py \
 ```
 
 <Warning>
-  CyBench 任务应始终运行在隔离环境中。challenge services 可能会开放端口或执行任意代码；生产评测建议启用 Docker 隔离。
+  CyBench 任务应始终运行在隔离环境中。挑战服务可能会开放端口或执行任意代码；生产评测建议启用 Docker 隔离。
 </Warning>
 
-## agent toolset
+## 智能体工具集
 
-CyBench 评测 agent 通常只注册一组适合 CTF 的最小工具面：
+CyBench 评测智能体通常只注册一组适合 CTF 的最小工具面：
 
 - `CodingToolSet`
-- shell execution
+- 终端执行
 - `SubmitAnswer`
 
 如有需要，也可以继续扩展浏览器工具。
@@ -170,4 +170,4 @@ qita board --logdir runs
 qita replay --run runs/<run_id>
 ```
 
-来检查具体任务 trace（运行记录）。
+来检查具体任务的追踪记录。

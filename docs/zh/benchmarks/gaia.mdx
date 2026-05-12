@@ -1,22 +1,22 @@
 ---
 title: "GAIA"
-description: "通过 `GaiaAdapter` 与 ReAct web research agent，在 QitOS 上运行 GAIA benchmark。"
+description: "通过 `GaiaAdapter` 与 ReAct 网页研究智能体，在 QitOS 上运行 GAIA 基准测试。"
 ---
 
-GAIA（General AI Assistants）是一个真实世界任务 benchmark，覆盖多步推理、网页研究、文件检查与算术能力。任务分成三个难度等级，并通过与参考答案做 exact-match 来评分。
+GAIA（通用 AI 助手）是一个真实世界任务基准测试，覆盖多步推理、网页研究、文件检查与算术能力。任务分成三个难度等级，通过与参考答案做精确匹配来评分。
 
-QitOS 提供 `GaiaAdapter` 将 GAIA 数据行转换为标准 `Task`。官方执行入口是 `qit bench run`，而 `examples/benchmarks/gaia_eval.py` 现在只是同一套官方结果契约上的薄包装。
+QitOS 提供 `GaiaAdapter` 将 GAIA 数据行转换为标准 `Task`。官方执行入口是 `qit bench run`，而 `examples/benchmarks/gaia_eval.py` 现在只是同一套官方结果契约上的薄封装。
 
 ## 准备工作
 
 <Steps>
-  <Step title="安装 benchmark 依赖">
+  <Step title="安装基准测试依赖">
     ```bash
     pip install "qitos[benchmarks]"
     ```
   </Step>
   <Step title="认证 HuggingFace">
-    GAIA 是 gated dataset。先在 [huggingface.co/datasets/gaia-benchmark/GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) 申请访问，再设置：
+    GAIA 是受限数据集。先在 [huggingface.co/datasets/gaia-benchmark/GAIA](https://huggingface.co/datasets/gaia-benchmark/GAIA) 申请访问，再设置：
 
     ```bash
     export HF_TOKEN="hf_..."
@@ -40,7 +40,7 @@ records = adapter.load_huggingface_records(split="validation")
 tasks = adapter.to_tasks(records, split="validation", limit=10)
 ```
 
-也可以使用一行式 loader：
+也可以使用一行式加载器：
 
 ```python
 from qitos.benchmark.gaia.adapter import load_gaia_tasks
@@ -52,7 +52,7 @@ tasks = load_gaia_tasks(split="validation", limit=20)
 
 ## 运行评测
 
-优先使用官方 CLI：
+优先使用官方命令行：
 
 ```bash
 qit bench run \
@@ -71,7 +71,7 @@ qit bench eval --input results/gaia_validation.jsonl --json
 qita board --logdir runs
 ```
 
-如果你想看 benchmark 专用的参考 wrapper，再使用 `examples/benchmarks/gaia_eval.py`。
+如果你想看基准测试专用的参考封装器，再使用 `examples/benchmarks/gaia_eval.py`。
 
 运行单个任务：
 
@@ -84,7 +84,7 @@ python examples/benchmarks/gaia_eval.py \
   --api-key "$OPENAI_API_KEY"
 ```
 
-运行完整 benchmark：
+运行完整基准测试：
 
 ```bash
 python examples/benchmarks/gaia_eval.py \
@@ -98,16 +98,16 @@ python examples/benchmarks/gaia_eval.py \
   --api-key "$OPENAI_API_KEY"
 ```
 
-## agent 结构
+## 智能体结构
 
-评测脚本会构造一个 ReAct 风格的 web research agent，通常组合：
+评测脚本会构造一个 ReAct 风格的网页研究智能体，通常组合：
 
-- browser tools
-- file reading
-- command execution
+- 浏览器工具
+- 文件读取
+- 命令执行
 - `ReActTextParser`
 
-由于 adapter 产出的还是标准 `Task`，你也可以替换成自己的 `AgentModule`。
+由于适配器产出的还是标准 `Task`，你也可以替换成自己的 `AgentModule`。
 
 ## 检查结果
 

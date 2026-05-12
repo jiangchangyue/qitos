@@ -1,25 +1,25 @@
 ---
-title: "为什么 gold presets 很重要"
-description: "QitOS v0.4 正式从一次性的 provider wiring 走向可复用的 family-level harness defaults。"
+title: "为什么黄金预设很重要"
+description: "QitOS v0.4 正式从一次性的供应商接线走向可复用的家族级适配层默认值。"
 ---
 
 QitOS 一开始追求的是：
 
-一个 kernel，很多 agent。
+一个内核，很多智能体。
 
 v0.4 把这件事进一步推进到了模型家族这一层。
 
-现在，我们不必每换一个 endpoint 就重写一套 example，而是先解析：
+现在，我们不必每换一个端点就重写一套示例，而是先解析：
 
-- family preset（预配置的模型家族默认值）
-- harness policy
-- transport adapter（与模型API通信的客户端）
-- protocol（模型输出的格式契约）与 parser（将原始模型输出解析为Decision的组件）对
+- 家族预设（预配置的模型家族默认值）
+- 适配层策略
+- 传输层适配器
+- 协议与解析器对
 
 这件事重要，不只是因为代码更干净。
 
 更关键的是：
 
-可复现的 agent 研究，不应该只记录 traces（运行记录），也应该记录模型侧契约本身。
+可复现的智能体研究，不应该只记录追踪记录，也应该记录模型侧契约本身。
 
-v0.4 的旗舰 example 现在可以在 Qwen、Kimi、MiniMax、`gpt-oss` 与 Gemma 4 之间切换，同时仍然保持同一个 agent 实现。
+v0.4 的旗舰示例现在可以在 Qwen、Kimi、MiniMax、`gpt-oss` 与 Gemma 4 之间切换，同时仍然保持同一个智能体实现。

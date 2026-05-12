@@ -1,9 +1,9 @@
 ---
 title: "Tracing"
-description: "QitOS 会为每次 run 写出结构化 trace artifacts，从而支持 replay、diff、export 与审计。"
+description: "QitOS 会为每次运行写出结构化追踪记录产物，从而支持回放、差异比较、导出与审计。"
 ---
 
-Tracing 是 QitOS observability 的持久化层。每次启用 trace（运行记录）的 run 都会写出一个自包含目录：
+追踪记录（tracing）是 QitOS 可观测性的持久化层。每次启用追踪记录的运行都会写出一个自包含目录：
 
 ```text
 <trace_logdir>/<run_id>/
@@ -16,29 +16,29 @@ Tracing 是 QitOS observability 的持久化层。每次启用 trace（运行记
 
 | 文件 | 作用 |
 | --- | --- |
-| `manifest.json` | run 摘要、复现元信息、benchmark 元信息与 official-run 字段 |
-| `events.jsonl` | runtime phases 的事件流 |
-| `steps.jsonl` | 每个已完成 step 的结构化记录 |
+| `manifest.json` | 运行摘要、复现元信息、基准测试元信息与官方运行字段 |
+| `events.jsonl` | 运行时阶段的事件流 |
+| `steps.jsonl` | 每个已完成步骤的结构化记录 |
 
-原始文件是事实来源，`qita` 是建立在这些 artifacts（持久化的输出文件）之上的人工检查层。
+原始文件是事实来源，`qita` 是建立在这些产物之上的人工检查层。
 
-## 为什么 tracing 是一等特性
+## 为什么追踪记录是一等特性
 
-QitOS 面向的是 agent 研究，而不仅是一次性 demo。
+QitOS 面向的是智能体研究，而不仅是一次性演示。
 
 这意味着框架必须能回答下列问题：
 
-- run 是怎么停下来的
-- 它用的是什么 prompt / parser（将原始模型输出解析为 Decision 的组件）契约
-- 它看到了哪些 tools
+- 运行是怎么停下来的
+- 它用的是什么提示词/解析器契约
+- 它看到了哪些工具
 - 上下文在长时运行中如何变化
-- 哪些配置字段决定了 replay 和 compare 的意义
+- 哪些配置字段决定了回放和比较的意义
 
-因此 `AgentModule.run(...)` 默认开启 tracing。
+因此 `AgentModule.run(...)` 默认开启追踪记录。
 
-## v0.3 中的重要 trace 元信息
+## v0.3 中的重要追踪记录元信息
 
-v0.3 补强了 manifest 中的复现字段，包括：
+v0.3 补强了清单中的复现字段，包括：
 
 - `git_sha`
 - `package_version`
@@ -52,26 +52,26 @@ v0.3 补强了 manifest 中的复现字段，包括：
 - `experiment_spec`
 - `official_run`
 - `replay_mode`
-- token / latency / cost 汇总
+- 令牌/延迟/成本汇总
 
-这些字段让 qita compare 与 benchmark result normalization 真正有了稳定语义。
+这些字段让 `qita compare` 与基准测试结果归一化真正有了稳定语义。
 
-## Best-effort replay
+## 尽力回放
 
-QitOS 的 tracing 支持的是 **best-effort research replay**。
+QitOS 的追踪记录支持的是**研究级尽力回放**。
 
-也就是说，它会尽量完整记录复盘需要的信息，但不会承诺远程模型 provider 或外部环境能被严格确定性重放。
+也就是说，它会尽量完整记录复盘需要的信息，但不会承诺远程模型服务提供商或外部环境能被严格确定性重放。
 
-这套 trace 适合：
+这套追踪记录适合：
 
-- 调试长轨迹 agent
-- 比较 prompt / parser / tool 变化
-- 导出审阅 artifact
-- replay benchmark failure
+- 调试长轨迹智能体
+- 比较提示词/解析器/工具变化
+- 导出审阅产物
+- 回放基准测试失败
 
-但不应被理解为远程模型永远返回完全相同的 tokens。
+但不应被理解为远程模型永远返回完全相同的令牌。
 
-## 用 qita 检查 traces
+## 用 qita 检查追踪记录
 
 ```bash
 qita board --logdir ./runs
@@ -79,11 +79,11 @@ qita replay --run ./runs/<run_id>
 qita export --run ./runs/<run_id> --html ./report.html
 ```
 
-`qita` 还支持 run compare，你可以直接回答两次 run 为什么不同，不需要手工读 JSON。
+`qita` 还支持运行比较，你可以直接回答两次运行为什么不同，不需要手工读 JSON。
 
 ## 继续阅读
 
-- [Official runs](/zh/concepts/official-runs)
-- [Observability](/zh/guides/observability)
+- [官方运行](/zh/concepts/official-runs)
+- [可观测性](/zh/guides/observability)
 - [CLI 参考](/zh/reference/cli)
-- [Replay 并检查失败 run](/zh/tutorials/replay-and-inspect-failed-runs)
+- [回放并检查失败运行](/zh/tutorials/replay-and-inspect-failed-runs)

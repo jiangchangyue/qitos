@@ -1,68 +1,68 @@
 ---
-title: "第三方 Benchmark 接入规范"
-description: "解释如何在不污染 framework kernel 的前提下，把新的 benchmark family 正式接入 QitOS。"
+title: "第三方基准测试接入规范"
+description: "解释如何在不污染框架内核的前提下，把新的基准测试家族正式接入 QitOS。"
 ---
 
-# 第三方 Benchmark 接入规范
+# 第三方基准测试接入规范
 
-QitOS 把 benchmark integration 当作一套正式 SDK，而不是零散脚本。
+QitOS 把基准测试集成当作一套正式 SDK，而不是零散脚本。
 
-如果你要新增一个 benchmark family，默认结构应该是：
+如果你要新增一个基准测试家族，默认结构应该是：
 
-- `qitos.benchmark.<family>`：数据集适配、runtime、evaluator、scorer、benchmark-native artifact
-- `qitos.recipes.*`：可复现 baseline method
+- `qitos.benchmark.<family>`：数据集适配、运行时、评估器、评分器、基准测试原生产物
+- `qitos.recipes.*`：可复现基线方法
 - `examples/*`：仅保留最薄的用户入口
 
-不要把 benchmark-specific 的 setup、scoring、dataset 逻辑塞进 `qitos/core`、`DesktopEnv` 或 example 文件。
+不要把基准测试专用的 setup、评分、数据集逻辑塞进 `qitos/core`、`DesktopEnv` 或示例文件。
 
 ## 三层边界
 
-### Framework 层
+### 框架层
 
-这些能力属于 framework：
+这些能力属于框架：
 
 - `AgentModule + Engine`
 - `ActionSpace`
 - `EnvironmentAdapter`
 - `DesktopEnv`
-- provider-neutral tool / action vocabulary
-- family preset（预配置）与 harness（模型适配层）ownership
-- qita replay、export、compare、screenshot timeline、overlay
+- 与提供商无关的工具/动作词汇
+- 家族预设与适配层（harness，负责将协议、传输层、工具交付等组合在一起的模型适配层）所有权
+- qita 回放、导出、比较、截图时间线、叠加层
 
-Framework 代码必须保持 benchmark-agnostic。
+框架代码必须保持与具体基准测试无关。
 
-### Benchmark 层
+### 基准测试层
 
 这些能力应放在 `qitos.benchmark.<family>`：
 
-- 数据集读取与 split 逻辑
-- 稳定 sample identity
-- benchmark runtime `prepare/finalize`
-- benchmark-specific `setup` / `postconfig`
-- evaluator bridge
-- scorer 与 failure taxonomy
-- benchmark-native artifact（持久化的输出文件）payload
+- 数据集读取与拆分逻辑
+- 稳定样本标识
+- 基准测试运行时 `prepare/finalize`
+- 基准测试专用 `setup` / `postconfig`
+- 评估器桥接
+- 评分器与失败分类法
+- 基准测试原生产物（artifact，持久化的输出文件）载荷
 
-凡是依赖 `test_all.json`、benchmark VM/bootstrap、upstream evaluator 语义的内容，都应该放在这里。
+凡是依赖 `test_all.json`、基准测试虚拟机/引导程序、上游评估器语义的内容，都应该放在这里。
 
-### Recipe 层
+### 配方层
 
 这些能力应放在 `qitos.recipes`：
 
-- canonical starter baseline
-- benchmark baseline
+- 规范入门基线
+- 基准测试基线
 - 可复现对比方法
 
-Recipe 应该能被这些入口共同复用：
+配方应该能被这些入口共同复用：
 
 - `qit bench`
-- docs/tutorials
-- thin examples
-- 后续 benchmark report 脚本
+- 文档/教程
+- 轻量示例
+- 后续基准测试报告脚本
 
 ## 建议目录结构
 
-新增 benchmark family 时，建议至少包含：
+新增基准测试家族时，建议至少包含：
 
 ```text
 qitos/benchmark/<family>/
@@ -74,58 +74,58 @@ qitos/benchmark/<family>/
 └── runner.py
 ```
 
-如果该 benchmark 有 canonical baseline，再新增：
+如果该基准测试有规范基线，再新增：
 
 ```text
 qitos/recipes/benchmarks/<family>.py
 ```
 
-## Adapter 契约
+## 适配器契约
 
-Adapter 负责：
+适配器（adapter）负责：
 
-- dataset root 解析
-- record loading
-- split / subset 过滤
-- 稳定 task/sample identity（标识）
-- task metadata 归一化
+- 数据集根路径解析
+- 记录加载
+- 拆分/子集过滤
+- 稳定任务/样本标识
+- 任务元数据归一化
 
-每个 task 都应携带足够 metadata，支持：
+每个任务都应携带足够元数据，支持：
 
-- benchmark-native evaluation
-- qita inspection
+- 基准测试原生评估
+- qita 检查
 - 可复现结果导出
 
 最低要求至少包含：
 
 - `benchmark`
 - `split`
-- 稳定 sample identity（标识），例如 `task_id` 或 `example_id`
-- runtime / evaluator 所需的 benchmark-native metadata
+- 稳定样本标识，例如 `task_id` 或 `example_id`
+- 运行时/评估器所需的基准测试原生元数据
 
-## Runtime hook 契约
+## 运行时钩子契约
 
-当 benchmark 需要这些能力时，请使用 `BenchmarkRuntimeHook`：
+当基准测试需要这些能力时，请使用 `BenchmarkRuntimeHook`：
 
-- 环境 prepare / finalize
-- agent 动作前的 benchmark-specific setup
-- bootstrap metadata
-- cleanup policy
+- 环境准备/收尾
+- 智能体动作前的基准测试专用设置
+- 引导元数据
+- 清理策略
 
 典型例子：
 
-- OSWorld 的 qcow2/bootstrap 与 controller readiness
-- benchmark-specific sandbox setup
-- 服务 warmup 或结束清理
+- OSWorld 的 qcow2/引导程序与控制器就绪
+- 基准测试专用沙箱设置
+- 服务预热或结束清理
 
-除非逻辑确实能被多个 benchmark family 复用，否则不要把它推回 `DesktopEnv` 或全局 engine。
+除非逻辑确实能被多个基准测试家族复用，否则不要把它推回 `DesktopEnv` 或全局引擎。
 
-## Evaluator 与 Scorer 契约
+## 评估器与评分器契约
 
-`BenchmarkEvaluator` 用来产生 benchmark-native payload，例如：
+`BenchmarkEvaluator` 用来产生基准测试原生载荷，例如：
 
-- upstream evaluator bridge 结果
-- benchmark-native score JSON
+- 上游评估器桥接结果
+- 基准测试原生评分 JSON
 - postconfig 执行结果
 
 `BenchmarkScorer` 负责把这些结果映射回标准公开行：
@@ -136,13 +136,13 @@ Adapter 负责：
 - `latency_seconds`
 - `token_usage`
 - `cost`
-- benchmark-specific metadata
+- 基准测试专用元数据
 
-对外公开结果仍然必须是 `BenchmarkRunResult`，不要再造第二套 public row schema。
+对外公开结果仍然必须是 `BenchmarkRunResult`，不要再造第二套公开行模式。
 
 ## 标准结果行要求
 
-每个 benchmark 运行最终都应输出统一 public row：
+每个基准测试运行最终都应输出统一公开行：
 
 - `task_id`
 - `benchmark`
@@ -157,55 +157,55 @@ Adapter 负责：
 - `trace_run_dir`
 - `run_spec_ref`
 
-benchmark-native 的附加信息请放在 `metadata`，不要破坏共享结果契约。
+基准测试原生的附加信息请放在 `metadata`，不要破坏共享结果契约。
 
-## Trace 与 qita 兼容要求
+## 追踪记录与 qita 兼容要求
 
-新的 benchmark family 必须保留：
+新的基准测试家族必须保留：
 
 - `RunSpec`
 - `ExperimentSpec`
-- trace（运行记录）directory 兼容性
-- qita replay / export / compare
+- 追踪记录（trace）目录兼容性
+- qita 回放/导出/比较
 
-如果新增 benchmark-native artifact，也要确保它仍能和这些共享产物一起工作：
+如果新增基准测试原生产物，也要确保它仍能和这些共享产物一起工作：
 
 - `manifest.json`
 - `events.jsonl`
 - `steps.jsonl`
 
-原则：benchmark 可以补充细节，但不能破坏共享 run contract。
+原则：基准测试可以补充细节，但不能破坏共享运行契约。
 
-## CLI 与注册要求
+## 命令行与注册表（registry）要求
 
-要把 benchmark family 变成正式入口，需要完成：
+要把基准测试家族变成正式入口，需要完成：
 
-1. 在 `qitos.benchmark` 中导出 family
-2. 在 `qitos.benchmark.runner` 中注册 task loading 与 builtin runner
+1. 在 `qitos.benchmark` 中导出家族
+2. 在 `qitos.benchmark.runner` 中注册任务加载与内置运行器
 3. 确保它能通过以下入口运行：
    - `qit bench run`
    - `qit bench eval`
    - `qit bench replay`
    - `qit bench export`
 
-examples 可以保留，但只能作为 recipe / runner 的薄包装。
+示例可以保留，但只能作为配方/运行器的薄包装。
 
 ## 文档同步清单
 
-新增 benchmark family 时，至少同步这些文档面：
+新增基准测试家族时，至少同步这些文档面：
 
-- benchmark overview
-- benchmark family 页面
-- CLI reference（如果 benchmark 名称或 strategy 变了）
-- contributor guide（如果引入了新的 runtime/evaluator 模式）
+- 基准测试概述
+- 基准测试家族页面
+- 命令行参考（如果基准测试名称或策略变了）
+- 贡献者指南（如果引入了新的运行时/评估器模式）
 - `CHANGELOG.md`
-- README 的 progress/news（只要是用户可见能力）
+- README 的进展/动态（只要是用户可见能力）
 
 这些更新属于实现的一部分，而不是事后补写。
 
 ## 当前仓库中的参考实现
 
-可以直接参考这些 canonical 结构：
+可以直接参考这些规范结构：
 
 - `qitos.benchmark.desktop`
 - `qitos.benchmark.osworld`
@@ -217,4 +217,4 @@ examples 可以保留，但只能作为 recipe / runner 的薄包装。
 - `qitos.recipes.benchmarks.tau_bench`
 - `qitos.recipes.benchmarks.cybench`
 
-未来的新 benchmark integration 应尽量对齐这些形态。
+未来的新基准测试集成应尽量对齐这些形态。

@@ -1,37 +1,37 @@
 ---
 title: "Official Runs"
-description: "什么样的 run 才算 QitOS 官方 run，以及 best-effort replay 到底意味着什么。"
+description: "什么样的运行才算 QitOS 官方运行，以及尽力回放到底意味着什么。"
 ---
 
-在 QitOS 里，official run 不等于跑完且留下了 trace。它指的是一类结构足够完整、可以被 replay、diff、export 和复盘的研究 artifact（持久化的输出文件）。
+在 QitOS 里，官方运行不等于跑完且留下了追踪记录。它指的是一类结构足够完整、可以被回放、差异比较、导出和复盘的研究产物。
 
 ## 最低契约
 
-一个 run 至少需要具备下面这些内容，才算 official run：
+一个运行至少需要具备下面这些内容，才算官方运行：
 
 - `RunSpec`
-- benchmark 场景下的 `ExperimentSpec`
+- 基准测试场景下的 `ExperimentSpec`
 - 标准 `manifest.json`、`events.jsonl`、`steps.jsonl`
-- 能被 `qita` replay / export / compare
-- benchmark 场景下产出统一的 `BenchmarkRunResult`
+- 能被 `qita` 回放/导出/比较
+- 基准测试场景下产出统一的 `BenchmarkRunResult`
 
-也就是说，它必须把模型身份、prompt protocol（模型输出的格式契约）、parser（将原始模型输出解析为 Decision 的组件）、tool manifest、环境摘要、seed、package version、git SHA 和 benchmark 元信息一起记录下来。
+也就是说，它必须把模型身份、提示词协议、解析器、工具清单、环境摘要、随机种子、包版本、Git 提交哈希和基准测试元信息一起记录下来。
 
 ## 为什么它重要
 
 没有这层契约时，经常会遇到这些问题：
 
-- 两次 run 的 parser 到底是不是同一个？
-- tool surface 有没有悄悄变过？
-- benchmark split 是否一致？
-- 这个失败还能不能之后 replay？
-- 两次 run 到底是配置不同，还是只是运气不同？
+- 两次运行的解析器到底是不是同一个？
+- 工具面有没有悄悄变过？
+- 基准测试的数据划分是否一致？
+- 这个失败还能不能之后回放？
+- 两次运行到底是配置不同，还是只是运气不同？
 
-QitOS 把这些问题视为 runtime 的一部分，不是事后整理表格时再补。
+QitOS 把这些问题视为运行时的一部分，不是事后整理表格时再补。
 
-## Best-effort replay
+## 尽力回放
 
-QitOS 当前提供的是 **research-grade best-effort replay**，不是严格字节级确定性重放。
+QitOS 当前提供的是**研究级尽力回放**，不是严格字节级确定性重放。
 
 它会尽量把复盘所需的关键条件记录完整：
 
@@ -42,22 +42,22 @@ QitOS 当前提供的是 **research-grade best-effort replay**，不是严格字
 - `parser_name`
 - `tool_manifest`
 - environment summary
-- step / event traces
+- 步骤/事件追踪记录
 
 但它不会承诺远程模型服务、网页内容、外部工具或挑战环境永远返回相同结果。
 
-所以这套 replay 语义适合用于：
+所以这套回放语义适合用于：
 
-- 调试失败 run
-- 比较 prompt / parser / tool 回归
-- benchmark 复盘
-- 向协作者分享 artifact
+- 调试失败运行
+- 比较提示词/解析器/工具回归
+- 基准测试复盘
+- 向协作者分享产物
 
-但不应被理解为所有远程调用都能严格重现到 token 级别。
+但不应被理解为所有远程调用都能严格重现到令牌级别。
 
 ## 官方入口
 
-benchmark 的官方入口是：
+基准测试的官方入口是：
 
 ```bash
 qit bench run ...
@@ -70,7 +70,7 @@ qit bench export ...
 
 ## 继续阅读
 
-- [Tracing](/zh/concepts/tracing)
+- [追踪记录](/zh/concepts/tracing)
 - [基准测试总览](/zh/benchmarks/overview)
 - [CLI 参考](/zh/reference/cli)
-- [可复现 benchmark run 教程](/zh/tutorials/reproducible-benchmark-runs)
+- [可复现基准测试运行教程](/zh/tutorials/reproducible-benchmark-runs)

@@ -1,10 +1,10 @@
 ---
 title: "安装"
-description: "从 PyPI 或源码安装 QitOS，并按需启用 models 与 benchmarks extras。"
+description: "从 PyPI 或源码安装 QitOS，并按需启用模型与基准测试扩展组件。"
 ---
 
 <Warning>
-QitOS 当前处于 **Alpha** 阶段。核心 `AgentModule + Engine` kernel（执行内核）、tracing 与规范化 examples 相对稳定；更高层 API 仍可能在版本间演进。用于生产时请固定版本。
+QitOS 当前处于 **Alpha** 阶段。核心 `AgentModule + Engine` 执行内核（kernel）、追踪（tracing）与规范化示例相对稳定；更高层 API 仍可能在版本间演进。用于生产环境时请固定版本号。
 </Warning>
 
 ## 环境要求
@@ -12,7 +12,7 @@ QitOS 当前处于 **Alpha** 阶段。核心 `AgentModule + Engine` kernel（执
 QitOS 需要 **Python 3.10 及以上**。当前测试覆盖 Python 3.10、3.11 和 3.12。
 
 <Note>
-如果你还没有远程模型 API，可以先看 [前置准备](/zh/prerequisites)，里面整理了推荐平台、API Key 获取方式和最小连通性验证。
+如果你还没有远程模型 API，可以先看 [前置准备](/zh/prerequisites)，其中整理了推荐平台、API 密钥获取方式和最小连通性验证。
 </Note>
 
 ## 标准安装
@@ -25,19 +25,19 @@ pip install qitos
 
 核心安装包含：
 
-- `AgentModule + Engine` 内核（kernel，执行内核）
+- `AgentModule + Engine` 执行内核
 - `qita` 可观测性工具
 - `kit` 工具箱模块
 
-它默认不包含 OpenAI client，也不包含 benchmark dataset loaders。
+它默认不包含 OpenAI 客户端，也不包含基准测试（benchmark）数据集加载器。
 
 <Tip>
-如果你想马上运行最小 coding-agent quickstart，直接安装 `pip install "qitos[models]"` 就可以。
+如果你想马上运行最小编程智能体（coding agent）快速入门，直接安装 `pip install "qitos[models]"` 即可。
 </Tip>
 
-## 可选 extras
+## 可选扩展组件（extras）
 
-通过 extras 按需加入模型支持、benchmark 依赖，或一次性安装全部组件。
+通过扩展组件按需加入模型支持、基准测试依赖，或一次性安装全部组件。
 
 <CodeGroup>
 
@@ -55,19 +55,19 @@ pip install "qitos[all]"
 
 </CodeGroup>
 
-| Extra | 增加的内容 |
+| 扩展组件 | 增加的内容 |
 |---|---|
-| `models` | `openai>=1.0.0`，用于 OpenAI-compatible model endpoints |
-| `benchmarks` | `datasets`、`huggingface_hub` 等 benchmark adapters 依赖 |
+| `models` | `openai>=1.0.0`，用于兼容 OpenAI 的模型接口 |
+| `benchmarks` | `datasets`、`huggingface_hub` 等基准测试适配器依赖 |
 | `all` | 以上全部 |
 
 <Tip>
-如果你刚开始接触 QitOS，最推荐 `pip install "qitos[models]"`。这足以跑通最小 coding-agent quickstart 和大部分 examples。
+如果你刚开始接触 QitOS，最推荐 `pip install "qitos[models]"`。这足以跑通最小编程智能体快速入门和大部分示例。
 </Tip>
 
 ## 从源码安装
 
-克隆仓库后，以 editable 模式安装，并带上开发依赖：
+克隆仓库后，以可编辑模式安装，并带上开发依赖：
 
 ```bash
 git clone https://github.com/Qitor/qitos.git
@@ -75,7 +75,7 @@ cd qitos
 pip install -e ".[dev,models,benchmarks]"
 ```
 
-`dev` extra 会安装 `pytest`、`black`、`flake8`、`mypy` 以及 QitOS 团队使用的打包工具。
+`dev` 扩展组件会安装 `pytest`、`black`、`flake8`、`mypy` 以及 QitOS 团队使用的打包工具。
 
 ## 验证安装
 
@@ -91,7 +91,7 @@ python -c "import qitos; print(qitos.__version__)"
 0.3.0
 ```
 
-也可以顺手验证最小 coding agent 和两个 CLI 是否已进入 PATH：
+也可以顺便验证最小编程智能体和两个命令行工具（CLI）是否已进入 PATH：
 
 ```bash
 qit demo minimal
@@ -103,7 +103,7 @@ qita --help
 
 <CardGroup cols={2}>
   <Card title="快速开始" icon="rocket" href="/zh/quickstart">
-    2 分钟内运行你的第一个 agent
+    2 分钟内运行你的第一个智能体（agent）
   </Card>
   <Card title="核心概念" icon="book" href="/zh/concepts/agent-module">
     理解 AgentModule、Engine、State 和 Tools

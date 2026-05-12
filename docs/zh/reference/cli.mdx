@@ -1,16 +1,16 @@
 ---
 title: "CLI 参考"
-description: "QitOS 的 qita 与 qit CLI 参考，包括最小 coding-agent demo 和 v0.3 中加入的 benchmark 官方入口。"
+description: "QitOS 的 qita 与 qit 命令行参考，包括最小编码智能体演示和 v0.3 中加入的基准测试官方入口。"
 ---
 
-QitOS 提供两个顶层 CLI：
+QitOS 提供两个顶层命令行工具：
 
-- `qita`：trace（运行记录）检查与回放
-- `qit`：demo、benchmark 与开发者工作流入口
+- `qita`：追踪记录检查与回放
+- `qit`：演示、基准测试与开发者工作流入口
 
 ## qit demo
 
-当你想最快拿到一次真正的模型驱动 QitOS run 时，使用 `qit demo`。
+当你想最快拿到一次真正的模型驱动 QitOS 运行时，使用 `qit demo`。
 
 ### `qit demo minimal`
 
@@ -20,10 +20,10 @@ qit demo minimal
 
 这个命令会：
 
-- 从环境变量或 flags 读取 OpenAI-compatible 模型配置
-- 先种一个最小 bug workspace
-- 运行最小 coding agent 去修这个 bug
-- 把 qita 可识别的 trace 写到 `./runs`
+- 从环境变量或标志位读取 OpenAI 兼容模型配置
+- 先创建一个最小缺陷工作区
+- 运行最小编码智能体去修这个缺陷
+- 把 qita 可识别的追踪记录写到 `./runs`
 
 可选参数：
 
@@ -38,7 +38,7 @@ qit demo minimal
 
 ## qita
 
-当你要检查 traced runs（运行记录）时，使用 `qita`。
+当你要检查已有追踪记录时，使用 `qita`。
 
 ### `qita board`
 
@@ -46,13 +46,13 @@ qit demo minimal
 qita board --logdir ./runs
 ```
 
-打开多 run board，支持：
+打开多运行面板，支持：
 
-- runs 列表与过滤
-- compare 选择
-- 进入 run detail
-- replay
-- raw / HTML export
+- 运行列表与过滤
+- 对比选择
+- 进入运行详情
+- 回放
+- 原始或 HTML 导出
 
 ### `qita replay`
 
@@ -60,7 +60,7 @@ qita board --logdir ./runs
 qita replay --run ./runs/<run_id>
 ```
 
-以时间轴方式打开一个 run。
+以时间轴方式打开一个运行。
 
 ### `qita export`
 
@@ -68,11 +68,11 @@ qita replay --run ./runs/<run_id>
 qita export --run ./runs/<run_id> --html ./report.html
 ```
 
-导出独立 HTML artifact（持久化的输出文件）。
+导出独立 HTML 产物。
 
 ## qit bench
 
-`qit bench` 是 v0.3 中 benchmark 的官方 CLI。
+`qit bench` 是 v0.3 中基准测试的官方命令行。
 
 ### `qit bench run`
 
@@ -87,22 +87,22 @@ qit bench run \
 
 这个命令会：
 
-- 加载 benchmark tasks
+- 加载基准测试任务
 - 构造 `RunSpec` 与 `ExperimentSpec`
 - 输出统一的 `BenchmarkRunResult`
 
-现在常见的 benchmark name 包括：
+现在常见的基准测试名称包括：
 
-- `desktop-starter`：canonical starter benchmark family
-- `osworld`：benchmark-specific OSWorld adapter path
-- `gaia`、`tau-bench`、`cybench`：已经迁入 `qitos.benchmark.*` 的 benchmark families
-- `desktop`：`desktop-starter` 的兼容 alias
+- `desktop-starter`：标准入门基准测试族
+- `osworld`：基准测试专用 OSWorld 适配器路径
+- `gaia`、`tau-bench`、`cybench`：已经迁入 `qitos.benchmark.*` 的基准测试族
+- `desktop`：`desktop-starter` 的兼容别名
 
-当前 CLI 默认遵循三层结构：
+当前命令行默认遵循三层结构：
 
-- `qitos.benchmark.*`：benchmark adapter / evaluator
-- `qitos.recipes.*`：canonical baseline method
-- `examples/*`：最薄的入口包装
+- `qitos.benchmark.*`：基准测试适配器与评估器
+- `qitos.recipes.*`：标准基线方法
+- `examples/*`：最薄的入口封装
 
 ### `qit bench eval`
 
@@ -110,7 +110,7 @@ qit bench run \
 qit bench eval --input ./results/tau.jsonl --json
 ```
 
-聚合统一 benchmark 结果。
+聚合统一基准测试结果。
 
 ### `qit bench replay`
 
@@ -118,7 +118,7 @@ qit bench eval --input ./results/tau.jsonl --json
 qit bench replay --run ./runs/<run_id>
 ```
 
-把 benchmark run 直接桥接到 qita replay（回放）。
+把基准测试运行直接桥接到 qita 回放。
 
 ### `qit bench export`
 
@@ -126,7 +126,7 @@ qit bench replay --run ./runs/<run_id>
 qit bench export --run ./runs/<run_id> --html ./report.html
 ```
 
-把 benchmark run 导出成独立 HTML。
+把基准测试运行导出成独立 HTML。
 
 ## qit skill
 
@@ -134,7 +134,7 @@ qit bench export --run ./runs/<run_id> --html ./report.html
 qit skill <subcommand>
 ```
 
-用于管理 QitOS 工作流中使用的第三方 skills。
+用于管理 QitOS 工作流中使用的第三方技能。
 
 ## 推荐流程
 
@@ -144,7 +144,7 @@ qit skill <subcommand>
 2. `qit demo minimal`
 3. `qita board`
 
-做 benchmark 工作时，推荐：
+做基准测试工作时，推荐：
 
 1. `qit bench run`
 2. `qit bench eval`
@@ -152,4 +152,4 @@ qit skill <subcommand>
 4. `qit bench replay`
 5. `qit bench export`
 
-如果你还想理解这条路径背后的设计，请继续阅读 [Official runs](/zh/concepts/official-runs) 与 [Tracing](/zh/concepts/tracing)。
+如果你还想理解这条路径背后的设计，请继续阅读 [官方运行](/zh/concepts/official-runs) 与 [追踪](/zh/concepts/tracing)。

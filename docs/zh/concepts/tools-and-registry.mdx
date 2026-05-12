@@ -1,13 +1,13 @@
 ---
 title: "Tools 与 Registry"
-description: "理解 QitOS 中的工具、工具集以及 ToolRegistry 如何组合成 agent 能力表面。"
+description: "理解 QitOS 中的工具、工具集以及 ToolRegistry 如何组合成智能体能力表面。"
 ---
 
-工具就是 agent 可以执行的动作。运行时，Engine 会把 `Decision` 里的 action（标准化工具调用）分发给 `ToolRegistry`，由它查找并执行对应 callable。
+工具就是智能体可以执行的动作。运行时，Engine 会把 `Decision` 里的动作（标准化工具调用）分发给 `ToolRegistry`，由它查找并执行对应的可调用对象。
 
 ## `@tool` 装饰器
 
-使用 `@tool` 把任意 callable 标记成 QitOS 工具。这个装饰器只会附加元数据，不会改变函数行为，测试里依旧可以像普通函数一样直接调用。
+使用 `@tool` 把任意可调用对象标记成 QitOS 工具。这个装饰器只会附加元数据，不会改变函数行为，测试里依旧可以像普通函数一样直接调用。
 
 ```python
 from qitos import tool
@@ -29,7 +29,7 @@ def read_file(path: str) -> str:
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | `name` | `str \| None` | 在 `Decision.actions` 中使用的工具名。默认是函数 `__name__`。 |
-| `description` | `str \| None` | 展示给 LLM 的工具说明。默认回退到 docstring。 |
+| `description` | `str \| None` | 展示给大模型的工具说明。默认回退到文档字符串。 |
 | `timeout_s` | `float \| None` | 单次调用超时时间，单位秒。`None` 表示不限时。 |
 | `max_retries` | `int` | 失败时重试次数。默认 `0`。 |
 | `permissions` | `ToolPermission \| None` | 声明该工具需要的系统能力。 |
@@ -37,7 +37,7 @@ def read_file(path: str) -> str:
 
 ### `ToolPermission`
 
-`ToolPermission` 描述工具允许做什么。Engine 可以在 preflight 阶段利用这些信息检查环境能力。
+`ToolPermission` 描述工具允许做什么。Engine 可以在预检阶段利用这些信息检查环境能力。
 
 ```python
 from qitos.core.tool import ToolPermission
@@ -56,7 +56,7 @@ ToolPermission(
 
 ## ToolRegistry
 
-`ToolRegistry` 是 Engine 分发 action 时查询的集合。通常在 `AgentModule` 构造函数里创建并传入。
+`ToolRegistry` 是 Engine 分发动作时查询的注册表。通常在 `AgentModule` 构造函数里创建并传入。
 
 ```python
 from qitos import ToolRegistry
@@ -66,7 +66,7 @@ registry = ToolRegistry()
 
 ### 注册单个工具
 
-用 `registry.register()` 注册一个 callable 或 `BaseTool` 实例：
+用 `registry.register()` 注册一个可调用对象或 `BaseTool` 实例：
 
 ```python
 @tool(name="add")
@@ -87,7 +87,7 @@ registry.register(some_func, meta=ToolMeta(description="Custom description"))
 ```
 
 <Warning>
-  同一个 registry 内工具名必须唯一。重复注册同名工具会抛出 `ValueError`。
+  同一个注册表内工具名必须唯一。重复注册同名工具会抛出 `ValueError`。
 </Warning>
 
 ### 用 `include` 扫描模块或对象
@@ -110,9 +110,9 @@ registry.include(tools)
 
 当你把一组相关工具封装成类方法时，这通常是最方便的注册方式。
 
-### 注册 toolset
+### 注册工具集
 
-Toolset 指的是任何拥有 `tools()` 方法、并返回 callable 或 `BaseTool` 列表的对象。使用 `register_toolset()` 注册它：
+工具集（toolset）指的是任何拥有 `tools()` 方法、并返回可调用对象或 `BaseTool` 列表的对象。使用 `register_toolset()` 注册它：
 
 ```python
 from qitos.kit import CodingToolSet
@@ -129,7 +129,7 @@ registry.register_toolset(
 )
 ```
 
-来自 toolset 的工具会自动带 namespace：`toolset_name.tool_name`。你也可以显式指定 namespace：
+来自工具集的工具会自动带命名空间：`toolset_name.tool_name`。你也可以显式指定命名空间：
 
 ```python
 registry.register_toolset(CodingToolSet(workspace_root="/tmp/work"), namespace="coding")
@@ -169,15 +169,15 @@ class DatabaseTool(BaseTool):
 registry.register(DatabaseTool(db_path="data.db"))
 ```
 
-当你向 `register()` 传入普通 callable 时，QitOS 内部会自动把它包装成 `FunctionTool`。大多数情况下你无需显式实例化它。
+当你向 `register()` 传入普通可调用对象时，QitOS 内部会自动把它包装成 `FunctionTool`。大多数情况下你无需显式实例化它。
 
 <Note>
-  对于实际编码 agent，通常优先使用 `CodingToolSet` 或 `qitos.kit.toolset` 中的 preset builders，而不是手工把文件、shell、web 工具逐个注册。
+  对于实际编码智能体，通常优先使用 `CodingToolSet` 或 `qitos.kit.toolset` 中的预设构建器，而不是手工把文件、Shell、Web 工具逐个注册。
 </Note>
 
 ---
 
-## 把 registry 传给 AgentModule
+## 把注册表传给 AgentModule
 
 把准备好的 `ToolRegistry` 传入 `AgentModule.__init__()`：
 
@@ -193,7 +193,7 @@ class SearchAgent(AgentModule[MyState, dict, Action]):
         super().__init__(tool_registry=registry)
 ```
 
-Engine 会读取 `agent.tool_registry` 并据此创建 `ActionExecutor`。你也可以调用 `registry.get_tool_descriptions()` 得到格式化工具说明，用于插入 system prompt：
+Engine 会读取 `agent.tool_registry` 并据此创建 `ActionExecutor`。你也可以调用 `registry.get_tool_descriptions()` 得到格式化工具说明，用于插入系统提示词：
 
 ```python
 def build_system_prompt(self, state: MyState) -> str | None:

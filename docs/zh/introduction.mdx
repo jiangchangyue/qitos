@@ -1,181 +1,181 @@
 ---
 title: "简介"
-description: "QitOS 是一个以研究为先的 agent 框架，用清晰的 AgentModule + Engine 内核构建可复现的 LLM agents。"
+description: "QitOS 是一个以研究为先的智能体框架，用清晰的 AgentModule + Engine 内核构建可复现的 LLM 智能体。"
 ---
 
-QitOS 提供了一套稳定的 `AgentModule + Engine` 执行内核（kernel），用于构建可复现的 LLM agent。无论你是在原型化 ReAct 循环、运行 GAIA 基准，还是交付一个面向真实工作流的编码 agent，运行结果始终可追踪、可组合、可复现。
+QitOS 提供了一套稳定的 `AgentModule + Engine` 内核（kernel），用于构建可复现的 LLM 智能体（agent）。无论你是在原型化 ReAct 循环、运行 GAIA 基准测试（benchmark），还是交付一个面向真实工作流的编程智能体，运行结果始终可追踪、可组合、可复现。
 
-一个长时间运行的 QitOS coding run 不应该退化成难以理解的胶水代码。
+一个长时间运行的 QitOS 编程任务不应该退化成难以理解的胶水代码。
 
-![QitOS 实时 coding run](/images/demo.gif)
+![QitOS 实时编程运行](/images/demo.gif)
 
-## 在 QitOS 中有两条 authoring path
+## QitOS 中的两种编写方式
 
-QitOS 保留两条 agent 编写路径。
+QitOS 提供两种智能体编写方式。
 
-### Research-first
+### 研究优先（research-first）
 
 这是研究者的默认入口。
 
 你可以手写：
 
-- system prompt
-- parser（将原始模型输出解析为 Decision 的组件）
-- model protocol（模型输出的格式契约）
-- model transport（与模型 API 通信的客户端）
-- tool surface
+- 系统提示词（prompt）
+- 解析器（parser）——将原始模型输出解析为决策（decision）的组件
+- 模型协议（protocol）——模型输出的格式契约
+- 模型传输层（transport）——与模型 API 通信的客户端
+- 工具面（tool surface）
 
-这是框架里最 torch-like 的路径：直接、显式、便于实验。
+这是框架里最接近 PyTorch 风格的路径：直接、显式、便于实验。
 
-### Preset-first
+### 预设优先（preset-first）
 
-当你需要稳定 baseline 或快速切换模型家族时，可以走 preset-first。
+当你需要稳定基线（baseline）或快速切换模型家族时，可以选择预设优先方式。
 
 你会从这些层开始：
 
-- family presets
-- harness policies
-- preset tool builders
+- 家族预设（family preset）
+- 适配层策略（harness policy）
+- 预设工具构建器
 
-这条路径尤其适合同一个 agent 在 Qwen、Kimi、MiniMax、`gpt-oss` 与 Gemma 4 之间切换的场景。
+这条路径尤其适合同一个智能体在 Qwen、Kimi、MiniMax、`gpt-oss` 与 Gemma 4 之间切换的场景。
 
 ## QitOS 适合谁
 
 QitOS 主要面向三类实践者：
 
-- **研究者**：原型化 ReAct、PlanAct、Tree-of-Thought、Reflexion 与新的 agent 方法，并获得可 replay、可对比、可发表的运行记录（trace）。
-- **Agent 构建者**：在稳定执行循环上构建 tool-using agents，而不是反复手写围绕裸 LLM 调用的框架胶水。
-- **评测者**：在和产品 agent 相同的内核上运行 GAIA、Tau-Bench 与 CyBench，让 benchmark 结果真正能够迁移。
+- **研究者**：原型化 ReAct、PlanAct、Tree-of-Thought、Reflexion 与新的智能体方法，并获得可回放（replay）、可对比、可发表的追踪记录（trace）。
+- **智能体构建者**：在稳定执行循环上构建使用工具的智能体，而不是反复手写围绕裸 LLM 调用的框架胶水。
+- **评测者**：在和产品智能体相同的内核上运行 GAIA、Tau-Bench 与 CyBench，让基准测试结果真正能够迁移。
 
 ## 核心能力
 
 ### 可复现的运行
 
-每次 QitOS 运行都会产出 `manifest.json`、`events.jsonl` 和 `steps.jsonl`。这些文件记录模型 ID、prompt hash、config hash、seed、tool manifest 等关键信息，足以精确复现或比较两次运行。
+每次 QitOS 运行都会产出 `manifest.json`、`events.jsonl` 和 `steps.jsonl`。这些文件记录模型 ID、提示词哈希、配置哈希、随机种子、工具清单等关键信息，足以精确复现或比较两次运行。
 
 ### 内置可观测性：qita
 
-`qita` 是 QitOS 自带的 trace viewer。任意一次运行结束后，启动 board 即可查看逐步执行、重放轨迹，并导出成独立 HTML。
+`qita` 是 QitOS 自带的追踪记录查看器。任意一次运行结束后，启动看板即可查看逐步执行、回放运行轨迹，并导出（export）成独立 HTML。
 
 ```bash
 qita board --logdir runs
 ```
 
-board 默认运行在 `http://127.0.0.1:8765`，当新的 run 出现时会自动刷新。
+看板默认运行在 `http://127.0.0.1:8765`，当新运行出现时会自动刷新。
 
-### 规范化的 agent 模式
+### 规范化的智能体模式
 
-QitOS 内置四种经典 reasoning pattern，对应的可运行示例位于 `examples/patterns/`：
+QitOS 内置四种经典推理模式，对应的可运行示例位于 `examples/patterns/`：
 
 | 模式 | 说明 |
 |---|---|
-| **ReAct** | 文本协议，每步至多执行一个核心动作 |
+| **ReAct** | 文本协议，每步至多执行一个核心动作（action） |
 | **PlanAct** | 先生成显式计划，再按步骤执行 |
 | **Tree-of-Thought** | 先分支、评分，再决定执行路径 |
 | **Reflexion** | Actor-Critic 循环，带基于证据的重试 |
 
 ### 基准测试适配器
 
-QitOS 提供 GAIA、Tau-Bench 与 CyBench 适配器，它们都运行在与你自定义 agent 相同的 `AgentModule + Engine` 内核上，不需要另一套独立评测框架。
+QitOS 提供 GAIA、Tau-Bench 与 CyBench 适配器，它们都运行在与你自定义智能体相同的 `AgentModule + Engine` 内核上，不需要另一套独立评测框架。
 
 ## 特色设计
 
-这些设计决定了 QitOS 不只是 agent 工具集合，而是一套清晰的运行时方法论。
+这些设计决定了 QitOS 不只是智能体工具集合，而是一套清晰的运行时（runtime）方法论。
 
 ### 单内核架构
 
-QitOS 最核心的约束只有一条：一次 run 只有一个 runtime kernel（执行内核）。
+QitOS 最核心的约束只有一条：一次运行只有一个运行时内核。
 
 - `AgentModule` 定义策略
 - `Engine` 负责执行
-- tools、parsers、critics（后置评估器，可批准、停止或重试当前步骤）、memory 与 tracing 都附着在这条主链路上
+- 工具、解析器、评估器（critic，可批准、停止或重试当前步骤的后置评估组件）、记忆与追踪都附着在这条主链路上
 
-这样示例、benchmark 和生产型 agent 之间就能保持可比性。
+这样示例、基准测试和生产型智能体之间就能保持可比性。
 
-### 协议感知的 prompt 与 parser
+### 协议感知的提示词与解析器
 
-QitOS 把 prompt 格式与 parser（将原始模型输出解析为 Decision 的组件）选择当作一等设计契约：
+QitOS 把提示词格式与解析器选择当作一等设计契约：
 
-- ReAct prompt 搭配 `ReActTextParser`
-- JSON prompt 搭配 `JsonDecisionParser`
-- XML prompt 搭配 `XmlDecisionParser`
-- Terminus、MiniMax tool-call parser 等结构化变体也仍然走同一条 `model response -> parser -> Decision` 路径
+- ReAct 提示词搭配 `ReActTextParser`
+- JSON 提示词搭配 `JsonDecisionParser`
+- XML 提示词搭配 `XmlDecisionParser`
+- Terminus、MiniMax 工具调用解析器等结构化变体也仍然走同一条 `model response -> parser -> Decision` 路径
 
-正因为这层契约是显式的，trace 才不会退化成 provider-specific 的隐式胶水。protocol 和 parser 的匹配关系始终可审计。
+正因为这层契约是显式的，追踪记录才不会退化成提供商特定的隐式胶水。协议和解析器的匹配关系始终可审计。
 
-### 以 preset 为优先的 agent 编写方式
+### 以预设为优先的智能体编写方式
 
-QitOS 提供可复用的 authoring blocks，不需要每个 agent 从零开始组装一切：
+QitOS 提供可复用的编写模块，不需要每个智能体从零开始组装一切：
 
 - `coding_tools(...)`、`advanced_coding_tools(...)`、`web_tools()`、`task_tools(...)`、`security_audit_tools(...)`
 - `WindowMemory`、`SummaryMemory`、`VectorMemory`、`MarkdownFileMemory`
 - `WindowHistory`、`TokenBudgetSummaryHistory`、`CompactHistory`
 - `NumberedPlanBuilder`、`DynamicTreeSearch`
 
-研究者可以调整 policy，而不必重搭整套基础设施。
+研究者可以调整策略，而不必重搭整套基础设施。
 
 ### 面向长时运行的上下文控制
 
-长时运行 agent 是 QitOS 的一等公民。你可以通过这些层次控制上下文膨胀：
+长时运行智能体是 QitOS 的一等公民。你可以通过这些层次控制上下文膨胀：
 
 - `HistoryPolicy` 控制消息选择
-- `TokenBudgetSummaryHistory` 做 token-budget 感知的摘要
-- `CompactHistory` 做多阶段 compaction（上下文压缩策略）
-- memory adapters 负责语义检索与持久记忆
+- `TokenBudgetSummaryHistory` 做 token 预算感知的摘要
+- `CompactHistory` 做多阶段上下文压缩（compaction）
+- 记忆适配器负责语义检索与持久记忆
 
 这也是 QitOS 的研究价值所在：框架帮你研究长时运行，而不是假设上下文是免费的。
 
-### trace-first 的可观测性
+### 追踪优先的可观测性
 
 QitOS 的假设是：只要一次运行重要，它就应该可检查。
 
-每次 traced run 都会产出结构化 artifacts（持久化的输出文件），而 `qita` 会把它们变成：
+每次追踪运行都会产出结构化产物（artifact），而 `qita` 会把它们变成：
 
-- 用于比较多次实验的 board
-- 用于逐步理解单次运行的 replay
-- 用于分享与审计的 export
+- 用于比较多次实验的看板
+- 用于逐步理解单次运行的回放
+- 用于分享与审计的导出
 
-### 不引入新 runtime 的领域专门化
+### 不引入新运行时的领域专门化
 
-QitOS 一个关键的设计点是：领域 agent 仍然是普通的 QitOS agent。
+QitOS 一个关键的设计点是：领域智能体仍然是普通的 QitOS 智能体。
 
-Claude Code 风格 agent、benchmark runners、代码安全审计 agent 都复用了同一个 runtime。领域行为体现在：
+Claude Code 风格智能体、基准测试运行器、代码安全审计智能体都复用了同一个运行时。领域行为体现在：
 
-- state 设计
-- prompt policy
-- tool composition
-- `reduce()` 语义
+- 状态设计
+- 提示词策略
+- 工具组合
+- `reduce()` 归约（reduce）语义
 
 专门化因此更容易理解，也更容易复现。
 
 ## 当前状态
 
 <Warning>
-QitOS 当前处于 **Alpha** 阶段。稳定的基础主要是 `AgentModule + Engine` 内核、`qita` trace/observability 流程、规范化示例以及 benchmark adapters。更高层的 convenience APIs、部分 `kit` 模块和实验性 toolsets 仍可能持续演进。若你正在评估采用路径，建议从内核与 examples 入手，不要假设所有 API 表面都已冻结。
+QitOS 当前处于 **Alpha** 阶段。稳定的基础主要是 `AgentModule + Engine` 内核、`qita` 追踪与可观测性流程、规范化示例以及基准测试适配器。更高层的便捷 API、部分 `kit` 模块和实验性工具集仍可能持续演进。若你正在评估采用路径，建议从内核与示例入手，不要假设所有 API 表面都已冻结。
 </Warning>
 
 ## 接下来读什么
 
 <CardGroup cols={2}>
   <Card title="快速开始" icon="rocket" href="/zh/quickstart">
-    2 分钟内运行第一个 agent
+    2 分钟内运行第一个智能体
   </Card>
   <Card title="教程课程" icon="graduation-cap" href="/zh/tutorials">
-    通过四节课程理解 QitOS 的 agent 设计方法
+    通过四节课程理解 QitOS 的智能体设计方法
   </Card>
   <Card title="安装" icon="download" href="/zh/installation">
-    安装 QitOS 及其可选 extras
+    安装 QitOS 及其可选组件
   </Card>
   <Card title="核心概念" icon="book" href="/zh/concepts/agent-module">
     理解 AgentModule、Engine、State 与 Tools
   </Card>
-  <Card title="Agent 模式" icon="diagram-project" href="/zh/guides/agent-patterns">
+  <Card title="智能体模式" icon="diagram-project" href="/zh/guides/agent-patterns">
     查看 ReAct、PlanAct、ToT 与 Reflexion 的模式地图
   </Card>
   <Card title="Kit 参考" icon="toolbox" href="/zh/reference/kit">
-    浏览内置 parsers、toolsets、memory、planning 与 history 策略
+    浏览内置解析器、工具集、记忆、规划与历史策略
   </Card>
-  <Card title="Tracing 与 qita" icon="chart-line" href="/zh/guides/observability">
-    了解 QitOS 如何让每次运行都可检查、可 replay、可导出
+  <Card title="追踪与 qita" icon="chart-line" href="/zh/guides/observability">
+    了解 QitOS 如何让每次运行都可检查、可回放、可导出
   </Card>
 </CardGroup>

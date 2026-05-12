@@ -1,28 +1,28 @@
 ---
-title: "OSWorld 基准适配层"
-description: "QitOS 中真正的 OSWorld benchmark adapter 路径，并与 desktop starter benchmark 和可复现 baseline recipe 区分开。"
+title: "OSWorld 基准测试适配器"
+description: "QitOS 中真正的 OSWorld 基准测试适配器路径，并与桌面入门基准测试和可复现基线方案区分开来。"
 ---
 
-# OSWorld 基准适配层
+# OSWorld 基准测试适配器
 
 现在 QitOS 明确区分三层：
 
 - **框架层**：`DesktopEnv`、`ActionSpace`、`EnvironmentAdapter`、qita 可视化调试
-- **Benchmark 层**：`qitos.benchmark.osworld`
-- **Recipe 层**：`qitos.recipes.desktop.osworld_starter`
+- **基准测试层**：`qitos.benchmark.osworld`
+- **方案层**：`qitos.recipes.desktop.osworld_starter`
 
-`osworld` 不再被 `desktop-starter` 这个 starter benchmark 名称隐含替代。
+`osworld` 不再被 `desktop-starter` 这个入门基准测试名称隐含替代。
 
 ## `qitos.benchmark.osworld` 负责什么
 
-OSWorld benchmark family 只负责 benchmark-relevant 的内容：
+OSWorld 基准测试族只负责与基准测试相关的内容：
 
 - 从 `test_all.json` 和 domain/example JSON 读取真实数据集
-- sample identity 与 benchmark 元数据归一化
-- benchmark runtime prepare/finalize hook
-- OSWorld 专用 setup / postconfig 生命周期
-- upstream evaluator / getter bridge
-- scorer 输出与 benchmark-native artifact
+- 样本身份与基准测试元数据归一化
+- 基准测试运行时准备与收尾钩子
+- OSWorld 专用安装与后配置生命周期
+- 上游评估器与获取器桥接
+- 评分器输出与基准测试原生产物
 
 这些都不应该塞进 `qitos/core` 或通用 `DesktopEnv`。
 
@@ -30,15 +30,15 @@ OSWorld benchmark family 只负责 benchmark-relevant 的内容：
 
 这些仍然属于框架层：
 
-- provider-neutral GUI action vocabulary
+- 与供应商无关的 GUI 动作词表
 - `DesktopEnv`
-- multimodal observation 契约
-- qita screenshot timeline / replay / overlay
-- protocol（模型输出的格式契约）/ parser（将原始模型输出解析为Decision的组件）/ native tool calling 的 family preset（预配置的模型家族默认值）所有权
+- 多模态观测结果契约
+- qita 截图时间轴、回放与叠加
+- 协议、解析器、原生工具调用的家族预设所有权
 
-## Canonical usage
+## 标准用法
 
-starter benchmark 仍然是：
+入门基准测试仍然是：
 
 ```bash
 qit bench run \
@@ -48,7 +48,7 @@ qit bench run \
   --output ./artifacts/desktop-starter.jsonl
 ```
 
-真实 benchmark family 则是独立路径：
+真实基准测试族则是独立路径：
 
 ```bash
 qit bench run \
@@ -61,8 +61,8 @@ qit bench run \
   --output ./artifacts/osworld.jsonl
 ```
 
-`desktop` 仍然保留为 `desktop-starter` 的兼容 alias，但 canonical benchmark name 现在是 `desktop-starter`。
+`desktop` 仍然保留为 `desktop-starter` 的兼容别名，但标准基准测试名称现在是 `desktop-starter`。
 
 ## 当前应该如何理解
 
-`osworld` 现在已经成为 QitOS 里的官方 benchmark family，但它应被理解为 benchmark adapter 层，而不是对 full OSWorld parity 的过度宣称。
+`osworld` 现在已经成为 QitOS 里的官方基准测试族，但它应被理解为基准测试适配器层，而不是对完整 OSWorld 对等性的过度宣称。

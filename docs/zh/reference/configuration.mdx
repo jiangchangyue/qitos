@@ -1,13 +1,13 @@
 ---
 title: "配置"
-description: "QitOS 的配置入口总览：`AgentModule.run()` 参数、`Engine` 构造参数、tracing 控制与环境变量。"
+description: "QitOS 的配置入口总览：`AgentModule.run()` 参数、`Engine` 构造参数、追踪控制与环境变量。"
 ---
 
 QitOS 的配置主要分三层：
 
-1. **`AgentModule.run()` 关键字参数**：最常见、最推荐的 per-run 配置入口
-2. **`Engine` 构造函数参数**：更底层的 runtime 控制
-3. **环境变量**：provider 凭证与模型默认值
+1. **`AgentModule.run()` 关键字参数**：最常见、最推荐的每次运行配置入口
+2. **`Engine` 构造函数参数**：更底层的运行时控制
+3. **环境变量**：供应商凭证与模型默认值
 
 ## AgentModule.run() 参数
 
@@ -34,7 +34,7 @@ QitOS 的配置主要分三层：
 
 </Accordion>
 
-<Accordion title="Tracing 与 Rendering">
+<Accordion title="追踪与渲染">
 
 - `trace`
 - `trace_logdir`
@@ -44,7 +44,7 @@ QitOS 的配置主要分三层：
 
 </Accordion>
 
-<Accordion title="Hooks 与 Engine 透传">
+<Accordion title="钩子与 Engine 透传">
 
 - `hooks`
 - `render_hooks`
@@ -71,7 +71,7 @@ result = agent.run(
 当你直接构造 `Engine` 时，最常用的参数包括：
 
 - `agent`
-- `budget`
+- `budget`（预算）
 - `validation_gate`
 - `recovery_handler`
 - `recovery_policy`
@@ -83,7 +83,7 @@ result = agent.run(
 - `critics`（评估器）
 - `env`
 - `history_policy`
-- `hooks`
+- `hooks`（钩子）
 
 `RuntimeBudget` 的常见字段：
 
@@ -101,14 +101,14 @@ class RuntimeBudget:
 
 | 变量 | 用途 |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI / OpenAI-compatible API key |
-| `OPENAI_BASE_URL` | OpenAI-compatible endpoint base URL |
-| `QITOS_API_KEY` | `ModelFactory.from_env()` 可识别的备用 key |
+| `OPENAI_API_KEY` | OpenAI / OpenAI 兼容 API 密钥 |
+| `OPENAI_BASE_URL` | OpenAI 兼容端点基础 URL |
+| `QITOS_API_KEY` | `ModelFactory.from_env()` 可识别的备用密钥 |
 | `QITOS_MODEL` | 默认模型 ID |
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI key |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint |
-| `AZURE_OPENAI_DEPLOYMENT` | Azure deployment 名称 |
-| `AZURE_OPENAI_API_VERSION` | Azure API version |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI 密钥 |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI 端点 |
+| `AZURE_OPENAI_DEPLOYMENT` | Azure 部署名称 |
+| `AZURE_OPENAI_API_VERSION` | Azure API 版本 |
 
 示例：
 
@@ -117,9 +117,9 @@ OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.siliconflow.cn/v1/
 ```
 
-## Trace 输出目录
+## 追踪输出目录
 
-默认情况下，`AgentModule.run()` 会把 trace（运行记录）写到 `./runs/`：
+默认情况下，`AgentModule.run()` 会把追踪记录写到 `./runs/`：
 
 ```text
 <trace_logdir>/

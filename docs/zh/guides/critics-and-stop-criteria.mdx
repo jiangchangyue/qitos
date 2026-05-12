@@ -1,18 +1,18 @@
 ---
-title: "Critics 与停止条件"
-description: "使用 critics、stop criteria 与 recovery policy 约束 agent 运行。"
+title: "评估器与停止条件"
+description: "使用评估器、停止条件与恢复策略来约束智能体运行。"
 ---
 
-Engine 提供两套互补机制来控制 run 的生命周期：
+Engine 提供两套互补机制来控制运行的生命周期：
 
-- **Critics（评估器）**：在 `reduce()`（归约）之后验证每一步，可以允许继续、强制停止，或要求重试本步。
-- **Stop criteria**：在 critics 通过后进行统一停止判断，根据 state 与 runtime 指标决定是否结束循环。
+- **评估器（critic）**：在归约（reduce，将观测结果和决策归约回状态的钩子）之后验证每一步，可以允许继续、强制停止，或要求重试本步。
+- **停止条件**：在评估器通过后进行统一停止判断，根据状态与运行时指标决定是否结束循环。
 
-## Critics
+## 评估器
 
-critic（后置评估器，可批准、停止或重试当前步骤）会接收当前 state、本步 decision（决策）和 action（标准化工具调用）results，然后返回一个结构化 verdict dict。
+评估器会接收当前状态、本步决策（decision，智能体每步的结构化决策）和动作（action，标准化工具调用）结果，然后返回一个结构化裁定字典。
 
-### Critic 契约
+### 评估器契约
 
 ```python
 from abc import ABC, abstractmethod
@@ -38,17 +38,17 @@ class Critic(ABC):
         """
 ```
 
-### 支持的 critic 动作
+### 支持的评估器动作
 
 | `action` | Engine 行为 |
 |---|---|
 | `"continue"` | 接受本步，继续运行 |
 | `"stop"` | 把 `state.stop_reason` 设为 `StopReason.CRITIC_STOP` 并结束 |
-| `"retry"` | 重试当前 step，保留 observation（每步后 agent 接收的结构化观察结果）并递增 step counter |
+| `"retry"` | 重试当前步骤，保留观测结果（observation，每步后智能体接收的结构化观察结果）并递增步数计数器 |
 
 除 `"stop"` 和 `"retry"` 外，其他值都会被视作 `"continue"`。
 
-### 如何给 run 添加 critics
+### 如何给运行添加评估器
 
 可以直接在 `agent.run()` 时传入：
 
@@ -70,7 +70,7 @@ engine = Engine(agent=agent, critics=[MyScoreCritic()])
 result = engine.run("my task")
 ```
 
-### 自定义 critic 示例
+### 自定义评估器示例
 
 ```python
 from typing import Any, Dict
@@ -99,13 +99,13 @@ class VerificationCritic(Critic):
         return {"action": "continue", "score": 1.0}
 ```
 
-critic 输出会被记录进 trace（运行记录）的 `step.critic_outputs`，并可在 `qita` 中查看。
+评估器输出会被记录进追踪记录（trace）的 `step.critic_outputs`，并可在 `qita` 中查看。
 
 ---
 
-## Stop criteria
+## 停止条件
 
-stop criteria 会在每步的 critic 阶段之后执行。每个 criterion 都会接收当前 state、step count 与 runtime info。
+停止条件会在每步的评估器阶段之后执行。每个条件都会接收当前状态、步数与运行时信息。
 
 ### StopCriteria 契约
 
@@ -126,13 +126,13 @@ class StopCriteria(ABC):
         """Return (should_stop, reason, detail)."""
 ```
 
-### 内置 criteria
+### 内置条件
 
 QitOS 在 `qitos.engine.stop_criteria` 中提供四个常用实现：
 
 **`FinalResultCriteria`**（默认）
 
-当 `state.final_result` 被设置为非空字符串时停止。它是默认唯一启用的 criterion。
+当 `state.final_result` 被设置为非空字符串时停止。它是默认唯一启用的条件。
 
 ```python
 from qitos.engine.stop_criteria import FinalResultCriteria
@@ -160,7 +160,7 @@ criterion = MaxRuntimeCriteria(max_runtime_seconds=120.0)
 
 **`StagnationCriteria`**
 
-当 state 连续若干步没有有效变化时停止。它使用一个 signature function 来判断是否有变化。
+当状态连续若干步没有有效变化时停止。它使用一个签名函数来判断是否有变化。
 
 ```python
 from qitos.engine.stop_criteria import StagnationCriteria
@@ -171,7 +171,7 @@ criterion = StagnationCriteria(
 )
 ```
 
-### 给 run 传入 stop criteria
+### 给运行传入停止条件
 
 ```python
 from qitos.engine.stop_criteria import FinalResultCriteria, MaxRuntimeCriteria, StagnationCriteria
@@ -192,7 +192,7 @@ result = agent.run(
   一旦你手动传入 `stop_criteria`，就会**替换**默认的 `FinalResultCriteria`。如果仍希望在 `final_result` 被设置时自动停止，请把 `FinalResultCriteria()` 也放进去。
 </Warning>
 
-### 自定义 criterion 示例
+### 自定义条件示例
 
 ```python
 from typing import Any, Dict, Optional, Tuple
@@ -221,7 +221,7 @@ class MinEvidenceCriteria(StopCriteria):
 
 ---
 
-## 用 TaskBudget 表达预算停止
+## 用 TaskBudget 表达预算（budget）停止
 
 对于结构化任务，通常用 `TaskBudget` 同时表达三种预算：
 
@@ -241,11 +241,11 @@ task = Task(
 result = agent.run(task=task, return_state=True)
 ```
 
-当传入 `Task` 时，Engine 会在 run 开始前把 `TaskBudget` 应用到内部 `RuntimeBudget` 上。
+当传入 `Task` 时，Engine 会在运行开始前把 `TaskBudget` 应用到内部 `RuntimeBudget` 上。
 
 ## StopReason 值
 
-`StopReason` 是 `qitos.core.errors` 中的字符串枚举。每次 run 结束后都会写入 `state.stop_reason`。
+`StopReason` 是 `qitos.core.errors` 中的字符串枚举。每次运行结束后都会写入 `state.stop_reason`。
 
 | 值 | 含义 |
 |---|---|
@@ -254,5 +254,5 @@ result = agent.run(task=task, return_state=True)
 | `budget_steps` | 达到 `max_steps` |
 | `budget_time` | 超过 `max_runtime_seconds` |
 | `budget_tokens` | 超过 `max_tokens` |
-| `critic_stop` | critic 返回了 `action: "stop"` |
-| `stagnation` | 连续多步 state 未发生有效变化 |
+| `critic_stop` | 评估器返回了 `action: "stop"` |
+| `stagnation` | 连续多步状态未发生有效变化 |

@@ -5,7 +5,7 @@ description: "理解 QitOS 中的 StateSchema、Task、TaskBudget、TaskResource
 
 ## StateSchema
 
-`StateSchema` 是 agent 强类型状态的基类。一次 run 中，所有 hooks 都围绕它读取与写入，它是整个运行期间的单一事实来源（single source of truth）。
+`StateSchema` 是智能体强类型状态的基类。一次运行中，所有钩子都围绕它读取与写入，它是整个运行期间的单一事实来源。
 
 ### 内置字段
 
@@ -27,14 +27,14 @@ class StateSchema:
 | `task` | 传给 `init_state` 的任务文本，通常由 Engine 自动设置。 |
 | `current_step` | 当前步索引。每步结束后由 Engine 递增。 |
 | `max_steps` | 最大允许步数，必须 `> 0` 且 `>= current_step`。 |
-| `final_result` | agent 的最终答案。设置后会触发默认的 `FinalResultCriteria`。 |
+| `final_result` | 智能体的最终答案。设置后会触发默认的 `FinalResultCriteria`。 |
 | `stop_reason` | 运行结束原因，由 `state.set_stop()` 或 Engine 在预算耗尽时写入。 |
 | `metadata` | 任意附加运行上下文。 |
 | `metrics` | 跟踪数值型指标的自由字典。 |
 
 ### 继承 StateSchema
 
-通过继承 `StateSchema` 来增加自己的字段。Engine 会在每个 step record 中通过 `state.to_dict()` 记录 state diff，因此这些字段也会自动进入 trace。
+通过继承 `StateSchema` 来增加自己的字段。Engine 会在每个步骤记录中通过 `state.to_dict()` 记录状态差异，因此这些字段也会自动进入追踪记录。
 
 ```python
 from dataclasses import dataclass, field
@@ -60,9 +60,9 @@ def init_state(self, task: str, **kwargs: Any) -> ResearchState:
     )
 ```
 
-### 让 run 停下来
+### 让运行停下来
 
-你可以在 `reduce` 中调用 `state.set_stop()`，让 run 在下一次 stop check 时终止。它接受 `StopReason` 枚举或等价字符串。
+你可以在 `reduce` 中调用 `state.set_stop()`，让运行在下一次停止检查时终止。它接受 `StopReason` 枚举或等价字符串。
 
 ```python
 from qitos import StopReason
@@ -83,7 +83,7 @@ state.final_result = "The answer is 42."
 
 ## Task
 
-`Task` 是结构化任务包，用来描述 agent 应完成什么、需要哪些资源、以及受什么约束。任何支持 `agent.run()` 或 `Engine.run()` 的地方都可以传入 `Task`。
+`Task` 是结构化任务包，用来描述智能体应完成什么、需要哪些资源、以及受什么约束。任何支持 `agent.run()` 或 `Engine.run()` 的地方都可以传入 `Task`。
 
 ```python
 from qitos import Task, TaskBudget, TaskResource
@@ -106,19 +106,19 @@ result = agent.run(task, return_state=True)
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | `str` | 唯一任务 ID，会写入 trace artifacts（持久化的输出文件）。 |
+| `id` | `str` | 唯一任务标识，会写入追踪记录产物。 |
 | `objective` | `str` | 传给 `init_state` 的任务文本。 |
-| `resources` | `list[TaskResource]` | 任务依赖的文件、目录、URL 或 artifacts（持久化的输出文件）。 |
-| `env_spec` | `EnvSpec \| None` | 声明 environment 类型与能力。 |
-| `constraints` | `dict[str, Any]` | 传给 agent 的自由约束信息。 |
+| `resources` | `list[TaskResource]` | 任务依赖的文件、目录、URL 或产物。 |
+| `env_spec` | `EnvSpec \| None` | 声明环境类型与能力。 |
+| `constraints` | `dict[str, Any]` | 传给智能体的自由约束信息。 |
 | `success_criteria` | `list[str]` | 在 `TaskResult` 中记录的人类可读成功标准。 |
-| `budget` | `TaskBudget` | 覆盖 Engine 默认 budget 的任务级预算。 |
-| `inputs` | `dict[str, Any]` | 提供给 agent 的结构化输入。 |
-| `metadata` | `dict[str, Any]` | 写入 trace manifest 的自由元数据。 |
+| `budget` | `TaskBudget` | 覆盖 Engine 默认预算的任务级预算。 |
+| `inputs` | `dict[str, Any]` | 提供给智能体的结构化输入。 |
+| `metadata` | `dict[str, Any]` | 写入追踪记录清单的自由元数据。 |
 
 ### TaskBudget
 
-`TaskBudget` 用来指定单个任务的步数、时间和 token 限制。传入 `Task` 时，它会优先于 Engine 默认的 `RuntimeBudget`。
+`TaskBudget` 用来指定单个任务的步数、时间和令牌限制。传入 `Task` 时，它会优先于 Engine 默认的 `RuntimeBudget`。
 
 ```python
 from qitos import TaskBudget
@@ -134,7 +134,7 @@ budget = TaskBudget(
 
 ### TaskResource
 
-`TaskResource` 描述任务依赖的文件、目录、URL 或先前 run 的 artifact。Engine 会在循环开始前验证所有 required resources。
+`TaskResource` 描述任务依赖的文件、目录、URL 或先前运行的产物。Engine 会在循环开始前验证所有必需资源。
 
 ```python
 from qitos import TaskResource
@@ -148,7 +148,7 @@ TaskResource(kind="dir", path="output/", required=False)
 # 远程 URL
 TaskResource(kind="url", uri="https://arxiv.org/abs/2501.12345", required=True)
 
-# 来自先前运行的 artifact（持久化的输出文件）
+# 来自先前运行的产物
 TaskResource(kind="artifact", path="runs/agent_20260407/steps.jsonl")
 ```
 
@@ -158,7 +158,7 @@ TaskResource(kind="artifact", path="runs/agent_20260407/steps.jsonl")
 
 ## Decision
 
-`Decision` 表示一次 decide step 的输出（decision，agent 每步的结构化决策），也就是 agent 下一步想做什么。它有四种模式，每种模式都对应一个工厂方法。
+`Decision` 表示一次决策步骤的输出，也就是智能体下一步想做什么。它有四种模式，每种模式都对应一个工厂方法。
 
 <Tabs>
   <Tab title="act">
@@ -174,7 +174,7 @@ TaskResource(kind="artifact", path="runs/agent_20260407/steps.jsonl")
     ```
   </Tab>
   <Tab title="final">
-    表示 agent 已经得到最终答案，运行应结束。
+    表示智能体已经得到最终答案，运行应结束。
 
     ```python
     decision = Decision.final(
@@ -184,7 +184,7 @@ TaskResource(kind="artifact", path="runs/agent_20260407/steps.jsonl")
     ```
   </Tab>
   <Tab title="wait">
-    本步暂时不执行动作，常用于等待外部事件或 environment 信号。
+    本步暂时不执行动作，常用于等待外部事件或环境信号。
 
     ```python
     decision = Decision.wait(rationale="Waiting for environment to reset.")

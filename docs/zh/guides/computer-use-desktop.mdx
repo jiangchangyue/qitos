@@ -1,43 +1,43 @@
 ---
-title: "Computer Use 与 Desktop Env"
-description: "在 QitOS 上构建 OSWorld-inspired desktop agent，而不绑定某一家 provider 的 computer-use API。"
+title: "计算机操控与桌面环境"
+description: "在 QitOS 上构建 OSWorld 风格的桌面智能体，而不绑定某一家提供商的计算机操控 API。"
 ---
 
-# Computer Use 与 Desktop Env
+# 计算机操控与桌面环境
 
-QitOS v0.5 把 desktop / computer-use 正式提升成一条官方主线。
+QitOS v0.5 把桌面/计算机操控正式提升成一条官方主线。
 
 核心组成：
 
 - `DesktopEnv`
 - `ComputerUseToolSet`
 - `desktop_actions_json_v1` / `desktop_actions_xml_v1`
-- 官方 `desktop-starter` benchmark starter
-- 独立的 `osworld` benchmark adapter
+- 官方 `desktop-starter` 基准测试入门
+- 独立的 `osworld` 基准测试适配器
 - `examples/real/openai_cua_agent.py`
-- qita visual replay
+- qita 可视化回放
 
-## canonical baseline
+## 规范基线
 
-`examples/real/openai_cua_agent.py` 不再只是 demo。
+`examples/real/openai_cua_agent.py` 不再只是演示。
 
-真正的 baseline 实现现在在 recipe 层：
+真正的基线实现现在在配方层：
 
 - `/Users/morinop/coding/yoga_framework/qitos/recipes/desktop/osworld_starter.py`
 
-公开 example 只保留为薄入口：
+公开示例只保留为薄入口：
 
 - `/Users/morinop/coding/yoga_framework/examples/real/openai_cua_agent.py`
 
-它现在是 benchmark-grade starter baseline，包含以下关键组件：
+它现在是基准测试级别的入门基线，包含以下关键组件：
 
-- planner
-- grounding
-- action selector
-- critic（评估器）/ retry
-- explicit stop / fail
+- 规划器
+- 接地
+- 动作选择器
+- 评估器/重试
+- 显式停止/失败
 
-## 官方 benchmark 入口
+## 官方基准测试入口
 
 ```bash
 qit bench run \

@@ -15,7 +15,7 @@ from qitos import AgentModule, Engine, Decision, ...
 
 <Accordion title="AgentModule">
 
-`AgentModule` 是 QitOS 的策略层。你通过继承它来定义 agent 的 state 形状、system prompt、decision logic 与 reduction rules；真正的执行循环由 `Engine`（执行内核）驱动。
+`AgentModule` 是 QitOS 的策略层。你通过继承它来定义智能体的状态形状、系统提示词、决策逻辑与归约规则；真正的执行循环由 `Engine`（执行内核）驱动。
 
 ```python
 class AgentModule(ABC, Generic[StateT, ObservationT, ActionT])
@@ -37,16 +37,16 @@ def __init__(
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `tool_registry` | `ToolRegistry \| None` | agent 可调用的工具注册表 |
-| `llm` | `Any` | 用于默认模型决策路径的 LLM callable |
-| `model_parser` | `Any` | parser（将原始模型输出解析为Decision的组件），把输出解析成 `Decision`（agent每步的结构化决策） |
-| `memory` | `Memory \| None` | 可选 memory adapter |
-| `history` | `History \| None` | 可选 history adapter |
+| `tool_registry` | `ToolRegistry \| None` | 智能体可调用的工具注册表 |
+| `llm` | `Any` | 用于默认模型决策路径的大模型可调用对象 |
+| `model_parser` | `Any` | 解析器，把输出解析成 `Decision`（智能体每步的结构化决策） |
+| `memory` | `Memory \| None` | 可选记忆适配器 |
+| `history` | `History \| None` | 可选历史适配器 |
 | `**config` | `Any` | 额外关键字参数，保存在 `self.config` |
 
-**Hooks**
+**钩子**
 
-只要求实现 `init_state` 与 `reduce`；其余 hooks 全部可选。
+只要求实现 `init_state` 与 `reduce`；其余钩子全部可选。
 
 <AccordionGroup>
 <Accordion title="init_state（必需）">
@@ -55,7 +55,7 @@ def __init__(
 def init_state(self, task: str, **kwargs: Any) -> StateT
 ```
 
-创建并返回本次 run 的初始 state。
+创建并返回本次运行的初始状态。
 
 </Accordion>
 
@@ -70,7 +70,7 @@ def reduce(
 ) -> StateT
 ```
 
-把当前 observation（每步后agent接收的结构化观察结果）与 decision（agent每步的结构化决策）折叠进下一步 state。
+把当前观测结果（每步后智能体接收的结构化观察结果）与决策（智能体每步的结构化决策）折叠进下一步状态。
 
 </Accordion>
 
@@ -80,7 +80,7 @@ def reduce(
 def build_system_prompt(self, state: StateT) -> str | None
 ```
 
-返回动态 system prompt；默认返回 `None`。
+返回动态系统提示词；默认返回 `None`。
 
 </Accordion>
 
@@ -90,7 +90,7 @@ def build_system_prompt(self, state: StateT) -> str | None
 def prepare(self, state: StateT) -> str
 ```
 
-把 state 转成模型输入文本；默认是 `str(state)`。
+把状态转成模型输入文本；默认是 `str(state)`。
 
 </Accordion>
 
@@ -104,7 +104,7 @@ def decide(
 ) -> Decision[ActionT] | None
 ```
 
-自定义决策 hook。返回 `Decision`（agent每步的结构化决策）时跳过默认模型调用；返回 `None` 时继续走 Engine 的模型路径。
+自定义决策钩子。返回 `Decision` 时跳过默认模型调用；返回 `None` 时继续走 Engine 的模型路径。
 
 </Accordion>
 
@@ -152,7 +152,7 @@ def run(
 
 <Accordion title="Engine">
 
-`Engine` 是执行内核，负责 phase loop、工具执行、recovery、tracing 与 stop criteria 评估。
+`Engine` 是执行内核，负责阶段循环、工具执行、恢复、追踪与停止条件评估。
 
 ```python
 class Engine(Generic[StateT, ObservationT, ActionT])
@@ -161,14 +161,14 @@ class Engine(Generic[StateT, ObservationT, ActionT])
 核心构造参数包括：
 
 - `agent`
-- `budget`
+- `budget`（预算）
 - `parser`
 - `stop_criteria`
-- `critics`
+- `critics`（评估器）
 - `env`
 - `history_policy`
 - `trace_writer`
-- `hooks`
+- `hooks`（钩子）
 
 最常用方法：
 
@@ -192,9 +192,9 @@ class EngineResult(Generic[StateT]):
 
 其中：
 
-- `state`：最终强类型 state
+- `state`：最终强类型状态
 - `records`：每步 `StepRecord`
-- `events`：所有 runtime events
+- `events`：所有运行时事件
 - `step_count`：执行步数
 - `task_result`：结构化任务结果
 
@@ -202,7 +202,7 @@ class EngineResult(Generic[StateT]):
 
 <Accordion title="Decision">
 
-`Decision` 是 decide phase 的规范输出（agent每步的结构化决策）。推荐用工厂方法构造：
+`Decision` 是决策阶段的规范输出（智能体每步的结构化决策）。推荐用工厂方法构造：
 
 ```python
 Decision.act(...)
@@ -211,9 +211,9 @@ Decision.wait(...)
 Decision.branch(...)
 ```
 
-四种 mode 分别对应：
+四种模式分别对应：
 
-- `"act"`：执行动作（action，标准化工具调用）
+- `"act"`：执行动作（标准化工具调用）
 - `"final"`：给出最终答案并结束
 - `"wait"`：本步不执行动作
 - `"branch"`：提出多个候选决策
@@ -231,7 +231,7 @@ Decision.branch(...)
 - `Action`
 - `StopReason`
 
-它们共同定义了一次 run 的输入、状态与输出语义。
+它们共同定义了一次运行的输入、状态与输出语义。
 
 </Accordion>
 

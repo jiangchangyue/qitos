@@ -1,54 +1,54 @@
 ---
-title: "Benchmark 与 Recipe"
-description: "解释 QitOS 如何拆分 framework capability、benchmark adapter 与可复现 recipe baseline。"
+title: "基准测试与配方（recipe）"
+description: "解释 QitOS 如何拆分框架能力、基准测试适配器与可复现配方基线。"
 ---
 
-# Benchmark 与 Recipe
+# 基准测试与配方
 
 QitOS 把三层明确分开。
 
-## 1. Framework 层
+## 1. 框架层
 
-这是可复用的内核（执行内核）：
+这是可复用的内核（kernel，执行内核）：
 
 - `AgentModule + Engine`
 - `DesktopEnv`
 - `ActionSpace`
 - `EnvironmentAdapter`
-- family presets
-- qita replay 与 visual inspection
+- 家族预设
+- qita 回放与可视化检查
 
-框架代码应保持 benchmark-agnostic。
+框架代码应保持与具体基准测试无关。
 
-## 2. Benchmark 层
+## 2. 基准测试层
 
 这里放数据集专属适配：
 
-- `qitos.benchmark.desktop`：starter benchmark family
-- `qitos.benchmark.osworld`：真实 OSWorld adapter path
-- benchmark-specific runtime
-- benchmark-specific evaluator/scorer
-- benchmark-native task metadata 与 artifact（持久化的输出文件）处理
+- `qitos.benchmark.desktop`：入门基准测试家族
+- `qitos.benchmark.osworld`：真实 OSWorld 适配器路径
+- 基准测试专用运行时
+- 基准测试专用评估器/评分器
+- 基准测试原生任务元数据与产物（artifact，持久化的输出文件）处理
 
-凡是 `test_all.json`、evaluator bridge、setup/postconfig、qcow2 boot input、benchmark-native scoring 这类内容，都应该放这里。
+凡是 `test_all.json`、评估器桥接、setup/postconfig、qcow2 启动输入、基准测试原生评分这类内容，都应该放这里。
 
-## 3. Recipe 层
+## 3. 配方层
 
-Recipe 是可复现的 baseline method：
+配方是可复现的基线方法：
 
-- canonical single-agent baseline
-- benchmark baseline method
-- multimodal starter method
+- 规范单智能体基线
+- 基准测试基线方法
+- 多模态入门方法
 
-desktop baseline 已经下沉到：
+桌面基线已经下沉到：
 
 - `/Users/morinop/coding/yoga_framework/qitos/recipes/desktop/osworld_starter.py`
 
-而公开 example：
+而公开示例：
 
 - `/Users/morinop/coding/yoga_framework/examples/real/openai_cua_agent.py`
 
-只保留成一个很薄的入口包装。
+只保留为一个很薄的入口包装。
 
 同样的结构也已扩展到：
 
@@ -60,10 +60,10 @@ desktop baseline 已经下沉到：
 
 这个拆分解决了三个真实问题：
 
-- benchmark runner 不再依赖 example 文件
-- 同一个 baseline 可以被 example、docs 和 benchmark runner 共同复用
+- 基准测试运行器不再依赖示例文件
+- 同一个基线可以被示例、文档和基准测试运行器共同复用
 - 未来独立 `qitos-recipes` 时，几乎只需要迁移打包边界，不需要重构设计
 
-这也是 research-first 框架应有的演进方式。
+这也是以研究为先的框架应有的演进方式。
 
-如果你要新增 benchmark family，下一步请直接看 [第三方 Benchmark 接入规范](/zh/guides/third-party-benchmark-integration)。
+如果你要新增基准测试家族，下一步请直接看[第三方基准测试接入规范](/zh/guides/third-party-benchmark-integration)。

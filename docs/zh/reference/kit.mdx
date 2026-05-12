@@ -1,9 +1,9 @@
 ---
 title: "Kit 参考"
-description: "qitos.kit 的能力地图：parsers、memory adapters、tool sets、planning helpers、critics 与 models。"
+description: "qitos.kit 的能力地图：解析器、记忆适配器、工具集、规划辅助、评估器与模型。"
 ---
 
-`qitos.kit` 提供可复用的 agent 编写积木。所有组件都挂接在 `AgentModule + Engine` 主流水线上，不会引入第二个 orchestrator。
+`qitos.kit` 提供可复用的智能体编写积木。所有组件都挂接在 `AgentModule + Engine` 主流水线上，不会引入第二个编排器。
 
 ```python
 from qitos.kit import ReActTextParser, WindowMemory, CodingToolSet, ...
@@ -15,38 +15,38 @@ from qitos.kit import ReActTextParser, WindowMemory, CodingToolSet, ...
 from qitos.harness import build_harness_policy, build_model_for_preset
 ```
 
-`OpenAICompatibleModel(...)` 仍然适合手工接单一路径；但如果你想让同一个 agent 在多个模型家族之间切换，family preset（预配置的模型家族默认值）才是推荐入口。
+`OpenAICompatibleModel(...)` 仍然适合手工接单一路径；但如果你想让同一个智能体在多个模型家族之间切换，家族预设才是推荐入口。
 
 ## 如何阅读这页
 
-把这页看成 QitOS authoring 的能力地图：
+把这页看成 QitOS 编写的能力地图：
 
 | 如果你在决定…… | 优先查看 |
 |---|---|
-| 模型该如何输出动作 | Parsers |
-| 长时运行如何保住有效上下文 | Memory 与 History / Compaction |
-| 要暴露哪些工具 | Tool sets |
-| 从哪些现成 registry 开始 | Preset builders |
-| 如何加 planning 或 search 结构 | Planning |
+| 模型该如何输出动作 | 解析器 |
+| 长时运行如何保住有效上下文 | 记忆与历史 / 上下文压缩 |
+| 要暴露哪些工具 | 工具集 |
+| 从哪些现成注册表开始 | 预设构建器 |
+| 如何加规划或搜索结构 | 规划 |
 
 ## 能力总览
 
-### Parsers
+### 解析器
 
 - `ReActTextParser`：解析 `Thought:` / `Action:` 文本协议
 - `JsonDecisionParser`：解析 JSON 决策对象
 - `XmlDecisionParser`：解析 XML 协议
-- `MiniMaxToolCallParser`：处理模型原生 tool-call 结构
+- `MiniMaxToolCallParser`：处理模型原生工具调用结构
 - `TerminusJsonParser` / `TerminusXmlParser`：处理带显式终止信号的格式
 
-### Tool presets
+### 工具预设
 
-- `coding_tools(...)`：标准 coding workspace
-- `advanced_coding_tools(...)`：更偏 Claude 风格的 coding preset
-- `web_tools()`：web research 与 extraction
-- `task_tools(...)`：持久 task-board 工作流
+- `coding_tools(...)`：标准编码工作区
+- `advanced_coding_tools(...)`：更偏 Claude 风格的编码预设
+- `web_tools()`：网页研究与提取
+- `task_tools(...)`：持久任务板工作流
 - `security_audit_tools(...)`：防御式仓库审计
-- `thinking_tools()`：显式 thought-recording 流程
+- `thinking_tools()`：显式思考记录流程
 
 ### 长时上下文能力
 
@@ -58,7 +58,7 @@ from qitos.harness import build_harness_policy, build_model_for_preset
 - `VectorMemory`
 - `MarkdownFileMemory`
 
-### Planning 与 Search
+### 规划与搜索
 
 - `NumberedPlanBuilder`
 - `PlanCursor`
@@ -67,9 +67,9 @@ from qitos.harness import build_harness_policy, build_model_for_preset
 ---
 
 <Tabs>
-<Tab title="Parsers">
+<Tab title="解析器">
 
-parser（将原始模型输出解析为 Decision 的组件）负责把原始 LLM 输出转换成 Decision（agent 每步的结构化决策）。最重要的原则是：**parser 必须与 prompt 请求的输出格式一一对应。**
+解析器负责把原始大模型输出转换成决策（智能体每步的结构化决策）。最重要的原则是：**解析器必须与提示词请求的输出格式一一对应。**
 
 <AccordionGroup>
 <Accordion title="ReActTextParser">
@@ -80,7 +80,7 @@ parser（将原始模型输出解析为 Decision 的组件）负责把原始 LLM
 from qitos.kit import ReActTextParser
 ```
 
-当你的 prompt 要求模型输出文本 ReAct 协议时，就使用它。
+当你的提示词要求模型输出文本 ReAct 协议时，就使用它。
 
 </Accordion>
 
@@ -104,7 +104,7 @@ from qitos.kit import XmlDecisionParser
 
 </Accordion>
 
-<Accordion title="Terminus parsers">
+<Accordion title="Terminus 解析器">
 
 `TerminusJsonParser` 与 `TerminusXmlParser` 用于带显式终止标记的协议。适合终端控制、长时交互等更强约束场景。
 
@@ -113,21 +113,21 @@ from qitos.kit import XmlDecisionParser
 
 </Tab>
 
-<Tab title="History & Compaction">
+<Tab title="历史与上下文压缩">
 
 QitOS 把长时上下文管理当成一等能力，而不是隐形中间件。
 
 - `WindowHistory`：最简单的最近窗口
-- `TokenBudgetSummaryHistory`：超 token budget 时自动摘要
-- `CompactHistory`：多阶段 compaction（上下文压缩策略），支持 warning、round grouping、summary compaction 与可观测 metadata
+- `TokenBudgetSummaryHistory`：超 token 预算时自动摘要
+- `CompactHistory`：多阶段上下文压缩，支持警告、轮次分组、摘要压缩与可观测元数据
 
-如果你在研究 long-running agents，`CompactHistory` 往往是最值得重点理解的组件。
+如果你在研究长时运行智能体，`CompactHistory` 往往是最值得重点理解的组件。
 
 </Tab>
 
-<Tab title="Memory">
+<Tab title="记忆">
 
-memory adapters 负责把跨步信息存起来，并在需要时重新检索：
+记忆适配器负责把跨步信息存起来，并在需要时重新检索：
 
 <AccordionGroup>
 <Accordion title="WindowMemory">
@@ -138,7 +138,7 @@ memory adapters 负责把跨步信息存起来，并在需要时重新检索：
 
 <Accordion title="SummaryMemory">
 
-保留最近记录，并把更早记录压缩成 summary。
+保留最近记录，并把更早记录压缩成摘要。
 
 </Accordion>
 
@@ -150,32 +150,32 @@ memory adapters 负责把跨步信息存起来，并在需要时重新检索：
 
 <Accordion title="MarkdownFileMemory">
 
-把 memory 写入本地 Markdown 文件，适合持久化与人工审阅。
+把记忆写入本地 Markdown 文件，适合持久化与人工审阅。
 
 </Accordion>
 </AccordionGroup>
 
 </Tab>
 
-<Tab title="Tool Sets">
+<Tab title="工具集">
 
-QitOS 的 toolsets 帮你直接组合出一个工作环境，而不是一组松散工具。
+QitOS 的工具集帮你直接组合出一个工作环境，而不是一组松散工具。
 
-- `CodingToolSet`：文件、编辑、shell、任务、notebook 等 coding 环境
-- `TaskToolSet`：todo / progress tracking
+- `CodingToolSet`：文件、编辑、终端、任务、笔记本等编码环境
+- `TaskToolSet`：待办与进度跟踪
 - `SecurityAuditToolSet`：代码与配置安全审计
-- 其他更窄场景的 bundles：`report_tools(...)`、`notebook_tools(...)`、`epub_tools(...)`
+- 其他更窄场景的捆绑包：`report_tools(...)`、`notebook_tools(...)`、`epub_tools(...)`
 
 一般建议：
 
-- 学框架时手工 registry
-- 做真实 workflow 时切换到 preset（预配置）toolset
+- 学习框架时手工构建注册表
+- 做真实工作流时切换到预设工具集
 
 </Tab>
 
-<Tab title="Planning">
+<Tab title="规划">
 
-planning helpers 帮你在不重写 runtime 的情况下引入显式计划与搜索结构：
+规划辅助工具帮你在不重写运行时的情况下引入显式计划与搜索结构：
 
 - `NumberedPlanBuilder`：从编号列表构建计划
 - `PlanCursor`：记录计划执行进度

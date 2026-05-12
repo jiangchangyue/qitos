@@ -1,15 +1,15 @@
 ---
-title: "在同一个 example 中切换模型家族"
-description: "使用同一个 Claude Code 风格 agent，在 Qwen、Kimi、MiniMax、gpt-oss 和 Gemma 4 之间快速切换。"
+title: "在同一个示例中切换模型家族"
+description: "使用同一个 Claude Code 风格智能体，在 Qwen、Kimi、MiniMax、gpt-oss 和 Gemma 4 之间快速切换。"
 ---
 
 这是 QitOS v0.4 最实用的一课。
 
 目标非常明确：
 
-- 保持同一个 agent 实现
+- 保持同一个智能体实现
 - 只切换模型家族配置
-- 让 traces、protocol 与 tool behavior 仍然清晰可见
+- 让追踪记录、协议与工具行为仍然清晰可见
 
 对应示例是：
 
@@ -17,16 +17,16 @@ description: "使用同一个 Claude Code 风格 agent，在 Qwen、Kimi、MiniM
 
 ## v0.4 到底改了什么
 
-这个 example 不再把 transport（与模型 API 通信的客户端）写死在代码里。
+这个示例不再把传输层写死在代码里。
 
 它现在会先解析：
 
-1. family preset（预配置的模型家族默认值）
-2. harness policy
-3. model transport
-4. parser（将原始模型输出解析为 Decision 的组件）与 protocol（模型输出的格式契约）
+1. 家族预设（预配置的模型家族默认值）
+2. 适配层策略
+3. 模型传输层
+4. 解析器与协议对
 
-因此，同一个 agent 现在可以切换：
+因此，同一个智能体现在可以切换：
 
 - Qwen
 - Kimi
@@ -43,15 +43,15 @@ export QITOS_MODEL_FAMILY="qwen"
 export QITOS_MODEL="Qwen/Qwen3-8B"
 ```
 
-高级 override：
+高级覆盖：
 
 ```bash
 export QITOS_PROTOCOL="json_decision_v1"
 ```
 
-## CLI override 层
+## 命令行覆盖层
 
-CLI 优先级高于环境变量。
+命令行优先级高于环境变量。
 
 ```bash
 python examples/real/claude_code_agent.py \
@@ -62,10 +62,10 @@ python examples/real/claude_code_agent.py \
 
 优先级顺序：
 
-1. 显式 CLI
+1. 显式命令行参数
 2. 环境变量
-3. family preset 默认值
-4. framework fallback
+3. 家族预设默认值
+4. 框架后备值
 
 ## 五个 v0.4 切换示例
 
@@ -124,8 +124,8 @@ python examples/real/claude_code_agent.py \
 - `parser`
 - `tool schema delivery`
 
-这些字段能帮助你确认：真正变化的是 harness（模型适配层）policy，而不是 example 被暗中改写成另一套 agent。
+这些字段能帮助你确认：真正变化的是适配层策略，而不是示例被暗中改写成另一套智能体。
 
 ## 为什么这很重要
 
-这就是 QitOS v0.4 的研究默认面。它让你在保持 agent 实现稳定的前提下，比较不同模型家族。
+这就是 QitOS v0.4 的研究默认面。它让你在保持智能体实现稳定的前提下，比较不同模型家族。

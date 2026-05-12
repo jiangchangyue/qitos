@@ -1,31 +1,31 @@
 ---
 title: "QitOS 文档"
-description: "面向 agent 研究者的 torch-flavor 框架，用单一 AgentModule + Engine 内核构建可复现的 LLM agents。"
+description: "面向智能体研究者的类 PyTorch 风格框架，用单一 AgentModule + Engine 内核构建可复现的 LLM 智能体。"
 ---
 
-QitOS 是面向 agent 研究者的 torch-flavor 框架。你可以在同一个 `AgentModule + Engine` 内核上原型化方法、运行 benchmark，并用内建 `qita` 观察长时轨迹。
+QitOS 是面向智能体（agent）研究者的类 PyTorch 风格框架。你可以在同一个 `AgentModule + Engine` 内核上原型化方法、运行基准测试（benchmark），并用内建 `qita` 观察长时运行轨迹（trajectory）。
 
-## 两条 authoring path
+## 两种编写方式
 
-QitOS 保留两条顶层的 agent 编写路径：
+QitOS 提供两种顶层的智能体编写方式：
 
-- `Research-first`：手写 prompt、parser、protocol（模型输出的格式契约）、transport（与模型 API 通信的客户端）和 tool surface，直接研究与优化 kernel（执行内核）。
-- `Preset-first`：从 family preset（预配置的模型家族默认值）和 preset tool builders 出发，快速得到稳定 baseline 与多模型切换能力。
+- 研究优先（research-first）：手写提示词（prompt）、解析器（parser）、协议（protocol，模型输出的格式契约）、传输层（transport，与模型 API 通信的客户端）和工具面（tool surface），直接研究与优化内核（kernel，执行内核）。
+- 预设优先（preset-first）：从家族预设（family preset，预配置的模型家族默认值）和预设工具构建器出发，快速得到稳定基线（baseline）与多模型切换能力。
 
-这两条路径都应该是一等公民。
+这两种方式都是一等公民。
 
 <CardGroup cols={2}>
   <Card title="快速开始" icon="rocket" href="/zh/quickstart">
-    2 分钟内跑起第一个 agent
+    2 分钟内跑起第一个智能体
   </Card>
-  <Card title="构建第一个 Agent" icon="code" href="/zh/guides/build-your-first-agent">
-    按步骤理解 state、tools、run 和 trace（运行记录）
+  <Card title="构建第一个智能体" icon="code" href="/zh/guides/build-your-first-agent">
+    按步骤理解状态、工具、运行和追踪记录（trace）
   </Card>
   <Card title="教程课程" icon="graduation-cap" href="/zh/tutorials">
-    通过四节课程式教程学习 QitOS 的 agent 设计方法
+    通过四节课程式教程学习 QitOS 的智能体设计方法
   </Card>
   <Card title="核心概念" icon="book" href="/zh/concepts/agent-module">
-    理解 AgentModule、Engine、State、Tools 与 Trace（运行记录）
+    理解 AgentModule、Engine、State、Tools 与追踪记录
   </Card>
   <Card title="API 参考" icon="rectangle-terminal" href="/zh/reference/api">
     查看公开 Python API 与 CLI
@@ -33,11 +33,11 @@ QitOS 保留两条顶层的 agent 编写路径：
 </CardGroup>
 
 <CardGroup cols={2}>
-  <Card title="Research-first 路径" icon="flask" href="/zh/guides/build-your-first-agent">
-    手写 prompt、parser、protocol 与 tool surface，直接理解 kernel。
+  <Card title="研究优先路径" icon="flask" href="/zh/guides/build-your-first-agent">
+    手写提示词、解析器、协议与工具面，直接理解内核。
   </Card>
-  <Card title="Preset-first 路径" icon="shuffle" href="/zh/tutorials/switch-model-families">
-    用 family presets 在同一个 example 里快速切换多个模型家族。
+  <Card title="预设优先路径" icon="shuffle" href="/zh/tutorials/switch-model-families">
+    用家族预设在同一个示例里快速切换多个模型家族。
   </Card>
 </CardGroup>
 
@@ -49,14 +49,14 @@ QitOS 保留两条顶层的 agent 编写路径：
     pip install "qitos[models]"
     ```
   </Step>
-  <Step title="设置 provider 配置">
+  <Step title="设置提供商配置">
     ```bash
     export OPENAI_API_KEY="sk-..."
     export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
     export QITOS_MODEL="Qwen/Qwen3-8B"
     ```
   </Step>
-  <Step title="运行最小 coding agent">
+  <Step title="运行最小编程智能体">
     ```bash
     qit demo minimal
     ```
@@ -65,27 +65,27 @@ QitOS 保留两条顶层的 agent 编写路径：
     ```bash
     qita board --logdir runs
     ```
-    打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)，查看 trace（运行记录）、replay 和导出结果。
+    打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)，查看追踪记录、回放（replay）和导出（export）结果。
   </Step>
 </Steps>
 
 ## QitOS 提供什么
 
 <CardGroup cols={2}>
-  <Card title="Agent 模式" icon="diagram-project" href="/zh/guides/agent-patterns">
+  <Card title="智能体模式" icon="diagram-project" href="/zh/guides/agent-patterns">
     开箱即用的 ReAct、PlanAct、Tree-of-Thought 和 Reflexion
   </Card>
   <Card title="课程式教程" icon="graduation-cap" href="/zh/tutorials">
-    从 ReAct 到代码安全审计 agent 的完整进阶路径
+    从 ReAct 到代码安全审计智能体的完整进阶路径
   </Card>
   <Card title="可观测性" icon="chart-line" href="/zh/guides/observability">
-    内置 `qita` board、replay 与 HTML export
+    内置 `qita` 看板、回放与 HTML 导出
   </Card>
   <Card title="基准测试" icon="trophy" href="/zh/benchmarks/overview">
     在同一个内核上运行 GAIA、Tau-Bench 与 CyBench
   </Card>
   <Card title="Kit 工具箱" icon="toolbox" href="/zh/reference/kit">
-    Parsers、toolsets、memory、history、planners 与 critics
+    解析器、工具集、记忆、历史、规划器与评估器（critic）
   </Card>
 </CardGroup>
 
@@ -93,15 +93,15 @@ QitOS 保留两条顶层的 agent 编写路径：
 
 <CardGroup cols={2}>
   <Card title="单一执行内核" icon="cpu" href="/zh/concepts/engine">
-    例子、评测与生产型 agent 全都运行在同一个 `AgentModule + Engine` 上
+    示例、评测与生产型智能体全都运行在同一个 `AgentModule + Engine` 上
   </Card>
   <Card title="协议感知解析" icon="brackets-curly" href="/zh/reference/kit">
-    prompt 格式与 parser 选择是显式设计，而不是隐藏胶水层
+    提示词格式与解析器选择是显式设计，而不是隐藏的胶水层
   </Card>
   <Card title="长时运行上下文控制" icon="clock-rotate-left" href="/zh/guides/memory-and-history">
-    HistoryPolicy、CompactHistory 与 memory adapters 共同处理长时任务
+    HistoryPolicy、CompactHistory 与记忆适配器共同处理长时任务
   </Card>
   <Card title="以 qita 为核心的可追溯性" icon="chart-line" href="/zh/guides/observability">
-    board、replay 与 export 都建立在结构化 trace artifacts（持久化的输出文件）之上
+    看板、回放与导出都建立在结构化追踪产物（artifact）之上
   </Card>
 </CardGroup>

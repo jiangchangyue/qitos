@@ -1,23 +1,23 @@
 ---
-title: "Desktop Starter 基准"
-description: "QitOS v0.5 第一个官方多模态 desktop benchmark 路径。"
+title: "Desktop Starter 基准测试"
+description: "QitOS v0.5 第一个官方多模态桌面基准测试路径。"
 ---
 
-# Desktop Starter 基准
+# Desktop Starter 基准测试
 
-`desktop-starter` 是 QitOS 第一个官方多模态 starter benchmark family。
+`desktop-starter` 是 QitOS 第一个官方多模态入门基准测试族。
 
-它被定义为 **OSWorld-compatible starter**：
+它被定义为 **OSWorld 兼容入门包**：
 
-- desktop / computer-use 任务结构
-- screenshot + a11y + OCR + UI candidates
-- provider-neutral GUI actions
+- 桌面与计算机使用任务结构
+- 截图 + 无障碍 + OCR + UI 候选项
+- 与供应商无关的 GUI 动作
 - 统一的 `BenchmarkRunResult`
-- qita replay / export / visual inspection
+- qita 回放、导出与可视化检查
 
-它**不是**对 full official OSWorld parity 的宣称。
+它**不是**对完整官方 OSWorld 对等性的宣称。
 
-## 运行 starter benchmark
+## 运行入门基准测试
 
 ```bash
 qit bench run \
@@ -40,4 +40,4 @@ qit bench run \
   --output ./artifacts/desktop-starter.jsonl
 ```
 
-真实 benchmark adapter 现在已经独立放到 `osworld`。
+真实基准测试适配器现在已经独立放到 `osworld`。

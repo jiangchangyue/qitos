@@ -1,23 +1,23 @@
 ---
 title: "快速开始"
-description: "在 2 分钟内运行你的第一个 QitOS 最小 coding agent，并用 qita 检查它。"
+description: "在 2 分钟内运行你的第一个 QitOS 最小编程智能体，并用 qita 检查它。"
 ---
 
-本页会带你从一个空环境走到一个模型驱动的最小 coding agent，再到可视化 trace，全程控制在 2 分钟左右。
+本页会带你从零开始，搭建一个模型驱动的最小编程智能体（coding agent），直到可视化查看追踪记录（trace），全程大约 2 分钟。
 
-QitOS runtime 实际运行时就是这个样子：
+QitOS 运行时（runtime）的实际效果如下：
 
-![QitOS runtime 快照](/images/qitos-cli.png)
+![QitOS 运行时快照](/images/qitos-cli.png)
 
 <Note>
-如果你还没有远程模型服务和 API Key，建议先看 [前置准备](/zh/prerequisites)。里面说明了去哪里注册、如何创建 API Key，以及如何先验证 OpenAI-compatible provider 是否可用。
+如果你还没有远程模型服务和 API 密钥，建议先阅读 [前置准备](/zh/prerequisites)。其中说明了去哪里注册、如何创建 API 密钥，以及如何验证兼容 OpenAI 的服务商（provider）是否可用。
 </Note>
 
 ## 前置条件
 
 - Python 3.10 或更高版本
 - `pip`
-- 一个 OpenAI-compatible API key
+- 一个兼容 OpenAI 的 API 密钥
 
 ## 操作步骤
 
@@ -28,7 +28,7 @@ QitOS runtime 实际运行时就是这个样子：
     ```
   </Step>
 
-  <Step title="设置 provider 配置">
+  <Step title="设置服务商配置">
     ```bash
     export OPENAI_API_KEY="sk-..."
     export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
@@ -36,16 +36,16 @@ QitOS runtime 实际运行时就是这个样子：
     ```
 
     <Tip>
-      任意 OpenAI-compatible endpoint 都可以使用。如果你不是直接使用 OpenAI，请把 `OPENAI_BASE_URL` 指向对应 provider。
+      任意兼容 OpenAI 的接口地址都可以使用。如果你不是直接使用 OpenAI，请将 `OPENAI_BASE_URL` 指向对应的服务商。
     </Tip>
   </Step>
 
-  <Step title="运行最小 coding agent">
+  <Step title="运行最小编程智能体">
     ```bash
     qit demo minimal
     ```
 
-    这个 demo 会先种一个最小 bug workspace，配置真实模型，让最小 coding agent 修复 bug、执行验证，并写出 qita 可识别的 trace（运行记录）。你会看到类似输出：
+    这条命令会先创建一个包含最小缺陷的工作区（workspace），配置真实模型，让最小编程智能体修复缺陷、执行验证，并输出 qita 可识别的追踪记录。你会看到类似输出：
 
     ```
     model_name: Qwen/Qwen3-8B
@@ -63,29 +63,29 @@ QitOS runtime 实际运行时就是这个样子：
     qita board --logdir runs
     ```
 
-    在浏览器中打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。board 会列出 logdir 中的所有 run，包括 step 数、stop reason 和 final result。点击任意 run 的 **view** 查看逐步轨迹，或用 **replay** 做回放。
+    在浏览器中打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。面板（board）会列出日志目录中的所有运行记录，包括步骤数、停止原因和最终结果。点击任意运行记录的 **view** 查看逐步轨迹，或点击 **replay** 按钮进行回放（replay）。
 
     <Tip>
-      打包好的 demo 与 [`examples/quickstart/minimal_agent.py`](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py) 讲的是同一条最小 coding-agent 路径。想读代码或改它时，就从这个例子文件开始。
+      打包好的演示与 [`examples/quickstart/minimal_agent.py`](https://github.com/Qitor/qitos/blob/main/examples/quickstart/minimal_agent.py) 走的是同一条最小编程智能体路径。想阅读或修改代码，可以从这个示例文件入手。
     </Tip>
   </Step>
 </Steps>
 
 ## 接下来怎么学
 
-你已经跑起了一个最小 coding agent，也看到了它的 trace（运行记录）。接下来推荐继续：
+你已经跑起了一个最小编程智能体，也看到了它的追踪记录。接下来推荐继续：
 
 <CardGroup cols={2}>
-  <Card title="构建第一个 Agent" icon="code" href="/zh/guides/build-your-first-agent">
-    从 state、model、tools、run 到 qita，系统理解最小 coding-agent 结构
+  <Card title="构建第一个智能体" icon="code" href="/zh/guides/build-your-first-agent">
+    从状态、模型、工具、运行到 qita，系统理解最小编程智能体的结构
   </Card>
   <Card title="教程课程" icon="graduation-cap" href="/zh/tutorials">
     通过 ReAct、PlanAct、Claude Code 风格和安全审计课程递进学习
   </Card>
   <Card title="可观测性" icon="chart-line" href="/zh/guides/observability">
-    全面了解 qita board、replay 与 export
+    全面了解 qita 面板、回放与导出（export）
   </Card>
-  <Card title="基准测试" icon="trophy" href="/zh/benchmarks/overview">
+  <Card title="基准测试（benchmark）" icon="trophy" href="/zh/benchmarks/overview">
     在 QitOS 内核上运行 GAIA、Tau-Bench 与 CyBench
   </Card>
 </CardGroup>

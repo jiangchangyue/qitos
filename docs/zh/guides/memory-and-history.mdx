@@ -1,30 +1,30 @@
 ---
-title: "Memory 与 History"
-description: "理解 QitOS 中 state、history、compaction 与 memory 的边界。"
+title: "记忆与历史"
+description: "理解 QitOS 中状态、历史、上下文压缩与记忆的边界。"
 ---
 
 QitOS 把两类能力明确拆开：
 
-- **History**：每步发给 LLM 的对话上下文。短期的、消息级别的，由 `HistoryPolicy` 控制。
-- **Memory**：跨步积累的语义记录存储，可以按 window、summary、vector 或 file 等策略检索。
+- **历史（History）**：每步发给大语言模型的对话上下文。短期的、消息级别的，由 `HistoryPolicy` 控制。
+- **记忆（Memory）**：跨步积累的语义记录存储，可以按窗口、摘要、向量或文件等策略检索。
 
-两者都不是必选项。如果你两者都不传，Engine 会使用内部默认的 24-message window history，并且不启用 memory adapter。
+两者都不是必选项。如果你两者都不传，Engine 会使用内部默认的 24 条消息窗口历史，并且不启用记忆适配器。
 
 ## 正确的心智模型
 
-研究者常常把 context 混成一个概念，但在 QitOS 里它被明确拆开：
+研究者常常把上下文混成一个概念，但在 QitOS 里它被明确拆开：
 
 | 关心的问题 | QitOS 原语 | 常见用途 |
 |---|---|---|
-| 下一步模型会看到什么 | `History` + `HistoryPolicy` | prompt 连续性 |
-| agent 想跨步记住什么 | `Memory` | findings、artifacts、prior observations |
+| 下一步模型会看到什么 | `History` + `HistoryPolicy` | 提示词连续性 |
+| 智能体想跨步记住什么 | `Memory` | 发现、产物、先前观测结果 |
 | 当上下文太大时怎么办 | `TokenBudgetSummaryHistory` / `CompactHistory` | 长时运行控制 |
 
-这也是 QitOS 处理 long-running agents 最实用的设计：你可以单独调消息窗口，而不必重写 memory；也可以替换 memory 策略，而不影响 prompt 协议。
+这也是 QitOS 处理长时间运行智能体最实用的设计：你可以单独调消息窗口，而不必重写记忆；也可以替换记忆策略，而不影响提示词协议。
 
-## History
+## 历史
 
-`History` 存储的是 `HistoryMessage`（`role`、`content`、`step_id`）。每次 LLM 调用前，Engine 会先追加 user message，调用后再追加 assistant message。真正发送给模型时，再由 `HistoryPolicy` 决定要取哪一段窗口。
+`History` 存储的是 `HistoryMessage`（`role`、`content`、`step_id`）。每次大语言模型调用前，Engine 会先追加用户消息，调用后再追加助手消息。真正发送给模型时，再由 `HistoryPolicy` 决定要取哪一段窗口。
 
 ### HistoryPolicy
 
@@ -52,13 +52,13 @@ result = agent.run(
 )
 ```
 
-`HistoryPolicy.build_query()` 会生成发给 `History` adapter 的检索查询。默认的内部 history 实现会用一个滑动窗口来满足它。
+`HistoryPolicy.build_query()` 会生成发给 `History` 适配器的检索查询。默认的内部历史实现会用一个滑动窗口来满足它。
 
 <Tip>
-当模型 context 很小，可以收紧 `max_messages`；如果只想保留最近几步，可以设置 `step_window=4`。
+当模型上下文很小时，可以收紧 `max_messages`；如果只想保留最近几步，可以设置 `step_window=4`。
 </Tip>
 
-## 内置 history 策略
+## 内置历史策略
 
 ### WindowHistory
 
@@ -66,48 +66,48 @@ result = agent.run(
 
 适合：
 
-- run 很短
+- 运行很短
 - 你希望上下文行为完全可预测
 - 你不需要自动摘要
 
 ### TokenBudgetSummaryHistory
 
-`TokenBudgetSummaryHistory` 会监控 token 预算，并在窗口超出预算时，把更早的消息压缩成一个 summary message。
+`TokenBudgetSummaryHistory` 会监控词元预算，并在窗口超出预算时，把更早的消息压缩成一条摘要消息。
 
 适合：
 
-- run 已经开始出现明显的 context pressure
-- 你只需要一个轻量 summary fallback
+- 运行已经开始出现明显的上下文压力
+- 你只需要一个轻量摘要后备方案
 - 暂时不需要 `CompactHistory` 的多阶段控制
 
 ### CompactHistory
 
-`CompactHistory` 是最完整的内置上下文压缩器，也是 QitOS 长时运行设计中最关键的部件之一。
+`CompactHistory` 是最完整的内置上下文压缩（compaction）器，也是 QitOS 长时运行设计中最关键的部件之一。
 
 它支持：
 
-- 溢出前 warning thresholds
-- 基于 round 的消息分组
-- 对巨大旧消息的 micro-compaction
-- 对更早历史的 summary compaction
-- 可进入 trace 的 compaction metadata
+- 溢出前警告阈值
+- 基于轮次的消息分组
+- 对巨大旧消息的微压缩
+- 对更早历史的摘要压缩
+- 可进入追踪记录的压缩元数据
 
 适合：
 
-- 你正在构建真正的 long-running agent
-- 你希望 compaction 行为是可检查、可研究的
-- 你不想把 context management 藏成黑盒中间件（compaction，即上下文压缩策略）
+- 你正在构建真正的长时间运行智能体
+- 你希望压缩行为是可检查、可研究的
+- 你不想把上下文管理藏成黑盒中间件
 
-## 实践中的 context compaction
+## 实践中的上下文压缩
 
 `CompactHistory` 值得重点理解，因为它体现了 QitOS 的一个核心主张：长时运行行为必须显式且可调试。
 
 它的关键组成包括：
 
-- `CompactConfig`：阈值与 compaction（压缩，上下文压缩策略）策略
+- `CompactConfig`：阈值与上下文压缩策略
 - `MessageGrouper`：消息如何按轮分组
-- micro-compaction：裁剪超长旧消息，但保留预览
-- summary compaction：把更早轮次替换成连续摘要
+- 微压缩：裁剪超长旧消息，但保留预览
+- 摘要压缩：把更早轮次替换成连续摘要
 
 典型配置：
 
@@ -126,13 +126,13 @@ history = CompactHistory(
 )
 ```
 
-如果你想把 context behavior 也纳入研究 artifact（持久化的输出文件），这通常是最合适的选择。
+如果你想把上下文行为也纳入研究产物，这通常是最合适的选择。
 
-## Memory
+## 记忆
 
 `Memory` 存储的是 `MemoryRecord`（`role`、`content`、`step_id`、`metadata`）。Engine 会在每步后调用 `memory.append()`，并在需要时检索记录，把结果重新注入 `prepare()` 或其他策略层。
 
-四个常用 adapter 都实现同一个 `Memory` 抽象：
+四个常用适配器都实现同一个 `Memory` 抽象：
 
 ```python
 from qitos.core.memory import Memory, MemoryRecord
@@ -145,9 +145,9 @@ class Memory(ABC):
     def reset(self, run_id=None) -> None: ...
 ```
 
-### 给 agent 挂载 memory
+### 给智能体挂载记忆
 
-可以直接把 memory 实例传给 `AgentModule` 构造函数：
+可以直接把记忆实例传给 `AgentModule` 构造函数：
 
 ```python
 from qitos.kit.memory import WindowMemory
@@ -170,11 +170,11 @@ from qitos.kit.memory import WindowMemory
 memory = WindowMemory(window_size=20)
 ```
 
-适合短期滚动记忆，以及你只关心最近若干 observation（每步后 agent 接收的结构化观察结果）的场景。
+适合短期滚动记忆，以及你只关心最近若干观测结果（observation，每步后智能体接收的结构化观察结果）的场景。
 
 ## SummaryMemory
 
-保留最近 `keep_last` 条原始记录；当调用 `evict()` 时，更早的记录会被压成 summary 字符串。
+保留最近 `keep_last` 条原始记录；当调用 `evict()` 时，更早的记录会被压成摘要字符串。
 
 ```python
 from qitos.kit.memory import SummaryMemory
@@ -186,7 +186,7 @@ memory = SummaryMemory(keep_last=10)
 
 ## VectorMemory
 
-使用语义相似度进行检索。每次 `append()` 都会对记录做 embedding，`retrieve()` 时按相似度排序。
+使用语义相似度进行检索。每次 `append()` 都会对记录做嵌入，`retrieve()` 时按相似度排序。
 
 ```python
 from qitos.kit.memory import VectorMemory
@@ -194,11 +194,11 @@ from qitos.kit.memory import VectorMemory
 memory = VectorMemory(top_k=5)
 ```
 
-适合：agent 在长时运行中按语义召回先前发现，而不是只按时间窗口取最近消息。
+适合：智能体在长时运行中按语义召回先前发现，而不是只按时间窗口取最近消息。
 
 ## MarkdownFileMemory
 
-把所有记录持久化到本地 Markdown 文件，是一种可检查、可跨 session 延续的记忆形式。
+把所有记录持久化到本地 Markdown 文件，是一种可检查、可跨会话延续的记忆形式。
 
 ```python
 from qitos.kit.memory import MarkdownFileMemory
@@ -209,15 +209,15 @@ memory = MarkdownFileMemory(
 )
 ```
 
-适合：长生命周期 agent、多 session 工作流，或者你需要让 memory 变成人类可审阅 artifact（持久化的输出文件）的情况。
+适合：长生命周期智能体、多会话工作流，或者你需要让记忆变成人类可审阅产物的情况。
 
 ## 什么时候该选什么
 
 一个实用的选择顺序通常是：
 
-1. 先只用 state。
+1. 先只用状态。
 2. 当消息窗口不够时，加 `HistoryPolicy`。
-3. 当简单裁剪会伤害行为时，加 `CompactHistory`。
+3. 当简单裁剪会损害行为时，加 `CompactHistory`。
 4. 当你需要跨步语义召回或持久记忆时，再加 `Memory`。
 
 这四层不是彼此替代关系，而是回答不同问题的方案。
