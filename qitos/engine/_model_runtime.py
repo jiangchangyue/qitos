@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, Generic, List, Optional, TypeVar, cast
 
 from ..core.action import Action
+
+_logger = logging.getLogger("qitos.engine._model_runtime")
 from ..core.decision import Decision
 from ..core.errors import ErrorCategory, ParseExecutionError, RuntimeErrorInfo
 from ..core.model_response import ModelResponse
@@ -382,17 +385,27 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
         delivery = str(metadata.get("tool_schema_delivery") or "prompt_injection")
         payload = getattr(prompt_bundle, "tool_schema_payload", None)
         llm = getattr(self.engine.agent, "llm", None)
-        if llm is None or delivery not in {"api_parameter", "hybrid"}:
-            return {}
-        build_options = getattr(llm, "build_tool_schema_request_options", None)
-        if callable(build_options):
-            try:
-                return dict(
-                    build_options(payload, protocol=protocol, delivery=delivery) or {}
-                )
-            except Exception:
-                return {}
-        return {}
+        options: Dict[str, Any] = {}
+
+        # Build tool schema options
+        if llm is not None and delivery in {"api_parameter", "hybrid"}:
+            build_options = getattr(llm, "build_tool_schema_request_options", None)
+            if callable(build_options):
+                try:
+                    options.update(
+                        build_options(payload, protocol=protocol, delivery=delivery) or {}
+                    )
+                except Exception:
+                    _logger.debug("build_tool_schema_request_options failed", exc_info=True)
+
+        # Merge default_request_kwargs from the model instance
+        # (e.g. chat_template_kwargs for thinking mode)
+        if llm is not None:
+            default_kwargs = getattr(llm, "default_request_kwargs", None)
+            if isinstance(default_kwargs, dict) and default_kwargs:
+                options.update(default_kwargs)
+
+        return options
 
     def _call_llm(
         self, llm: Any, messages: List[Dict[str, Any]], request_options: Dict[str, Any]
@@ -410,12 +423,22 @@ class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
             try:
                 return call_raw(messages, **request_options)
             except TypeError:
+                _logger.warning(
+                    "call_raw rejected request_options (TypeError), "
+                    "falling back without options. Keys: %s",
+                    list(request_options.keys()),
+                )
                 return call_raw(messages)
         if not request_options:
             return llm(messages)
         try:
             return llm(messages, **request_options)
         except TypeError:
+            _logger.warning(
+                "LLM call rejected request_options (TypeError), "
+                "falling back without options. Keys: %s",
+                list(request_options.keys()),
+            )
             return llm(messages)
 
     def _call_llm_streaming(
