@@ -36,13 +36,14 @@ class MinimalCodingAgent(AgentModule[MinimalCodingState, dict[str, Any], Action]
 
     name = TRACE_PREFIX
 
-    def __init__(self, llm: Any, workspace_root: str) -> None:
+    def __init__(self, llm: Any, workspace_root: str, *, auto_approve: bool = True) -> None:
         super().__init__(
             toolset=[
                 coding_tools(
                     workspace_root=workspace_root,
                     shell_timeout=20,
                     include_notebook=False,
+                    auto_approve=auto_approve,
                 )
             ],
             llm=llm,

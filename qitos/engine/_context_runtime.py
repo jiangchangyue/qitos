@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Optional
 
+from ._protocol import _EngineProtocol
 from .states import ContextConfig, ContextTelemetry
 
 
@@ -13,7 +14,7 @@ class ContextOverflowError(RuntimeError):
 
 
 class _ContextRuntime:
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
         self.config = ContextConfig()
         self.reset()

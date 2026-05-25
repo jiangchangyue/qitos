@@ -127,6 +127,33 @@ class StateSchema:
         if final_result is not None:
             self.final_result = final_result
 
+    @classmethod
+    def _get_field_reducers(cls) -> Any:
+        """Get the FieldReducerRegistry for this StateSchema subclass.
+
+        Lazily scans Annotated[type, reducer] annotations on first access.
+        Uses __dict__ lookup on the class to ensure per-subclass caching.
+        """
+        # Check this specific class's own __dict__ (not inherited)
+        if "_field_reducers_cache" not in cls.__dict__:
+            from .field_reducers import FieldReducerRegistry
+            cls._field_reducers_cache = FieldReducerRegistry.from_schema(cls)
+        return cls.__dict__["_field_reducers_cache"]
+
+    def reduce_update(self, update: Dict[str, Any]) -> None:
+        """Apply per-field reducers to update state fields in-place.
+
+        For fields annotated with Annotated[type, reducer], the reducer
+        function is called with (current_value, update_value).
+        Unannotated fields use Replace (last-value-wins) semantics,
+        which is identical to the old __dict__.update() behavior.
+        """
+        registry = self._get_field_reducers()
+        reduced = registry.apply_all(self, update)
+        for key, value in reduced.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
     def advance_step(self) -> None:
         self.current_step += 1
         self.validate()

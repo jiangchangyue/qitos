@@ -186,6 +186,7 @@ class ToolSpec:
     output_schema: Optional[Dict[str, Any]] = None
     read_only: bool = False
     concurrency_safe: bool = False
+    needs_approval: bool = False
     requires_user_interaction: bool = False
     supports_background: bool = False
     result_max_chars: Optional[int] = None
@@ -207,6 +208,7 @@ class ToolMeta:
     output_schema: Optional[Dict[str, Any]] = None
     read_only: bool = False
     concurrency_safe: bool = False
+    needs_approval: bool = False
     requires_user_interaction: bool = False
     supports_background: bool = False
     result_max_chars: Optional[int] = None
@@ -318,6 +320,14 @@ class FunctionTool(BaseTool):
     """Tool wrapper around callable functions or bound methods."""
 
     def __init__(self, func: Callable[..., Any], meta: Optional[ToolMeta] = None):
+        # If func is already a FunctionTool (e.g. from __get__ binding),
+        # unwrap it to get the underlying callable
+        if isinstance(func, FunctionTool):
+            self.func = func.func
+            self.meta = meta or func.meta
+            spec = func.spec
+            super().__init__(spec)
+            return
         self.func = func
         self.meta = meta or get_tool_meta(func) or ToolMeta()
         spec = build_tool_spec(func, self.meta)
@@ -325,6 +335,21 @@ class FunctionTool(BaseTool):
         description = inspect.getdoc(func) or self.meta.description
         if description:
             self.spec.description = inspect.cleandoc(description)
+
+    def __get__(self, obj, objtype=None):
+        """Descriptor protocol: bind the tool to an instance when accessed as a method.
+
+        This allows ``@function_tool`` to work on class methods the same way
+        ``@tool`` does — the underlying function receives ``self`` automatically.
+        """
+        if obj is None:
+            return self
+        # Create a bound copy that prepends obj (self) to the function call
+        bound = FunctionTool.__new__(FunctionTool)
+        bound.func = self.func.__get__(obj, objtype)
+        bound.meta = self.meta
+        bound.spec = self.spec
+        return bound
 
     def run(self, **kwargs: Any) -> Any:
         return self.func(**kwargs)
@@ -367,6 +392,7 @@ def tool(
     output_schema: Optional[Dict[str, Any]] = None,
     read_only: bool = False,
     concurrency_safe: bool = False,
+    needs_approval: bool = False,
     requires_user_interaction: bool = False,
     supports_background: bool = False,
     result_max_chars: Optional[int] = None,
@@ -388,6 +414,7 @@ def tool(
             output_schema=output_schema,
             read_only=read_only,
             concurrency_safe=concurrency_safe,
+            needs_approval=needs_approval,
             requires_user_interaction=requires_user_interaction,
             supports_background=supports_background,
             result_max_chars=result_max_chars,
@@ -453,6 +480,7 @@ def build_tool_spec(func: Callable[..., Any], meta: ToolMeta) -> ToolSpec:
         output_schema=meta.output_schema,
         read_only=meta.read_only,
         concurrency_safe=meta.concurrency_safe,
+        needs_approval=meta.needs_approval,
         requires_user_interaction=meta.requires_user_interaction,
         supports_background=meta.supports_background,
         result_max_chars=meta.result_max_chars,
@@ -471,7 +499,16 @@ def _type_to_json(annotation: Any) -> str:
         dict: "object",
         list: "array",
     }
-    return mapping.get(annotation, "any")
+    result = mapping.get(annotation)
+    if result is not None:
+        return result
+    # Fallback to type_to_json_schema for complex types
+    from .tool_schema import type_to_json_schema
+
+    schema = type_to_json_schema(annotation)
+    if isinstance(schema, dict) and "type" in schema and isinstance(schema["type"], str):
+        return schema["type"]
+    return "any"
 
 
 __all__ = [

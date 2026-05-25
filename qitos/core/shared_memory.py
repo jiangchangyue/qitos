@@ -120,3 +120,146 @@ class FileSharedMemory(SharedMemory):
     def clear(self) -> None:
         with self._lock:
             self._write_all({})
+
+
+# ---------------------------------------------------------------------------
+# Namespace isolation
+# ---------------------------------------------------------------------------
+
+
+class SharedMemoryNamespace:
+    """A namespaced view over a SharedMemory instance.
+
+    All keys are prefixed with ``namespace:`` to avoid collisions between
+    agents. Optionally, a namespace can be marked *read_only* so that
+    sub-agents cannot modify it.
+
+    Parameters
+    ----------
+    memory : SharedMemory
+        The backing store.
+    namespace : str
+        The prefix for this namespace.
+    read_only : bool
+        If True, write and delete operations raise ``PermissionError``.
+    """
+
+    def __init__(
+        self,
+        memory: SharedMemory,
+        namespace: str,
+        read_only: bool = False,
+    ) -> None:
+        self._memory = memory
+        self._namespace = namespace
+        self._read_only = read_only
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
+
+    @property
+    def read_only(self) -> bool:
+        return self._read_only
+
+    def _prefix(self, key: str) -> str:
+        return f"{self._namespace}:{key}"
+
+    def write(self, key: str, value: Any) -> None:
+        if self._read_only:
+            raise PermissionError(
+                f"Namespace '{self._namespace}' is read-only"
+            )
+        self._memory.write(self._prefix(key), value)
+
+    def read(self, key: str) -> Optional[Any]:
+        return self._memory.read(self._prefix(key))
+
+    def delete(self, key: str) -> bool:
+        if self._read_only:
+            raise PermissionError(
+                f"Namespace '{self._namespace}' is read-only"
+            )
+        return self._memory.delete(self._prefix(key))
+
+    def list_keys(self) -> List[str]:
+        prefix = f"{self._namespace}:"
+        return [
+            k[len(prefix):]
+            for k in self._memory.list_keys()
+            if k.startswith(prefix)
+        ]
+
+    def clear(self) -> None:
+        if self._read_only:
+            raise PermissionError(
+                f"Namespace '{self._namespace}' is read-only"
+            )
+        for key in self.list_keys():
+            self._memory.delete(self._prefix(key))
+
+
+# ---------------------------------------------------------------------------
+# Manager
+# ---------------------------------------------------------------------------
+
+
+class SharedMemoryManager:
+    """Manages multiple SharedMemoryNamespace instances over a single store.
+
+    Provides per-agent namespace isolation and read-only views for
+    subordinate agents during multi-agent handoff.
+
+    Parameters
+    ----------
+    memory : SharedMemory
+        The backing store. Defaults to a new InMemorySharedMemory.
+    """
+
+    def __init__(self, memory: Optional[SharedMemory] = None) -> None:
+        self._memory = memory or InMemorySharedMemory()
+        self._namespaces: Dict[str, SharedMemoryNamespace] = {}
+
+    @property
+    def memory(self) -> SharedMemory:
+        """The underlying backing store."""
+        return self._memory
+
+    def namespace(self, name: str, read_only: bool = False) -> SharedMemoryNamespace:
+        """Get or create a namespace.
+
+        If a namespace with the same name already exists, returns the
+        cached instance. If ``read_only`` differs from the existing
+        namespace, returns a new read-only view (does not replace the
+        cached writable instance).
+
+        Parameters
+        ----------
+        name : str
+            The namespace identifier (e.g. agent name).
+        read_only : bool
+            Whether this view is read-only.
+
+        Returns
+        -------
+        SharedMemoryNamespace
+        """
+        if name in self._namespaces and not read_only:
+            return self._namespaces[name]
+        ns = SharedMemoryNamespace(self._memory, name, read_only=read_only)
+        if name not in self._namespaces:
+            self._namespaces[name] = ns
+        return ns
+
+    def list_namespaces(self) -> List[str]:
+        """List all namespace names that have been accessed."""
+        return list(self._namespaces.keys())
+
+    def global_namespace(self) -> SharedMemoryNamespace:
+        """Get the shared global namespace (not read-only)."""
+        return self.namespace("__global__")
+
+    def clear_all(self) -> None:
+        """Clear all data in the backing store and reset namespace cache."""
+        self._memory.clear()
+        self._namespaces.clear()

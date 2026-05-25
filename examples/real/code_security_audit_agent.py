@@ -1,7 +1,5 @@
 """Canonical example: build a code security audit agent with QitOS presets."""
 
-# This full application is scheduled to move to qitos-zoo and is not part of QitOS core examples.
-
 from __future__ import annotations
 
 import os

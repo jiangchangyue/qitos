@@ -58,9 +58,15 @@ class ToolRegistry:
             tool_obj = self._to_tool(item)
             base_name = tool_obj.spec.name
             full_name = f"{prefix}.{base_name}" if prefix else base_name
-            tool_obj.spec.name = full_name
+            # Create a shallow copy to avoid mutating the original tool's spec
+            # when adding the namespace prefix. Without this, registering the
+            # same toolset under different namespaces would corrupt the spec.
+            from copy import copy
+            named_tool = copy(tool_obj)
+            named_tool.spec = copy(tool_obj.spec)
+            named_tool.spec.name = full_name
             self._register_tool_object(
-                tool_obj,
+                named_tool,
                 origin=ToolOrigin(
                     source="toolset",
                     toolset_name=toolset_name,

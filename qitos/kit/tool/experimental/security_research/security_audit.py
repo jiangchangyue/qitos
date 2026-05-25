@@ -12,7 +12,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from qitos.core.tool import ToolPermission, tool
+from qitos.core.function_tool_decorator import function_tool
+from qitos.core.tool import ToolPermission
 
 try:  # Python 3.11+
     import tomllib  # type: ignore[attr-defined]
@@ -402,11 +403,12 @@ class SecurityAuditToolSet:
                     return match.group(1)
         return ""
 
-    @tool(
+    @function_tool(
         name="audit_inventory",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_inventory(self) -> Dict[str, Any]:
         """
@@ -467,11 +469,12 @@ class SecurityAuditToolSet:
         )
         return payload
 
-    @tool(
+    @function_tool(
         name="audit_entrypoints",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_entrypoints(self) -> Dict[str, Any]:
         """
@@ -497,11 +500,12 @@ class SecurityAuditToolSet:
         )
         return payload
 
-    @tool(
+    @function_tool(
         name="audit_sink_scan",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_sink_scan(self, category: str = "all") -> Dict[str, Any]:
         """
@@ -685,11 +689,12 @@ class SecurityAuditToolSet:
         )
         return payload
 
-    @tool(
+    @function_tool(
         name="audit_secret_scan",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_secret_scan(self) -> Dict[str, Any]:
         """
@@ -816,11 +821,12 @@ class SecurityAuditToolSet:
             return None
         return value
 
-    @tool(
+    @function_tool(
         name="audit_config_scan",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_config_scan(self) -> Dict[str, Any]:
         """
@@ -947,11 +953,12 @@ class SecurityAuditToolSet:
         )
         return payload
 
-    @tool(
+    @function_tool(
         name="audit_dependency_inventory",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_dependency_inventory(self) -> Dict[str, Any]:
         """
@@ -1090,10 +1097,11 @@ class SecurityAuditToolSet:
                     names.append(match.group(1))
         return sorted(set(names))
 
-    @tool(
+    @function_tool(
         name="audit_dependency_audit",
         permissions=ToolPermission(filesystem_read=True, command=True, network=True),
         read_only=True,
+        needs_approval=True,
     )
     def audit_dependency_audit(self) -> Dict[str, Any]:
         """
@@ -1294,11 +1302,12 @@ class SecurityAuditToolSet:
                     )
         return findings
 
-    @tool(
+    @function_tool(
         name="audit_notes_scan",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_notes_scan(self) -> Dict[str, Any]:
         """
@@ -1343,11 +1352,12 @@ class SecurityAuditToolSet:
         )
         return payload
 
-    @tool(
+    @function_tool(
         name="audit_hotspots",
         permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         concurrency_safe=True,
+        needs_approval=True,
     )
     def audit_hotspots(
         self, findings: Optional[List[Dict[str, Any]]] = None

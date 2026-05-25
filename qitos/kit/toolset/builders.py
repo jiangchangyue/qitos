@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 from qitos.core.tool_registry import ToolRegistry
 from .advanced import advanced_coding_tools
 from .codebase import codebase_tools
@@ -18,7 +18,7 @@ def math_tools() -> ToolRegistry:
     """Build a tiny registry of arithmetic example tools."""
     registry = ToolRegistry()
 
-    @tool(name="add")
+    @function_tool(name="add")
     def add(a: int, b: int) -> int:
         """
         Return the sum of two integers.
@@ -28,7 +28,7 @@ def math_tools() -> ToolRegistry:
         """
         return a + b
 
-    @tool(name="multiply")
+    @function_tool(name="multiply")
     def multiply(a: int, b: int) -> int:
         """
         Return the product of two integers.

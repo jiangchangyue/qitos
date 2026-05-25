@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 import hashlib
 import json
+import logging
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Generic, Optional, TypeVar
@@ -14,15 +15,18 @@ from ..core.spec import ExperimentSpec, RunSpec
 from ..core.state import StateSchema
 from ..core.task import Task, TaskCriterionResult, TaskResult, TaskValidationIssue
 from ..trace import runtime_event_to_trace, runtime_step_to_trace
+from ._protocol import _EngineProtocol
 from .hooks import HookContext
 from .states import RuntimeEvent, RuntimePhase, StepRecord
+
+_logger = logging.getLogger("qitos.engine._trace_runtime")
 
 
 StateT = TypeVar("StateT", bound=StateSchema)
 
 
 class _TraceRuntime(Generic[StateT]):
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
         self.parser_error_count = 0
         self.parser_warning_count = 0
@@ -61,6 +65,12 @@ class _TraceRuntime(Generic[StateT]):
             self.notify_event(event, state)
 
     def write_trace_event(self, event: RuntimeEvent) -> None:
+        # Route through TracingProvider if available
+        provider = getattr(self.engine, "_tracing_provider", None)
+        if provider is not None:
+            # The LegacyTraceWriterProcessor handles the bridge,
+            # so we don't need to also write directly.
+            return
         if self.engine.trace_writer is None:
             return
         self.engine.trace_writer.write_event(
@@ -68,6 +78,10 @@ class _TraceRuntime(Generic[StateT]):
         )
 
     def write_trace_step(self, step: StepRecord) -> None:
+        # Route through TracingProvider if available
+        provider = getattr(self.engine, "_tracing_provider", None)
+        if provider is not None:
+            return
         if self.engine.trace_writer is None:
             return
         self.engine.trace_writer.write_step(runtime_step_to_trace(step))
@@ -80,7 +94,8 @@ class _TraceRuntime(Generic[StateT]):
                 continue
             try:
                 on_step_end(record=record, state=state, engine=self.engine)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("on_step_end hook raised: %s", exc)
                 continue
 
     def write_lifecycle_event(
@@ -248,8 +263,8 @@ class _TraceRuntime(Generic[StateT]):
                         tools.append(engine.tool_registry.describe_tool(name))
                     else:
                         tools.append({"name": name})
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to list tools: %s", exc)
         env_info = engine._env_identity()
         return {
             "model_name": model_name,
@@ -379,7 +394,8 @@ class _TraceRuntime(Generic[StateT]):
                 continue
             try:
                 on_event(event=event, state=state, record=record, engine=self.engine)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("on_event hook raised: %s", exc)
                 continue
 
     def notify_run_start(self, task: str, state: StateT) -> None:
@@ -389,7 +405,8 @@ class _TraceRuntime(Generic[StateT]):
                 continue
             try:
                 on_run_start(task=task, state=state, engine=self.engine)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("on_run_start hook raised: %s", exc)
                 continue
 
     def notify_run_end(self, result: Any) -> None:
@@ -399,7 +416,8 @@ class _TraceRuntime(Generic[StateT]):
                 continue
             try:
                 on_run_end(result=result, engine=self.engine)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("on_run_end hook raised: %s", exc)
                 continue
 
     def dispatch_hook(self, method_name: str, ctx: HookContext) -> None:
@@ -413,9 +431,11 @@ class _TraceRuntime(Generic[StateT]):
             except TypeError:
                 try:
                     method(ctx, self.engine)
-                except Exception:
+                except Exception as exc:
+                    _logger.debug("Hook %s (positional) raised: %s", method_name, exc)
                     continue
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Hook %s raised: %s", method_name, exc)
                 continue
 
     def inject_hook_payload(self, method_name: str, ctx: HookContext) -> None:

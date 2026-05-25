@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class EpubToolSet:
@@ -29,8 +29,9 @@ class EpubToolSet:
     def tools(self) -> List[Any]:
         return [self.list_chapters, self.read_chapter, self.search]
 
-    @tool(
-        name="list_chapters", description="List chapter files and titles from an EPUB"
+    @function_tool(
+        name="list_chapters", description="List chapter files and titles from an EPUB",
+        read_only=True,
     )
     def list_chapters(self, path: str) -> Dict[str, Any]:
         """
@@ -57,7 +58,7 @@ class EpubToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @tool(name="read_chapter", description="Read one chapter text from an EPUB")
+    @function_tool(name="read_chapter", description="Read one chapter text from an EPUB", read_only=True)
     def read_chapter(
         self, path: str, chapter_index: int, max_chars: int = 8000
     ) -> Dict[str, Any]:
@@ -93,7 +94,7 @@ class EpubToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    @tool(name="search", description="Search keyword in EPUB chapters")
+    @function_tool(name="search", description="Search keyword in EPUB chapters", read_only=True)
     def search(
         self, path: str, query: str, top_k: int = 3, snippet_chars: int = 240
     ) -> Dict[str, Any]:

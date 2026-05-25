@@ -13,6 +13,7 @@ from qitos.kit.context import (
     build_coding_context,
     load_project_instructions,
 )
+from qitos.kit.history.compact_history import CompactConfig, CompactHistory, compact_history
 from qitos.kit.permission import PermissionPipeline, PermissionMode
 
 from .system_prompt import CLAUDE_CODE_SYSTEM_PROMPT
@@ -61,17 +62,39 @@ class ClaudeCodeAgent(AgentModule[ClaudeCodeState, Any, Any]):
         model_protocol: Any = None,
         permission_mode: str = "default",
         include_mcp: bool = False,
+        history: CompactHistory | None = None,
     ):
         toolset = CodingToolSet(
             workspace_root=workspace_root,
             expose_modern_names=True,
         )
+
+        # Build a coding-optimized CompactHistory if none provided.
+        # Coding sessions tend to be longer, so we give a larger token
+        # budget and preserve fewer recent rounds to keep context sharp.
+        if history is None:
+            history = compact_history(
+                llm=llm,
+                config=CompactConfig(
+                    max_tokens=32000,
+                    keep_last_rounds=2,
+                    keep_last_messages=10,
+                    hard_window=128,
+                    warning_ratio=0.8,
+                    auto_compact=True,
+                    compact_long_messages_over_chars=900,
+                    microcompact_preview_chars=220,
+                    summary_max_chars=2000,
+                ),
+            )
+
         super().__init__(
             llm=llm,
             toolset=[toolset],
             max_steps=max_steps,
             model_parser=model_parser,
             model_protocol=model_protocol,
+            history=history,
         )
         self.max_steps = max_steps
         self.workspace_root = os.path.abspath(workspace_root)

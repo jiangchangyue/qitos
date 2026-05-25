@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 @dataclass
@@ -40,7 +40,7 @@ class ThinkingToolSet:
     def tools(self) -> List[Any]:
         return [self.sequential_thinking, self.get_thoughts, self.clear_thoughts]
 
-    @tool(
+    @function_tool(
         name="sequential_thinking",
         description="Record one thought step with optional revision/branch metadata",
     )
@@ -150,7 +150,7 @@ class ThinkingToolSet:
             },
         }
 
-    @tool(name="get_thoughts", description="Return thought history and branch traces")
+    @function_tool(name="get_thoughts", description="Return thought history and branch traces")
     def get_thoughts(self) -> Dict[str, Any]:
         """
         Return the full recorded thought history and all branch traces.
@@ -168,7 +168,7 @@ class ThinkingToolSet:
             "branch_count": len(self.branches),
         }
 
-    @tool(name="clear_thoughts", description="Clear all recorded thoughts and branches")
+    @function_tool(name="clear_thoughts", description="Clear all recorded thoughts and branches")
     def clear_thoughts(self) -> Dict[str, Any]:
         """
         Clear all stored thoughts and branch metadata from the toolset state.

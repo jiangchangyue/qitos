@@ -29,7 +29,7 @@ class ModelConfig:
             "provider": self.provider,
             "model": self.model,
             "model_name": self.model_name,
-            "api_key": self.api_key,
+            "api_key": "***REDACTED***" if self.api_key else "",
             "base_url": self.base_url,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,

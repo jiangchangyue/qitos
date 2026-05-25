@@ -12,7 +12,9 @@ from ..core.errors import StopReason
 from ..core.state import StateSchema
 from .engine import Engine, EngineResult
 from .events import EngineEvent, EngineEventType, EventStream
-from .states import ContextConfig, RuntimeBudget, RuntimePhase, StepRecord
+from .hooks import HookContext
+from .states import ContextConfig, RuntimeBudget, RuntimeEvent, RuntimePhase, StepRecord
+from .stream.transformer import StreamTransformer, TransformerChain, TransformerOutput
 from ..models.base import ModelStreamChunk
 
 StateT = TypeVar("StateT", bound=StateSchema)
@@ -53,18 +55,35 @@ class AsyncEngine(Generic[StateT, ObservationT, ActionT]):
         return await asyncio.to_thread(self._engine.run, task, **kwargs)
 
     async def arun_stream(
-        self, task: str, **kwargs: Any
-    ) -> AsyncIterator[EngineEvent]:
+        self,
+        task: str,
+        *,
+        transformers: Optional[List[StreamTransformer]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[EngineEvent | TransformerOutput]:
         """Run the agent loop and yield structured events as they occur.
 
         A sync Engine runs in a thread pool. Engine hooks bridge events
         into the EventStream for async consumption.
+
+        Parameters
+        ----------
+        task : str
+            The task to execute.
+        transformers : list of StreamTransformer, optional
+            If provided, each event is passed through the transformer chain
+            and TransformerOutput values are yielded instead of raw events.
+            Events that produce no TransformerOutput are suppressed.
         """
         stream = EventStream()
         self.event_stream = stream
+        chain = TransformerChain(transformers) if transformers else None
 
         hook = _StreamBridgeHook(stream)
         self._engine.hooks.append(hook)
+
+        if chain:
+            chain.on_run_start()
 
         def _run() -> EngineResult[StateT]:
             try:
@@ -76,8 +95,15 @@ class AsyncEngine(Generic[StateT, ObservationT, ActionT]):
 
         try:
             async for event in stream:
-                yield event
+                if chain:
+                    outputs = await chain.aprocess(event)
+                    for output in outputs:
+                        yield output
+                else:
+                    yield event
         finally:
+            if chain:
+                chain.on_run_end()
             self._engine.hooks = [
                 h for h in self._engine.hooks if h is not hook
             ]
@@ -151,7 +177,7 @@ class _StreamBridgeHook:
     def __init__(self, stream: EventStream) -> None:
         self._stream = stream
 
-    def on_run_start(self, task: str, state: Any, engine: Any) -> None:
+    def on_run_start(self, task: str, state: Any, engine: Engine) -> None:
         self._stream.emit_sync(
             EngineEvent(
                 event_type=EngineEventType.RUN_START,
@@ -159,7 +185,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_run_end(self, result: Any, engine: Any) -> None:
+    def on_run_end(self, result: EngineResult, engine: Engine) -> None:
         self._stream.emit_sync(
             EngineEvent(
                 event_type=EngineEventType.RUN_END,
@@ -175,7 +201,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_before_step(self, ctx: Any, engine: Any) -> None:
+    def on_before_step(self, ctx: HookContext, engine: Engine) -> None:
         agent_id = getattr(ctx.record, "agent_id", None) if ctx.record else None
         self._stream.emit_sync(
             EngineEvent(
@@ -187,7 +213,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_after_step(self, ctx: Any, engine: Any) -> None:
+    def on_after_step(self, ctx: HookContext, engine: Engine) -> None:
         agent_id = getattr(ctx.record, "agent_id", None) if ctx.record else None
         self._stream.emit_sync(
             EngineEvent(
@@ -202,7 +228,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_before_decide(self, ctx: Any, engine: Any) -> None:
+    def on_before_decide(self, ctx: HookContext, engine: Engine) -> None:
         self._stream.emit_sync(
             EngineEvent(
                 event_type=EngineEventType.DECIDE,
@@ -212,7 +238,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_after_decide(self, ctx: Any, engine: Any) -> None:
+    def on_after_decide(self, ctx: HookContext, engine: Engine) -> None:
         mode = None
         if ctx.decision is not None:
             mode = getattr(ctx.decision, "mode", None)
@@ -225,7 +251,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_before_act(self, ctx: Any, engine: Any) -> None:
+    def on_before_act(self, ctx: HookContext, engine: Engine) -> None:
         self._stream.emit_sync(
             EngineEvent(
                 event_type=EngineEventType.ACT,
@@ -235,7 +261,7 @@ class _StreamBridgeHook:
             )
         )
 
-    def on_after_act(self, ctx: Any, engine: Any) -> None:
+    def on_after_act(self, ctx: HookContext, engine: Engine) -> None:
         self._stream.emit_sync(
             EngineEvent(
                 event_type=EngineEventType.ACT,
@@ -246,7 +272,7 @@ class _StreamBridgeHook:
         )
 
     def on_event(
-        self, event: Any, state: Any, record: Any, engine: Any
+        self, event: RuntimeEvent, state: Any, record: Optional[StepRecord], engine: Engine
     ) -> None:
         phase_val = getattr(event, "phase", None)
         phase_str = phase_val.value if phase_val else ""

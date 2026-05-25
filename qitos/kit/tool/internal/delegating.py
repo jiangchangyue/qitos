@@ -12,7 +12,10 @@ class DelegatingTool(BaseTool):
     """Thin BaseTool adapter that delegates behavior to one callable tool."""
 
     def __init__(self, delegate: Any):
-        self._delegate = FunctionTool(delegate)
+        if isinstance(delegate, FunctionTool):
+            self._delegate = delegate
+        else:
+            self._delegate = FunctionTool(delegate)
         super().__init__(deepcopy(self._delegate.spec))
         self.spec.description = str(self._delegate.spec.description)
 

@@ -37,6 +37,10 @@ class _FakeHTTPResponse:
 def test_anthropic_native_messages_adapter(monkeypatch) -> None:
     captured = {}
 
+    # Ensure the default Anthropic endpoint is used, even if ANTHROPIC_BASE_URL
+    # is set in the environment (e.g., a corporate proxy).
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+
     def fake_post(url, headers=None, json=None, timeout=None):
         captured["url"] = url
         captured["headers"] = headers

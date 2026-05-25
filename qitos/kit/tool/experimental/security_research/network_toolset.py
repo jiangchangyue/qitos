@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class NetworkToolSet:
@@ -109,7 +109,7 @@ class NetworkToolSet:
 
         return packets
 
-    @tool(name="packet_capture")
+    @function_tool(name="packet_capture", needs_approval=True)
     def packet_capture(
         self,
         interface: str = "",
@@ -232,7 +232,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="traffic_analyze")
+    @function_tool(name="traffic_analyze", needs_approval=True)
     def traffic_analyze(
         self,
         pcap_file: str,
@@ -321,7 +321,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="dns_sniff")
+    @function_tool(name="dns_sniff", needs_approval=True)
     def dns_sniff(
         self, interface: str = "", duration: int = 30, output_file: str = ""
     ) -> Dict[str, Any]:
@@ -423,7 +423,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="arp_scan")
+    @function_tool(name="arp_scan", needs_approval=True)
     def arp_scan(self, target: str, interface: str = "") -> Dict[str, Any]:
         """
         Perform ARP scan to discover hosts on a local network.
@@ -488,7 +488,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="traceroute")
+    @function_tool(name="traceroute", needs_approval=True)
     def traceroute(
         self, target: str, max_hops: int = 30, method: str = "udp"
     ) -> Dict[str, Any]:
@@ -557,7 +557,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="http_request")
+    @function_tool(name="http_request", needs_approval=True)
     def http_request(
         self,
         url: str,
@@ -658,7 +658,7 @@ class NetworkToolSet:
             },
         }
 
-    @tool(name="scapy_craft")
+    @function_tool(name="scapy_craft", needs_approval=True)
     def scapy_craft(self, script: str) -> Dict[str, Any]:
         """
         Execute a Scapy packet crafting script.

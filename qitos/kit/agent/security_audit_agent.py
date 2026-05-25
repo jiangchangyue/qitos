@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+import warnings
+
+warnings.warn(
+    "Importing from qitos.kit.agent.security_audit_agent is deprecated. "
+    "Use qitos.kit.tool.experimental.security_research instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 

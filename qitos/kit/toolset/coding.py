@@ -1,4 +1,9 @@
-"""Coding-oriented preset toolset and registry builder."""
+"""Coding-oriented preset toolset and registry builder.
+
+Migration note (Phase 2): COMPLETE — all @tool decorators in coding_impl.py
+have been migrated to @function_tool for richer schema inference and
+needs_approval support. See qitos.core.function_tool_decorator for details.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ class FullCodingToolSet(CodingToolSet):
         *,
         shell_timeout: int = 30,
         include_notebook: bool = True,
+        auto_approve: bool = False,
     ):
         super().__init__(
             workspace_root=workspace_root,
@@ -26,11 +32,16 @@ class FullCodingToolSet(CodingToolSet):
             expose_legacy_aliases=True,
             expose_modern_names=False,
             profile="full",
+            auto_approve=auto_approve,
         )
 
 
 def coding_tools(
-    workspace_root: str, shell_timeout: int = 30, include_notebook: bool = True
+    workspace_root: str,
+    shell_timeout: int = 30,
+    include_notebook: bool = True,
+    *,
+    auto_approve: bool = False,
 ) -> ToolRegistry:
     """Build a registry with the standard full coding bundle."""
     return ToolRegistry().include_toolset(
@@ -38,6 +49,7 @@ def coding_tools(
             workspace_root=workspace_root,
             shell_timeout=shell_timeout,
             include_notebook=include_notebook,
+            auto_approve=auto_approve,
         )
     )
 

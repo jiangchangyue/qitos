@@ -12,7 +12,7 @@ import subprocess
 import os
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class PasswordToolSet:
@@ -229,7 +229,7 @@ class PasswordToolSet:
 
         return result
 
-    @tool(name="hash_identify")
+    @function_tool(name="hash_identify", needs_approval=True)
     def hash_identify(self, hash_str: str) -> Dict[str, Any]:
         """
         Identify the type of a hash string.
@@ -272,7 +272,7 @@ class PasswordToolSet:
             "data": detection,
         }
 
-    @tool(name="john_crack")
+    @function_tool(name="john_crack", needs_approval=True)
     def john_crack(
         self,
         hash_file: str,
@@ -373,7 +373,7 @@ class PasswordToolSet:
             },
         }
 
-    @tool(name="hashcat_crack")
+    @function_tool(name="hashcat_crack", needs_approval=True)
     def hashcat_crack(
         self,
         hash_file: str,
@@ -500,7 +500,7 @@ class PasswordToolSet:
             },
         }
 
-    @tool(name="hydra_bruteforce")
+    @function_tool(name="hydra_bruteforce", needs_approval=True)
     def hydra_bruteforce(
         self,
         target: str,
@@ -633,7 +633,7 @@ class PasswordToolSet:
             },
         }
 
-    @tool(name="wordlist_manage")
+    @function_tool(name="wordlist_manage", needs_approval=True)
     def wordlist_manage(
         self,
         action: str,

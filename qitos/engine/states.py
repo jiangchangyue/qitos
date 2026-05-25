@@ -23,6 +23,7 @@ class RuntimePhase(str, Enum):
     DELEGATE_END = "DELEGATE_END"
     HANDOFF_START = "HANDOFF_START"
     HANDOFF_END = "HANDOFF_END"
+    INTERRUPT = "INTERRUPT"
     FANOUT_START = "FANOUT_START"
     FANOUT_END = "FANOUT_END"
     COMPACT = "COMPACT"
@@ -32,7 +33,7 @@ class RuntimePhase(str, Enum):
 
 @dataclass
 class RuntimeBudget:
-    max_steps: int = 20
+    max_steps: int = 10  # Default matches Engine's safe step limit
     max_runtime_seconds: Optional[float] = None
     max_tokens: Optional[int] = None
 
@@ -155,3 +156,4 @@ class StepResult:
     stop_reason: Optional[Any] = None  # StopReason
     error: Optional[Exception] = None
     recovered: bool = False
+    interrupt_info: Optional[Any] = None  # InterruptInfo (avoids circular import)

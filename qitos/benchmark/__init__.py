@@ -1,8 +1,14 @@
-"""Benchmark adapters and runner contracts for QitOS."""
+"""Benchmark adapters and runner contracts for QitOS.
+
+Core interfaces (BenchmarkAdapter, BenchmarkRuntimeHook, etc.) are stable.
+Concrete adapter implementations are available but deprecated — they will
+move to ``qitos.recipes.benchmarks`` in a future release.
+"""
 
 from __future__ import annotations
 
 import importlib
+import warnings
 
 from .base import BenchmarkAdapter, BenchmarkSource
 from .contracts import (
@@ -12,16 +18,21 @@ from .contracts import (
     PreparedBenchmarkTask,
 )
 
-_LAZY_ATTRS = {
+# Core utilities — stable API
+_CORE_ATTRS = {
     "build_experiment_spec": (".common", "build_experiment_spec"),
     "evaluate_benchmark_results": (".common", "evaluate_benchmark_results"),
     "read_benchmark_results": (".common", "read_benchmark_results"),
     "write_benchmark_results": (".common", "write_benchmark_results"),
     "load_benchmark_tasks": (".runner", "load_benchmark_tasks"),
     "normalize_benchmark_name": (".runner", "normalize_benchmark_name"),
-    "resolve_builtin_runner": (".runner", "resolve_builtin_runner"),
     "resolve_runner": (".runner", "resolve_runner"),
     "run_benchmark_tasks": (".runner", "run_benchmark_tasks"),
+}
+
+# Concrete adapter implementations — deprecated (will move to qitos.recipes.benchmarks)
+_DEPRECATED_ADAPTER_ATTRS = {
+    "resolve_builtin_runner": (".runner", "resolve_builtin_runner"),
     "DesktopStarterAdapter": (".desktop", "DesktopStarterAdapter"),
     "load_desktop_tasks": (".desktop", "load_desktop_tasks"),
     "run_desktop_starter_task": (".desktop", "run_desktop_starter_task"),
@@ -60,8 +71,19 @@ _LAZY_ATTRS = {
     "run_tau_bench_task": (".tau_bench", "run_tau_bench_task"),
 }
 
+_LAZY_ATTRS = {**_CORE_ATTRS, **_DEPRECATED_ADAPTER_ATTRS}
+
 
 def __getattr__(name: str):
+    # Deprecation warning for concrete adapter imports
+    if name in _DEPRECATED_ADAPTER_ATTRS:
+        warnings.warn(
+            f"Importing {name!r} from qitos.benchmark is deprecated. "
+            f"Use qitos.recipes.benchmarks instead. "
+            f"This import will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     target = _LAZY_ATTRS.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -73,6 +95,7 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    # Stable core API
     "BenchmarkAdapter",
     "BenchmarkSource",
     "BenchmarkRuntimeHook",
@@ -85,9 +108,9 @@ __all__ = [
     "build_experiment_spec",
     "write_benchmark_results",
     "read_benchmark_results",
-    "evaluate_benchmark_results",
-    "resolve_builtin_runner",
     "resolve_runner",
+    # Deprecated — concrete adapters (still available for now)
+    "resolve_builtin_runner",
     "DesktopStarterAdapter",
     "load_desktop_tasks",
     "run_desktop_starter_task",

@@ -25,6 +25,7 @@ class EngineEventType(str, Enum):
     DELEGATE = "delegate"
     FANOUT = "fanout"
     ERROR = "error"
+    INTERRUPT = "interrupt"
     RUN_START = "run_start"
     RUN_END = "run_end"
     STEP_STREAM = "step_stream"  # Token-level streaming chunk
@@ -79,7 +80,7 @@ class EventStream:
     """
 
     def __init__(self) -> None:
-        self._queue: asyncio.Queue[Optional[EngineEvent]] = asyncio.Queue()
+        self._queue: asyncio.Queue[Optional[EngineEvent]] = asyncio.Queue(maxsize=4096)
         self._subscribers: List[asyncio.Queue[Optional[EngineEvent]]] = []
         self._closed = False
 

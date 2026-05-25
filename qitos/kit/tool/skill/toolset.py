@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 from qitos.kit.skill import SkillManager, SkillRegistry
 
 
@@ -48,7 +48,7 @@ class SkillToolSet:
             self.get_skill_info,
         ]
 
-    @tool(name="check_skill_hub")
+    @function_tool(name="check_skill_hub", read_only=True)
     def check_skill_hub(self, runtime_context: Optional[dict[str, Any]] = None) -> str:
         """
         Report whether the configured skill provider is available for use.
@@ -61,7 +61,7 @@ class SkillToolSet:
             "Use search_skills or install_skill to work with third-party skills."
         )
 
-    @tool(name="install_skill_hub")
+    @function_tool(name="install_skill_hub", needs_approval=True)
     def install_skill_hub(
         self, hub_url: str, runtime_context: Optional[dict[str, Any]] = None
     ) -> str:
@@ -75,7 +75,7 @@ class SkillToolSet:
         installed = manager.install(f"local:{hub_url}", activate=False)
         return f"Installed hub manifest '{installed.manifest.name}' from {hub_url}."
 
-    @tool(name="search_skills")
+    @function_tool(name="search_skills", read_only=True)
     def search_skills(
         self,
         query: str,
@@ -101,7 +101,7 @@ class SkillToolSet:
             lines.append(f"{result.ref} (v{version}): {result.description}")
         return "\n".join(lines)
 
-    @tool(name="install_skill")
+    @function_tool(name="install_skill", needs_approval=True)
     def install_skill(
         self,
         skill_ref: str = "",
@@ -123,7 +123,7 @@ class SkillToolSet:
         state = "activated" if installed.active else "installed"
         return f"Successfully {state} skill '{installed.key}' v{installed.package.version}. {installed.manifest.description}"
 
-    @tool(name="activate_skill")
+    @function_tool(name="activate_skill", needs_approval=True)
     def activate_skill(
         self,
         skill_ref: str,
@@ -140,7 +140,7 @@ class SkillToolSet:
             return f"Activated skill '{skill_ref}'."
         return f"Skill '{skill_ref}' is not installed."
 
-    @tool(name="list_installed_skills")
+    @function_tool(name="list_installed_skills", read_only=True)
     def list_installed_skills(
         self, runtime_context: Optional[dict[str, Any]] = None
     ) -> str:
@@ -159,7 +159,7 @@ class SkillToolSet:
             lines.append(f"- {item.key}{active}: {item.manifest.description}")
         return "\n".join(lines)
 
-    @tool(name="get_skill_info")
+    @function_tool(name="get_skill_info", read_only=True)
     def get_skill_info(
         self,
         skill_ref: str = "",

@@ -1,0 +1,78 @@
+name: Model Adapter Request
+description: Request support for a new model family or adapter
+labels: ["enhancement", "models"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request support for a new model family in QitOS.
+        Before submitting, check if the model family is already supported in the
+        [Family Preset documentation](/zh/concepts/family-presets).
+
+  - type: input
+    id: model-family
+    attributes:
+      label: Model Family Name
+      description: Name of the model family (e.g., Yi, Baichuan, ChatGLM)
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider / API Endpoint
+      description: API provider or endpoint URL
+      placeholder: "https://api.example.com/v1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: API Compatibility
+      description: Is the API OpenAI-compatible?
+      options:
+        - Yes, fully OpenAI-compatible
+        - Partially compatible (with extensions)
+        - No, custom API format
+    validations:
+      required: true
+
+  - type: textarea
+    id: tool-call-format
+    attributes:
+      label: Tool Call Format
+      description: |
+        How does this model handle tool calls?
+        (e.g., JSON decision, native function calling, XML, custom format)
+    validations:
+      required: true
+
+  - type: input
+    id: context-window
+    attributes:
+      label: Context Window Size
+      description: Maximum context window in tokens
+      placeholder: "128000"
+    validations:
+      required: false
+
+  - type: textarea
+    id: recommended-models
+    attributes:
+      label: Recommended Models
+      description: Specific model names/IDs within this family
+      placeholder: |
+        model-name-1: description
+        model-name-2: description
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: |
+        Any other relevant details (embedding support, pricing, special features, etc.)
+    validations:
+      required: false

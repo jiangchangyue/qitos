@@ -158,6 +158,7 @@ def test_whitzard_agent_roundtrip_collects_findings_and_requires_double_completi
         render=False,
         trace=False,
         return_state=True,
+        engine_kwargs={"auto_approve": True},
     )
 
     assert result.state.stop_reason in ("success", "final")

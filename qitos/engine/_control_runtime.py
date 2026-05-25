@@ -9,6 +9,7 @@ from ..core.decision import Decision
 from ..core.errors import StopReason
 from ..core.state import StateSchema
 from ._context_runtime import ContextOverflowError
+from ._protocol import _EngineProtocol
 from .critic_result import CriticResult
 from .states import RuntimePhase, StepRecord
 
@@ -19,7 +20,7 @@ ActionT = TypeVar("ActionT")
 
 
 class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
 
     def run_reduce(
@@ -46,7 +47,7 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
         before = state.to_dict()
         new_state = engine.agent.reduce(state, observation, decision)
         if new_state is not state:
-            state.__dict__.update(new_state.__dict__)
+            state.reduce_update(new_state.__dict__)
         after = state.to_dict()
         engine._memory_append("next_state", after, record.step_id)
         record.state_diff = engine._compute_state_diff(before, after)

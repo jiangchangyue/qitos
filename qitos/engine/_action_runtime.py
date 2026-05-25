@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Generic, List, TypeVar, cast
+from typing import Any, Dict, Generic, List, Optional, TypeVar, cast
 
 from ..core.action import Action
 from ..core.decision import Decision
 from ..core.tool_result import ToolResult
+from ._protocol import _EngineProtocol
 from .states import RuntimePhase, StepRecord
 
 
@@ -16,7 +17,7 @@ ActionT = TypeVar("ActionT")
 
 
 class _ActionRuntime(Generic[StateT, ActionT]):
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
 
     def run_act(
@@ -48,12 +49,21 @@ class _ActionRuntime(Generic[StateT, ActionT]):
         actions: List[Action] = []
         for action in decision.actions:
             if isinstance(action, Action):
+                # Check for handoff tool interception
+                handoff = engine._intercept_handoff_action(action)
+                if handoff is not None:
+                    return handoff
                 actions.append(action)
                 continue
             payload = (
                 action if isinstance(action, dict) else cast(Dict[str, Any], action)
             )
-            actions.append(Action.from_dict(payload))
+            normalized = Action.from_dict(payload)
+            # Check for handoff tool interception
+            handoff = engine._intercept_handoff_action(normalized)
+            if handoff is not None:
+                return handoff
+            actions.append(normalized)
         for normalized_action in actions:
             engine._memory_append("action", normalized_action, record.step_id)
             loop_result = engine._tool_loop_detector.check_detailed(

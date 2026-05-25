@@ -385,6 +385,7 @@ def test_terminal_examples_smoke(tmp_path: Path) -> None:
         render=False,
         trace=False,
         return_state=True,
+        engine_kwargs={"auto_approve": True},
     )
     assert whitzard_result.state.stop_reason in ("success", "final")
     assert whitzard_result.state.final_report_path == "security_report.md"

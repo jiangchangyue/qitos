@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from qitos.core.tool import get_tool_meta
+from qitos.core.tool import FunctionTool, get_tool_meta
 from qitos.core.tool_registry import ToolRegistry
 
 from .exploit_toolset import ExploitToolSet
@@ -23,7 +23,10 @@ def _register_explicit_toolset(registry: ToolRegistry, toolset: Any) -> None:
         if attr_name.startswith("_"):
             continue
         attr = getattr(toolset, attr_name)
-        if callable(attr) and get_tool_meta(attr) is not None:
+        # Support both @tool (marker: __qitos_tool_meta__) and @function_tool (FunctionTool instance)
+        if isinstance(attr, FunctionTool):
+            registry.register(attr)
+        elif callable(attr) and get_tool_meta(attr) is not None:
             registry.register(attr)
 
 

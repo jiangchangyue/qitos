@@ -14,7 +14,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class ReconToolSet:
@@ -300,7 +300,7 @@ class ReconToolSet:
 
         return records
 
-    @tool(name="host_discovery")
+    @function_tool(name="host_discovery", needs_approval=True)
     def host_discovery(self, target: str, scan_type: str = "ping") -> Dict[str, Any]:
         """
         Discover live hosts on a network.
@@ -379,7 +379,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="port_scan")
+    @function_tool(name="port_scan", needs_approval=True)
     def port_scan(
         self, target: str, ports: str = "1-1000", scan_type: str = "syn"
     ) -> Dict[str, Any]:
@@ -466,7 +466,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="service_scan")
+    @function_tool(name="service_scan", needs_approval=True)
     def service_scan(
         self, target: str, ports: str = "1-10000", intensity: int = 5
     ) -> Dict[str, Any]:
@@ -560,7 +560,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="os_detect")
+    @function_tool(name="os_detect", needs_approval=True)
     def os_detect(self, target: str) -> Dict[str, Any]:
         """
         Detect the operating system of the target host.
@@ -611,7 +611,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="subnet_scan")
+    @function_tool(name="subnet_scan", needs_approval=True)
     def subnet_scan(self, target: str, scan_types: str = "default") -> Dict[str, Any]:
         """
         Comprehensive network scan combining host discovery, port scanning, service detection, and OS fingerprinting.
@@ -708,7 +708,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="dns_lookup")
+    @function_tool(name="dns_lookup", needs_approval=True)
     def dns_lookup(
         self, domain: str, record_types: str = "ANY", dns_server: str = ""
     ) -> Dict[str, Any]:
@@ -783,7 +783,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="dns_enum")
+    @function_tool(name="dns_enum", needs_approval=True)
     def dns_enum(self, domain: str, wordlist: str = "") -> Dict[str, Any]:
         """
         Enumerate DNS records using DNSRecon.
@@ -839,7 +839,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="whois_lookup")
+    @function_tool(name="whois_lookup", needs_approval=True)
     def whois_lookup(self, target: str) -> Dict[str, Any]:
         """
         Perform WHOIS lookup for a domain or IP address.
@@ -901,7 +901,7 @@ class ReconToolSet:
             },
         }
 
-    @tool(name="subdomain_enum")
+    @function_tool(name="subdomain_enum", needs_approval=True)
     def subdomain_enum(
         self, domain: str, sources: str = "all", depth: int = 2
     ) -> Dict[str, Any]:

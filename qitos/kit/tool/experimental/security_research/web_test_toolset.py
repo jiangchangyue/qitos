@@ -13,7 +13,7 @@ import subprocess
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class WebTestToolSet:
@@ -245,7 +245,7 @@ class WebTestToolSet:
 
         return findings
 
-    @tool(name="sqlmap_scan")
+    @function_tool(name="sqlmap_scan", needs_approval=True)
     def sqlmap_scan(
         self,
         target_url: str,
@@ -347,7 +347,7 @@ class WebTestToolSet:
             },
         }
 
-    @tool(name="dir_bruteforce")
+    @function_tool(name="dir_bruteforce", needs_approval=True)
     def dir_bruteforce(
         self,
         target_url: str,
@@ -441,7 +441,7 @@ class WebTestToolSet:
             },
         }
 
-    @tool(name="header_check")
+    @function_tool(name="header_check", needs_approval=True)
     def header_check(self, target_url: str) -> Dict[str, Any]:
         """
         Analyze HTTP security headers of a target.
@@ -509,7 +509,7 @@ class WebTestToolSet:
             },
         }
 
-    @tool(name="ssl_check")
+    @function_tool(name="ssl_check", needs_approval=True)
     def ssl_check(self, target_url: str) -> Dict[str, Any]:
         """
         Check SSL/TLS configuration of a target.
@@ -591,7 +591,7 @@ class WebTestToolSet:
             },
         }
 
-    @tool(name="tech_detect")
+    @function_tool(name="tech_detect", needs_approval=True)
     def tech_detect(self, target_url: str) -> Dict[str, Any]:
         """
         Detect technologies used by a web application.
@@ -707,7 +707,7 @@ class WebTestToolSet:
             },
         }
 
-    @tool(name="vhost_enum")
+    @function_tool(name="vhost_enum", needs_approval=True)
     def vhost_enum(
         self,
         target_url: str,

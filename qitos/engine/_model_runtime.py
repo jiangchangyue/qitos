@@ -28,6 +28,7 @@ from ..core.observation import Observation
 from ..protocols import get_protocol, resolve_protocol_chain
 from ..core.state import StateSchema
 from ._context_runtime import ContextOverflowError
+from ._protocol import _EngineProtocol
 from .streaming import StreamHandler, to_stream_handler
 from .parser import (
     build_parser_diagnostics,
@@ -44,7 +45,7 @@ ActionT = TypeVar("ActionT")
 
 
 class _ModelRuntime(Generic[StateT, ObservationT, ActionT]):
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
         self.stream_callback: Optional[Any] = None  # Callable[[str], None] or StreamHandler
 

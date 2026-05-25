@@ -26,6 +26,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
     """Canonical policy contract for step-based agents."""
 
     name: str = "agent"
+    handoff_targets: List[str] | None = None
 
     def __init__(
         self,
@@ -36,6 +37,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         model_protocol: Any = None,
         memory: Memory | None = None,
         history: History | None = None,
+        mcp_servers: List[Any] | None = None,
         **config: Any,
     ):
         self.tool_registry = self._resolve_tool_registry(
@@ -46,6 +48,7 @@ class AgentModule(ABC, Generic[StateT, ObservationT, ActionT]):
         self.model_protocol = model_protocol
         self.memory = memory
         self.history = history
+        self.mcp_servers: List[Any] = mcp_servers or []
         self.config = config
 
     @abstractmethod

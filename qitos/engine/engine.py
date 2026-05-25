@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 from uuid import uuid4
 
+_logger = logging.getLogger("qitos.engine")
+
+from ..checkpoint.store import Checkpoint, CheckpointConfig, CheckpointId, CheckpointMetadata, CheckpointStore, StateVersions
+from ..checkpoint.versioning import StateVersionTracker
+from ..checkpoint.durability import DurabilityManager, DurabilityMode
+from ..checkpoint.pending_writes import PendingWriteManager
 from ..core.agent_module import AgentModule
 from ..core.decision import Decision
 from ..core.errors import ErrorCategory, StopReason
 from ..core.env import Env, EnvObservation, EnvStepResult
 from ..core.history import History, HistoryMessage, HistoryPolicy
+from ..core.interceptor import InterceptorChain, ToolInterceptor
 from ..core.memory import Memory, MemoryRecord
 from ..core.state import StateSchema
 from ..core.task import Task, TaskResult, TaskValidationIssue
@@ -28,6 +36,7 @@ from ._model_runtime import _ModelRuntime
 from ._handoff_runtime import _HandoffRuntime
 from ._trace_runtime import _TraceRuntime
 from .action_executor import ActionExecutor
+from .cancellation import CancelMode, CancelToken
 from .branching import BranchSelector, FirstCandidateSelector
 from .critic import Critic
 from .hooks import EngineHook, HookContext
@@ -134,6 +143,20 @@ class EngineResult(Generic[StateT]):
     runtime_seconds: float = 0.0
     total_tokens: int = 0
     run_id: str = ""
+    _cancel_token: Optional[CancelToken] = None
+
+    def cancel(self, mode: str = "immediate") -> None:
+        """Request cancellation of the running Engine.
+
+        Parameters
+        ----------
+        mode : str
+            ``"immediate"`` — stop as soon as possible (may be mid-step).
+            ``"after_step"`` — wait for the current step to complete first.
+        """
+        if self._cancel_token is None:
+            return
+        self._cancel_token.request_cancel(mode)
 
     @property
     def tool_calls_by_name(self) -> Dict[str, int]:
@@ -239,17 +262,27 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         context_config: Optional[ContextConfig | Dict[str, Any]] = None,
         cache_backend: Optional[Any] = None,
         checkpoint_manager: Optional[Any] = None,
+        checkpoint_store: Optional[CheckpointStore] = None,
+        checkpoint_durability: DurabilityMode = DurabilityMode.SYNC,
         permission_pipeline: Optional[Any] = None,
         read_before_write_enforcer: Optional[Any] = None,
         permission_interaction_callback: Optional[Any] = None,
         loop_detector: Optional[ToolCallLoopDetector] = None,
+        tracing_provider: Optional[Any] = None,
+        interceptors: Optional[List[ToolInterceptor]] = None,
+        auto_approve: bool = False,
     ):
         self.agent = agent
         self.agent_registry = agent_registry
         self._delegate_depth = delegate_depth
         self._shared_memory = shared_memory
         self.tool_registry = agent.tool_registry
-        self.budget = budget or RuntimeBudget(max_steps=10)
+        # Ensure Engine always has a ToolRegistry — agents without tools still
+        # need one for handoff/permission tools registered by the Engine itself.
+        if self.tool_registry is None:
+            from ..core.tool_registry import ToolRegistry as _TR
+            self.tool_registry = _TR()
+        self.budget = budget or RuntimeBudget()
         self._base_budget = RuntimeBudget(
             max_steps=self.budget.max_steps,
             max_runtime_seconds=self.budget.max_runtime_seconds,
@@ -287,6 +320,12 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         resolved_pipeline = permission_pipeline or getattr(agent, "permission_pipeline", None)
         resolved_rbw = read_before_write_enforcer or getattr(agent, "_rbw_enforcer", None)
 
+        # Build interceptor chain from interceptors list
+        self._interceptor_chain: Optional[InterceptorChain] = None
+        if interceptors:
+            self._interceptor_chain = InterceptorChain(interceptors)
+
+        self.auto_approve = auto_approve
         self.executor = (
             ActionExecutor(
                 tool_registry=self.tool_registry,
@@ -297,6 +336,8 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 permission_pipeline=resolved_pipeline,
                 read_before_write_enforcer=resolved_rbw,
                 permission_interaction_callback=permission_interaction_callback,
+                interceptor_chain=self._interceptor_chain,
+                auto_approve=auto_approve,
             )
             if self.tool_registry is not None
             else None
@@ -315,6 +356,8 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             max_repeats=max(1, int(self.context_config.loop_max_repeats))
         )
         self._last_system_prompt: str = ""
+        self._critic_modified_prompt: Optional[str] = None
+        self._critic_instruction_patch: Optional[str] = None
         self._last_prompt_metadata: Dict[str, Any] = {}
         self._last_context_telemetry: Dict[str, Any] = {}
         self._model_runtime: _ModelRuntime[StateT, ObservationT, ActionT] = (
@@ -342,8 +385,33 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             if not isinstance(self.agent.llm, CachedModel):
                 self.agent.llm = CachedModel(self.agent.llm, self.cache_backend)
 
-        # Checkpoint manager for run persistence
+        # Checkpoint: new CheckpointStore takes precedence over legacy CheckpointManager
+        self._checkpoint_store = checkpoint_store
+        self._version_tracker: Optional[StateVersionTracker] = None
+        self._durability_manager: Optional[DurabilityManager] = None
+        self._pending_write_manager: Optional[PendingWriteManager] = None
+        self._last_checkpoint_id: Optional[CheckpointId] = None
+
+        if checkpoint_store is not None:
+            self._durability_manager = DurabilityManager(checkpoint_store, mode=checkpoint_durability)
+            self._pending_write_manager = PendingWriteManager(checkpoint_store)
+
+        # Legacy checkpoint manager (deprecated — kept for backward compat)
         self.checkpoint_manager = checkpoint_manager
+
+        # Tracing provider: if provided, bridge legacy TraceWriter to it
+        self._tracing_provider = tracing_provider
+        if tracing_provider is not None and trace_writer is not None:
+            from ..tracing.legacy_processor import LegacyTraceWriterProcessor
+            tracing_provider.add_processor(LegacyTraceWriterProcessor(trace_writer))
+
+        # Handoff tools: auto-register if agent declares handoff_targets
+        self._handoff_tools: List[Any] = []
+        if getattr(agent, "handoff_targets", None) and self.tool_registry is not None:
+            self._register_handoff_tools()
+
+        # Cancellation token — shared with EngineResult for external cancel
+        self._cancel_token = CancelToken()
 
     def resolve_protocol(self) -> Any:
         if self._resolved_protocol is not None:
@@ -403,17 +471,17 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         if memory is not None:
             try:
                 memory.reset()
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to reset memory: %s", exc)
         try:
             self._history().reset()
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.debug("Failed to reset history: %s", exc)
         if hasattr(self.recovery_policy, "reset"):
             try:
                 self.recovery_policy.reset()
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to reset recovery_policy: %s", exc)
         self._active_run_id = f"run_{uuid4().hex[:12]}"
         self._last_system_prompt = ""
         self._last_prompt_metadata = {}
@@ -452,6 +520,13 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         The caller can inspect ``result.stop`` to decide whether to
         continue the loop.
         """
+        from .interrupt import (
+            EngineInterrupt,
+            InterruptInfo,
+            _reset_interrupt_context,
+        )
+
+        _reset_interrupt_context()
         step_id = state.current_step
         started_at = time.monotonic()
         record = StepRecord(step_id=step_id, agent_id=self.agent.name)
@@ -460,6 +535,26 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         # DECIDE
         try:
             decision = self._run_decide(state, observation, record)
+        except EngineInterrupt as ei:
+            # Save checkpoint and report interrupt
+            cp_id = self._save_interrupt_checkpoint(step_id, state, ei)
+            info = InterruptInfo(
+                interrupt_id=ei.interrupt_id,
+                checkpoint_id=cp_id,
+                value=ei.value,
+            )
+            self._emit(step_id, RuntimePhase.INTERRUPT, ok=True, payload={"interrupt_id": ei.interrupt_id})
+            self._finalize_step(record, state)
+            return StepResult(
+                step_id=step_id,
+                decision=None,
+                record=record,
+                observation=observation,
+                action_results=[],
+                stop=True,
+                stop_reason=StopReason.INTERRUPT,
+                interrupt_info=info,
+            )
         except Exception as exc:
             failed_phase = self._infer_failed_phase(record)
             if self._recover(state, failed_phase, exc):
@@ -554,7 +649,27 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         )
         record.observation = new_observation
         self._memory_append("observation", new_observation, record.step_id)
-        self._run_reduce(state, new_observation, decision, record)
+        try:
+            self._run_reduce(state, new_observation, decision, record)
+        except EngineInterrupt as ei:
+            cp_id = self._save_interrupt_checkpoint(step_id, state, ei)
+            info = InterruptInfo(
+                interrupt_id=ei.interrupt_id,
+                checkpoint_id=cp_id,
+                value=ei.value,
+            )
+            self._emit(step_id, RuntimePhase.INTERRUPT, ok=True, payload={"interrupt_id": ei.interrupt_id})
+            self._finalize_step(record, state)
+            return StepResult(
+                step_id=step_id,
+                decision=decision,
+                record=record,
+                observation=new_observation,
+                action_results=action_results,
+                stop=True,
+                stop_reason=StopReason.INTERRUPT,
+                interrupt_info=info,
+            )
 
         # CHECK STOP
         stop = self._run_check_stop(state, decision, step_id, started_at)
@@ -627,23 +742,37 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         """Return the active state, if any."""
         return self._active_state
 
+    @property
+    def checkpoint_store(self) -> Optional[CheckpointStore]:
+        """Return the configured CheckpointStore, if any."""
+        return self._checkpoint_store
+
+    @property
+    def tracing_provider(self) -> Any:
+        """Return the configured TracingProvider, if any."""
+        return self._tracing_provider
+
     def run(self, task: str | Task, **kwargs: Any) -> EngineResult[StateT]:
+        # Check for resume-from-checkpoint internal kwargs
+        _resume_state = kwargs.pop("_resume_state", None)
+        _resume_step = kwargs.pop("_resume_step", None)
+
         self._reset_run_state()
         memory = self._memory()
         if memory is not None:
             try:
                 memory.reset()
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to reset memory: %s", exc)
         try:
             self._history().reset()
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.debug("Failed to reset history: %s", exc)
         if hasattr(self.recovery_policy, "reset"):
             try:
                 self.recovery_policy.reset()
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to reset recovery_policy: %s", exc)
         self._active_run_id = (
             str(getattr(self.trace_writer, "run_id", "")).strip()
             if self.trace_writer is not None
@@ -664,7 +793,21 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 "agents": [s.name for s in self.agent_registry.list_available()],
             }
             self.trace_writer.metadata["agent_name"] = self.agent.name
-        state = self.agent.init_state(task_text, **kwargs)
+
+        # Initialize version tracker for checkpoint store
+        if self._checkpoint_store is not None:
+            self._version_tracker = StateVersionTracker()
+
+        # Connect MCP servers and bridge their tools
+        self._connected_mcp_servers: List[Any] = []
+        if getattr(self.agent, "mcp_servers", None):
+            self._connect_mcp_servers()
+
+        # State initialization: fresh or resumed
+        if _resume_state is not None:
+            state = _resume_state
+        else:
+            state = self.agent.init_state(task_text, **kwargs)
         self._memory_append(
             "task",
             {
@@ -746,6 +889,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 runtime_seconds=time.monotonic() - started_at,
                 total_tokens=int(self._token_usage),
                 run_id=self._active_run_id,
+                _cancel_token=self._cancel_token,
             )
             self._notify_run_end(result)
             self._clear_active_context()
@@ -759,12 +903,25 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             )
             return result
 
-        step_id = 0
+        step_id = _resume_step if _resume_step is not None else 0
         current_observation = self._build_initial_observation(
             state, step_id, started_at
         )
         try:
             while True:
+                # -- Cancellation check --
+                if self._cancel_token.is_cancel_requested:
+                    if self._cancel_token.mode == CancelMode.IMMEDIATE:
+                        self._emit(
+                            step_id,
+                            RuntimePhase.END,
+                            ok=False,
+                            payload={"stop_reason": "cancelled_immediate"},
+                        )
+                        break
+                    # after_step: break after this iteration's step completes
+                    # (checked again at end of loop body below)
+
                 if self._budget_exhausted(step_id, started_at, state):
                     self._emit(
                         step_id,
@@ -1089,6 +1246,22 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 current_observation = observation
                 state.advance_step()
                 step_id += 1
+
+                # -- after_step cancellation: break after step completes --
+                if (
+                    self._cancel_token.is_cancel_requested
+                    and self._cancel_token.mode == CancelMode.AFTER_STEP
+                ):
+                    self._save_checkpoint_if_needed(
+                        state, step_id - 1, force=True
+                    )
+                    self._emit(
+                        step_id - 1,
+                        RuntimePhase.END,
+                        ok=False,
+                        payload={"stop_reason": "cancelled_after_step"},
+                    )
+                    break
         finally:
             self._teardown_env()
             self._teardown_toolsets(
@@ -1098,6 +1271,21 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                     "task": task_obj or task_text,
                 }
             )
+            # Checkpoint on cancellation (immediate mode)
+            if self._cancel_token.is_cancel_requested and self._checkpoint_store is not None:
+                try:
+                    self._save_checkpoint(state, step_id)
+                except Exception as exc:
+                    _logger.warning("Checkpoint save failed during cancellation: %s", exc)
+            # Flush durability manager on run end
+            if self._durability_manager is not None:
+                try:
+                    self._durability_manager.flush()
+                except Exception as exc:
+                    _logger.warning("Durability manager flush failed: %s", exc)
+
+            # Cleanup MCP servers
+            self._cleanup_mcp_servers()
 
         if self.trace_writer is not None:
             status = (
@@ -1137,6 +1325,7 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             runtime_seconds=time.monotonic() - started_at,
             total_tokens=int(self._token_usage),
             run_id=self._active_run_id,
+            _cancel_token=self._cancel_token,
         )
         self._notify_run_end(result)
         self._clear_active_context()
@@ -1303,6 +1492,11 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
     def _save_checkpoint_if_needed(
         self, step_id: int, state: StateT, task_text: str, task_obj: Optional[Any]
     ) -> None:
+        # --- New CheckpointStore path ---
+        if self._checkpoint_store is not None:
+            self._save_checkpoint(step_id, state, task_text, source="loop")
+            return
+        # --- Legacy CheckpointManager path (deprecated) ---
         if self.checkpoint_manager is None:
             return
         if not self.checkpoint_manager.should_checkpoint(step_id):
@@ -1327,6 +1521,153 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
             self.checkpoint_manager.save(checkpoint)
         except OSError:
             pass
+
+    def _save_checkpoint(
+        self,
+        step_id: int,
+        state: StateT,
+        task_text: str,
+        source: str = "loop",
+    ) -> None:
+        """Save a checkpoint via the new CheckpointStore (every step)."""
+        if self._checkpoint_store is None or self._durability_manager is None:
+            return
+
+        state_data = state.to_dict()
+        new_versions: StateVersions = {}
+        if self._version_tracker is not None:
+            # Compute diff from last snapshot and bump versions
+            new_versions = self._version_tracker.snapshot()
+
+        checkpoint = Checkpoint(
+            id=CheckpointId(uuid4().hex),
+            thread_id=self._active_run_id,
+            step=step_id,
+            state_data=state_data,
+            state_versions=new_versions,
+            versions_seen={},
+            pending_writes=[],
+            parent_id=self._last_checkpoint_id,
+        )
+
+        metadata: CheckpointMetadata = {
+            "source": source,
+            "step": step_id,
+            "run_id": self._active_run_id,
+        }
+
+        config = CheckpointConfig(thread_id=self._active_run_id)
+        self._durability_manager.put(config, checkpoint, metadata, new_versions)
+        self._last_checkpoint_id = checkpoint.id
+
+        # Also flush pending writes if any
+        if self._pending_write_manager is not None:
+            write_config = CheckpointConfig(
+                thread_id=self._active_run_id,
+                checkpoint_id=checkpoint.id,
+            )
+            self._pending_write_manager.commit_writes(write_config)
+
+    def resume_from_checkpoint(
+        self,
+        config: CheckpointConfig,
+    ) -> EngineResult:
+        """Resume a run from a saved checkpoint.
+
+        Args:
+            config: CheckpointConfig pointing to the checkpoint to resume from.
+
+        Returns:
+            EngineResult from the resumed run.
+        """
+        if self._checkpoint_store is None:
+            raise RuntimeError("No checkpoint_store configured; cannot resume.")
+
+        tuple_ = self._checkpoint_store.get_tuple(config)
+        if tuple_ is None:
+            raise ValueError(f"Checkpoint not found: {config}")
+
+        checkpoint = tuple_.checkpoint
+        state = type(self._active_state or StateSchema).from_dict(checkpoint.state_data)  # type: ignore[misc]
+
+        # Restore version tracker
+        if self._version_tracker is not None:
+            self._version_tracker.apply_versions(checkpoint.state_versions)
+
+        # Set up internal state for resume
+        self._active_run_id = checkpoint.thread_id
+        self._last_checkpoint_id = checkpoint.id
+        self._active_task = tuple_.metadata.get("run_id", "")
+        self._active_state = state  # type: ignore[assignment]
+
+        # Load pending writes for crash recovery
+        if self._pending_write_manager is not None:
+            resume_config = CheckpointConfig(
+                thread_id=checkpoint.thread_id,
+                checkpoint_id=checkpoint.id,
+            )
+            self._pending_write_manager.load_pending_from_store(resume_config)
+
+        # Continue the run from the next step
+        return self.run(
+            self._active_task,
+            _resume_state=state,
+            _resume_step=checkpoint.step + 1,
+        )
+
+    def resume(
+        self,
+        checkpoint_id: CheckpointId,
+        resume_value: Any = None,
+        resume_values: Optional[Dict[str, Any]] = None,
+    ) -> EngineResult:
+        """Resume an interrupted run.
+
+        Args:
+            checkpoint_id: The checkpoint to resume from.
+            resume_value: Value to pass to the first ``interrupt()`` call.
+            resume_values: Dict mapping interrupt IDs to values for
+                multiple interrupts.
+
+        Returns:
+            EngineResult from the resumed run.
+        """
+        from .interrupt import _set_resume_values
+
+        # Prepare resume values
+        values: Dict[str, Any] = dict(resume_values or {})
+        if resume_value is not None and not values:
+            # Default: map to the first interrupt
+            values["int_1"] = resume_value
+
+        _set_resume_values(values)
+
+        config = CheckpointConfig(
+            thread_id=self._active_run_id,
+            checkpoint_id=checkpoint_id,
+        )
+        result = self.resume_from_checkpoint(config)
+        return result
+
+    def _save_interrupt_checkpoint(
+        self,
+        step_id: int,
+        state: StateT,
+        interrupt_exc: Any,
+    ) -> CheckpointId:
+        """Save a checkpoint when an interrupt fires.  Returns the checkpoint ID."""
+        from .interrupt import EngineInterrupt
+
+        if self._checkpoint_store is None:
+            # No store configured — generate a transient ID
+            return CheckpointId(uuid4().hex)
+
+        self._save_checkpoint(step_id, state, self._active_task, source="interrupt")
+        # Update the interrupt exception with the checkpoint ID
+        if isinstance(interrupt_exc, EngineInterrupt) and self._last_checkpoint_id is not None:
+            interrupt_exc.checkpoint_id = self._last_checkpoint_id
+            return self._last_checkpoint_id
+        return CheckpointId(uuid4().hex)
 
     def _memory_append(
         self,
@@ -1371,8 +1712,8 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                             ),
                         ),
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Failed to append context telemetry to history: %s", exc)
         return self._runtime_history
 
     def _history_append(
@@ -1442,8 +1783,8 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
                 if step_value is not None:
                     try:
                         payload_message["_step_id"] = int(step_value)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _logger.debug("Failed to parse step_id: %s", exc)
                 tool_calls = item.get("tool_calls")
                 if isinstance(tool_calls, list):
                     payload_message["tool_calls"] = [
@@ -1658,6 +1999,77 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self._handoff_history = []
         self._critic_modified_prompt = None
         self._critic_instruction_patch = None
+        self._cancel_token.clear()
+
+    # -- MCP server lifecycle helpers --
+
+    def _connect_mcp_servers(self) -> None:
+        """Connect all configured MCP servers and bridge their tools."""
+        from ..mcp.bridge import mcp_server_to_function_tools
+
+        for server in self.agent.mcp_servers:
+            try:
+                if hasattr(server, "connect"):
+                    server.connect()
+                self._connected_mcp_servers.append(server)
+                # Bridge MCP tools into the engine's tool registry
+                if self.tool_registry is not None:
+                    tools = mcp_server_to_function_tools(server)
+                    for tool in tools:
+                        if hasattr(self.tool_registry, "register"):
+                            self.tool_registry.register(tool)
+            except Exception as exc:
+                # Log but don't fail the entire run for one bad MCP server
+                _logger.debug("MCP server connection failed: %s", exc)
+
+    def _cleanup_mcp_servers(self) -> None:
+        """Cleanup all connected MCP servers."""
+        for server in self._connected_mcp_servers:
+            try:
+                if hasattr(server, "cleanup"):
+                    server.cleanup()
+            except Exception as exc:
+                _logger.debug("MCP server cleanup failed: %s", exc)
+        self._connected_mcp_servers = []
+
+    # -- Handoff tool helpers --
+
+    def _register_handoff_tools(self) -> None:
+        """Register HandoffTool for each declared handoff target."""
+        from ..kit.tool.handoff_tool import HandoffTool
+
+        targets = self.agent.handoff_targets or []
+        for target_name in targets:
+            # Resolve description from agent registry if available
+            description = ""
+            if self.agent_registry is not None:
+                try:
+                    spec = self.agent_registry.resolve(target_name)
+                    description = getattr(spec, "description", "") or ""
+                except Exception as exc:
+                    _logger.debug("Failed to resolve handoff target %s: %s", target_name, exc)
+
+            tool = HandoffTool(
+                target_name=target_name,
+                target_description=description,
+            )
+            if hasattr(self.tool_registry, "register"):
+                self.tool_registry.register(tool)
+            self._handoff_tools.append(tool)
+
+    def _intercept_handoff_action(self, action: Any) -> Any | None:
+        """Check if an action is a handoff tool call. Return Decision.handoff() or None."""
+        if not action.name.startswith("transfer_to_"):
+            return None
+
+        from ..core.decision import Decision
+
+        target = action.name.replace("transfer_to_", "", 1)
+        rationale = ""
+        if isinstance(action.args, dict):
+            rationale = action.args.get("rationale", "")
+
+        return Decision.handoff(target=target, rationale=rationale)
 
     def _harness_mismatch_diagnostics(self) -> Dict[str, Any]:
         llm = getattr(self.agent, "llm", None)

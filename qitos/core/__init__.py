@@ -59,9 +59,13 @@ from .multimodal import (
 )
 from .tool_result import ToolResult
 from .tool import BaseTool, FunctionTool, ToolPermission, ToolSpec, tool
+from .tool_schema import function_schema, type_to_json_schema, parse_docstring
+from .function_tool_decorator import function_tool
+from .channel import Append, Replace, Ephemeral, last_value, append_list, dict_merge, add_messages
+from .field_reducers import FieldReducerRegistry
 from .tool_registry import ToolRegistry
 from .agent_spec import AgentSpec, AgentRegistry, ContextStrategy, HandoffContext, StateAdapter
-from .shared_memory import SharedMemory, InMemorySharedMemory, FileSharedMemory
+from .shared_memory import SharedMemory, InMemorySharedMemory, FileSharedMemory, SharedMemoryNamespace, SharedMemoryManager
 
 __all__ = [
     "AgentModule",
@@ -120,6 +124,18 @@ __all__ = [
     "ToolPermission",
     "ToolSpec",
     "tool",
+    "function_schema",
+    "type_to_json_schema",
+    "parse_docstring",
+    "function_tool",
+    "Append",
+    "Replace",
+    "Ephemeral",
+    "last_value",
+    "append_list",
+    "dict_merge",
+    "add_messages",
+    "FieldReducerRegistry",
     "ToolRegistry",
     "AgentSpec",
     "AgentRegistry",
@@ -129,4 +145,6 @@ __all__ = [
     "SharedMemory",
     "InMemorySharedMemory",
     "FileSharedMemory",
+    "SharedMemoryNamespace",
+    "SharedMemoryManager",
 ]

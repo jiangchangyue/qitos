@@ -13,7 +13,8 @@ from urllib.parse import urlparse
 
 import requests
 
-from qitos.core.tool import ToolPermission, tool
+from qitos.core.function_tool_decorator import function_tool
+from qitos.core.tool import ToolPermission
 from qitos.kit.tool.internal.coding_utils import (
     build_diff,
     default_rule_scope,
@@ -76,6 +77,7 @@ class CodingToolSet:
         expose_modern_names: bool = False,
         profile: str = "full",
         include_http_tools: bool = False,
+        auto_approve: bool = False,
     ):
         self.workspace_root = os.path.abspath(workspace_root)
         self.shell_timeout = int(shell_timeout)
@@ -87,6 +89,7 @@ class CodingToolSet:
         self.expose_modern_names = bool(expose_modern_names)
         self.profile = str(profile or "full")
         self.include_http_tools = bool(include_http_tools)
+        self.auto_approve = bool(auto_approve)
         self._notebook = (
             NotebookToolSet(workspace_root=self.workspace_root)
             if self.include_notebook
@@ -181,6 +184,12 @@ class CodingToolSet:
                 )
             if self._notebook is not None:
                 items.extend(self._notebook.tools())
+        if self.auto_approve:
+            for item in items:
+                if hasattr(item, "meta") and getattr(item.meta, "needs_approval", False):
+                    item.meta.needs_approval = False
+                if hasattr(item, "spec") and getattr(item.spec, "needs_approval", False):
+                    item.spec.needs_approval = False
         return items
 
     def _read_text_file(self, path: Path) -> tuple[str, str, float]:
@@ -386,9 +395,9 @@ class CodingToolSet:
         self._task_counter += 1
         return f"task-{self._task_counter:03d}"
 
-    @tool(
+    @function_tool(
         name="bash_v2",
-        permissions=ToolPermission(command=True),
+        needs_approval=True,
         supports_background=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -492,9 +501,9 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "command": text}
 
-    @tool(
+    @function_tool(
         name="run_command",
-        permissions=ToolPermission(command=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def run_command(
@@ -508,9 +517,8 @@ class CodingToolSet:
         """
         return self.bash_v2(command=command, runtime_context=runtime_context)
 
-    @tool(
+    @function_tool(
         name="file_read_v2",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -563,9 +571,8 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="read_file",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -594,9 +601,8 @@ class CodingToolSet:
             "size": len(result.get("content", "")),
         }
 
-    @tool(
+    @function_tool(
         name="view",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -645,9 +651,8 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="list_files",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -688,9 +693,9 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="write_file",
-        permissions=ToolPermission(filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def write_file(
@@ -714,9 +719,9 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="create",
-        permissions=ToolPermission(filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def create(self, path: str, content: str = "") -> Dict[str, Any]:
@@ -736,9 +741,9 @@ class CodingToolSet:
             "size": len(content),
         }
 
-    @tool(
+    @function_tool(
         name="file_edit_v2",
-        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def file_edit_v2(
@@ -881,9 +886,9 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="str_replace",
-        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def str_replace(self, path: str, old_str: str, new_str: str = "") -> Dict[str, Any]:
@@ -898,9 +903,9 @@ class CodingToolSet:
             path=path, action="str_replace", old_text=old_str, new_text=new_str
         )
 
-    @tool(
+    @function_tool(
         name="insert",
-        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def insert(self, path: str, insert_line: int, new_str: str) -> Dict[str, Any]:
@@ -915,9 +920,9 @@ class CodingToolSet:
             path=path, action="insert", insert_line=insert_line, new_text=new_str
         )
 
-    @tool(
+    @function_tool(
         name="replace_lines",
-        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def replace_lines(
@@ -939,9 +944,9 @@ class CodingToolSet:
             replacement=replacement,
         )
 
-    @tool(
+    @function_tool(
         name="append_file",
-        permissions=ToolPermission(filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def append_file(
@@ -972,9 +977,9 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="make_directory",
-        permissions=ToolPermission(filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def make_directory(
@@ -994,9 +999,8 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="glob_v2",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1050,9 +1054,8 @@ class CodingToolSet:
                 "path": path,
             }
 
-    @tool(
+    @function_tool(
         name="glob_files",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1078,9 +1081,8 @@ class CodingToolSet:
             result["num_files"] = result.get("match_count", 0)
         return result
 
-    @tool(
+    @function_tool(
         name="grep_v2",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1166,9 +1168,8 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "pattern": pattern}
 
-    @tool(
+    @function_tool(
         name="grep_files",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1206,9 +1207,8 @@ class CodingToolSet:
             result["num_matches"] = result.get("match_count", 0)
         return result
 
-    @tool(
+    @function_tool(
         name="read_file_range",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1243,9 +1243,8 @@ class CodingToolSet:
             "has_more": result.get("has_more", False),
         }
 
-    @tool(
+    @function_tool(
         name="search",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1258,9 +1257,8 @@ class CodingToolSet:
         """
         return self.grep_v2(pattern=keyword, path=path, regex=False, limit=15)
 
-    @tool(
+    @function_tool(
         name="list_tree",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
     )
@@ -1290,9 +1288,8 @@ class CodingToolSet:
         except Exception as e:
             return {"status": "error", "message": str(e), "path": path}
 
-    @tool(
+    @function_tool(
         name="http_request",
-        permissions=ToolPermission(network=True),
         rule_scope_builder=_default_rule_scope,
     )
     def http_request(
@@ -1335,9 +1332,9 @@ class CodingToolSet:
             max_content_chars=max_content_chars,
         )
 
-    @tool(
+    @function_tool(
         name="http_get",
-        permissions=ToolPermission(network=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def http_get(
@@ -1369,9 +1366,8 @@ class CodingToolSet:
             allow_redirects=allow_redirects,
         )
 
-    @tool(
+    @function_tool(
         name="http_post",
-        permissions=ToolPermission(network=True),
         rule_scope_builder=_default_rule_scope,
     )
     def http_post(
@@ -1406,7 +1402,7 @@ class CodingToolSet:
             allow_redirects=allow_redirects,
         )
 
-    @tool(name="extract_web_text")
+    @function_tool(name="extract_web_text")
     def extract_web_text(self, html: str) -> Dict[str, Any]:
         """
         Extract readable text from raw HTML.
@@ -1420,9 +1416,9 @@ class CodingToolSet:
             "content": payload.get("text", ""),
         }
 
-    @tool(
+    @function_tool(
         name="web_fetch_v2",
-        permissions=ToolPermission(network=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def web_fetch_v2(
@@ -1474,9 +1470,9 @@ class CodingToolSet:
             "auth_hint": auth_hint,
         }
 
-    @tool(
+    @function_tool(
         name="web_fetch",
-        permissions=ToolPermission(network=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
     )
     def web_fetch(
@@ -1500,7 +1496,7 @@ class CodingToolSet:
             "auth_hint": payload.get("auth_hint", ""),
         }
 
-    @tool(name="ask_user_choice", requires_user_interaction=True)
+    @function_tool(name="ask_user_choice", requires_user_interaction=True)
     def ask_user_choice(
         self,
         questions: List[Dict[str, Any]],
@@ -1515,7 +1511,7 @@ class CodingToolSet:
         _ = runtime_context
         return {"status": "needs_user_input", "questions": list(questions or [])}
 
-    @tool(name="todo_write")
+    @function_tool(name="todo_write")
     def todo_write(
         self,
         todos: List[Dict[str, Any]],
@@ -1533,7 +1529,7 @@ class CodingToolSet:
             state.metadata["todos"] = normalized
         return {"status": "success", "count": len(normalized), "todos": normalized}
 
-    @tool(name="tool_search", read_only=True)
+    @function_tool(name="tool_search", read_only=True)
     def tool_search(
         self, query: str, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1559,7 +1555,7 @@ class CodingToolSet:
                     results.append({"name": name, "description": desc})
         return {"status": "success", "count": len(results), "results": results}
 
-    @tool(
+    @function_tool(
         name="enter_plan_mode",
         prompt="Use this tool proactively when you need to plan a non-trivial implementation before starting. This transitions into a read-only mode where you can analyze the codebase without making changes.",
     )
@@ -1578,7 +1574,7 @@ class CodingToolSet:
             state.metadata["plan_reason"] = reason
         return {"status": "success", "current_mode": "plan", "reason": reason}
 
-    @tool(name="exit_plan_mode")
+    @function_tool(name="exit_plan_mode")
     def exit_plan_mode(
         self, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1592,7 +1588,7 @@ class CodingToolSet:
             state.metadata["mode"] = "work"
         return {"status": "success", "current_mode": "work"}
 
-    @tool(name="enter_worktree")
+    @function_tool(name="enter_worktree")
     def enter_worktree(
         self, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1606,7 +1602,7 @@ class CodingToolSet:
             state.metadata["worktree_mode"] = True
         return {"status": "success", "current_mode": "worktree"}
 
-    @tool(name="exit_worktree")
+    @function_tool(name="exit_worktree")
     def exit_worktree(
         self, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1620,7 +1616,7 @@ class CodingToolSet:
             state.metadata["worktree_mode"] = False
         return {"status": "success", "current_mode": "workspace"}
 
-    @tool(name="lsp_query", read_only=True)
+    @function_tool(name="lsp_query", read_only=True)
     def lsp_query(
         self,
         operation: str,
@@ -1641,7 +1637,7 @@ class CodingToolSet:
             return {"status": "error", "message": "LSP capability unavailable"}
         return lsp.query(operation=operation, symbol=symbol, **kwargs)
 
-    @tool(
+    @function_tool(
         name="task_create",
         prompt="Use this tool proactively when you're about to start a non-trivial implementation task. Creating tasks helps you track progress and organize complex work.",
     )
@@ -1688,7 +1684,7 @@ class CodingToolSet:
         self._session_tasks[task_id] = task
         return {"status": "success", "task": dict(task)}
 
-    @tool(name="task_get", read_only=True)
+    @function_tool(name="task_get", read_only=True)
     def task_get(
         self, task_id: str, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1704,7 +1700,7 @@ class CodingToolSet:
             return {"status": "error", "message": f"Task not found: {task_id}"}
         return {"status": "success", "task": dict(task)}
 
-    @tool(name="task_list", read_only=True)
+    @function_tool(name="task_list", read_only=True)
     def task_list(
         self,
         status: str = "",
@@ -1730,7 +1726,7 @@ class CodingToolSet:
             "count": len(tasks),
         }
 
-    @tool(name="task_update")
+    @function_tool(name="task_update")
     def task_update(
         self,
         task_id: str,
@@ -1776,7 +1772,7 @@ class CodingToolSet:
         self._session_tasks[str(task_id)] = task
         return {"status": "success", "task": dict(task)}
 
-    @tool(name="mcp_list_resources", read_only=True)
+    @function_tool(name="mcp_list_resources", read_only=True)
     def mcp_list_resources(
         self, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1790,7 +1786,7 @@ class CodingToolSet:
             "resources": dict((runtime_context or {}).get("mcp_resources") or {}),
         }
 
-    @tool(name="mcp_read_resource", read_only=True)
+    @function_tool(name="mcp_read_resource", read_only=True)
     def mcp_read_resource(
         self, server: str, uri: str, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -1807,7 +1803,7 @@ class CodingToolSet:
                 return {"status": "success", "resource": item}
         return {"status": "error", "message": f"Resource not found: {server}:{uri}"}
 
-    @tool(
+    @function_tool(
         name="agent_spawn",
         prompt=(
             "Launch a new agent to handle a sub-task autonomously. "
@@ -2014,7 +2010,7 @@ class CodingToolSet:
             "message": f"Agent running in background. Use task_get with task_id='{task_id}' to check results.",
         }
 
-    @tool(name="cron_create")
+    @function_tool(name="cron_create")
     def cron_create(
         self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Dict[str, Any]:
@@ -2026,7 +2022,7 @@ class CodingToolSet:
         _ = runtime_context
         return {"status": "success", "created": True, "job": kwargs}
 
-    @tool(name="cron_delete")
+    @function_tool(name="cron_delete")
     def cron_delete(
         self, runtime_context: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Dict[str, Any]:
@@ -2038,7 +2034,7 @@ class CodingToolSet:
         _ = runtime_context
         return {"status": "success", "deleted": True, "request": kwargs}
 
-    @tool(name="cron_list", read_only=True)
+    @function_tool(name="cron_list", read_only=True)
     def cron_list(
         self, runtime_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -2053,9 +2049,8 @@ class CodingToolSet:
     # ── Claude Code modern-name aliases ────────────────────────────────────────
     # These match Claude Code's exact tool names and signatures for compatibility.
 
-    @tool(
+    @function_tool(
         name="Read",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
@@ -2104,9 +2099,9 @@ class CodingToolSet:
             numbered.append(f"{i}\t{line}")
         return "\n".join(numbered)
 
-    @tool(
+    @function_tool(
         name="Edit",
-        permissions=ToolPermission(filesystem_read=True, filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
             "Performs exact string replacements in files.\n"
@@ -2145,9 +2140,9 @@ class CodingToolSet:
             return f"Error editing file: {result.get('error', 'unknown error')}"
         return result.get("content", "Edit applied successfully")
 
-    @tool(
+    @function_tool(
         name="Write",
-        permissions=ToolPermission(filesystem_write=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
             "Writes a file to the local filesystem.\n"
@@ -2179,9 +2174,8 @@ class CodingToolSet:
             return f"Error writing file: {result.get('error', 'unknown error')}"
         return f"Successfully wrote to {file_path}"
 
-    @tool(
+    @function_tool(
         name="Glob",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
@@ -2212,9 +2206,8 @@ class CodingToolSet:
         files = result.get("files", [])
         return "\n".join(files)
 
-    @tool(
+    @function_tool(
         name="Grep",
-        permissions=ToolPermission(filesystem_read=True),
         read_only=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
@@ -2278,9 +2271,9 @@ class CodingToolSet:
                 lines.append(str(m))
         return "\n".join(lines)
 
-    @tool(
+    @function_tool(
         name="Bash",
-        permissions=ToolPermission(command=True),
+        needs_approval=True,
         supports_background=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
@@ -2334,9 +2327,9 @@ class CodingToolSet:
             return f"Exit code {returncode}:\n{stdout}\n{stderr}"
         return stdout
 
-    @tool(
+    @function_tool(
         name="WebFetch",
-        permissions=ToolPermission(network=True),
+        needs_approval=True,
         rule_scope_builder=_default_rule_scope,
         prompt=(
             "Fetches content from a specified URL and processes it using an AI model. Takes a URL and a prompt as input. Fetches the URL content, converts HTML to markdown. Processes the content with the prompt using a small, fast model.\n"
@@ -2370,7 +2363,7 @@ class CodingToolSet:
             return f"Error fetching URL: {result.get('error', 'unknown error')}"
         return result.get("content", "")
 
-    @tool(
+    @function_tool(
         name="AskUserQuestion",
         requires_user_interaction=True,
         prompt=(

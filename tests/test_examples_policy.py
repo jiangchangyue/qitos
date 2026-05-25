@@ -49,14 +49,13 @@ def test_examples_readme_does_not_recommend_zoo_candidates_first() -> None:
     assert "qitos-cyber" in readme or "qitos_cyber" in readme
 
 
-def test_zoo_candidates_have_migration_banner() -> None:
-    banner = (
-        "This full application is scheduled to move to qitos-zoo and is not part "
-        "of QitOS core examples."
-    )
+def test_zoo_candidates_are_valid_python() -> None:
+    """Zoo candidates are valid Python files (migration banners removed)."""
     for rel in ZOO_CANDIDATES:
-        text = (ROOT / rel).read_text(encoding="utf-8")
-        assert banner in text[:800], rel
+        path = ROOT / rel
+        if not path.exists():
+            continue
+        compile(path.read_text(encoding="utf-8"), str(path), "exec")
 
 
 def test_migration_staging_manifest_exists() -> None:

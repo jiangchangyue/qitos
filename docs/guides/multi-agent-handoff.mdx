@@ -1,0 +1,140 @@
+---
+title: Multi-Agent Handoff
+description: Context strategies and SharedMemory for multi-agent collaboration
+---
+
+# Multi-Agent Handoff
+
+QitOS supports multi-agent collaboration through Handoff — switching execution between agents. Handoff determines what context the target agent receives.
+
+## Two Trigger Modes
+
+### Tool Mode (Delegation)
+
+Triggered via `DelegateTool`, suitable for temporary subtask delegation:
+
+```python
+from qitos.core.agent_spec import AgentSpec, AgentRegistry
+
+registry = AgentRegistry()
+registry.register(AgentSpec(
+    name="coder",
+    description="Coding specialist",
+    agent=coder_agent,
+))
+
+# Engine automatically creates DelegateTool for each registered agent
+delegate_tools = registry.get_delegate_tools()
+```
+
+### Decision Mode (Switch)
+
+Triggered via `Decision.handoff()`, suitable for formal agent transitions:
+
+```python
+decision = Decision.handoff(target="researcher")
+```
+
+## Context Strategies
+
+Context strategies control how the source agent's conversation history is passed to the target agent:
+
+### FULL — Pass Everything
+
+Pass the complete conversation history. Suitable when the target agent needs full context.
+
+```python
+from qitos.core.agent_spec import AgentSpec, ContextStrategy
+
+spec = AgentSpec(
+    name="researcher",
+    description="Research agent",
+    agent=researcher_agent,
+    context_strategy=ContextStrategy.FULL,
+)
+```
+
+### SUMMARY — Compressed (Default)
+
+Compress older history into a summary, keeping the last 3 rounds intact. Prevents context explosion.
+
+```python
+spec = AgentSpec(
+    name="coder",
+    description="Coding specialist",
+    agent=coder_agent,
+    context_strategy=ContextStrategy.SUMMARY,
+)
+```
+
+### ISOLATED — Fresh Start
+
+Pass only the system prompt and task description. The target agent starts fresh. Suitable for independent subtask execution.
+
+```python
+spec = AgentSpec(
+    name="executor",
+    description="Task executor",
+    agent=executor_agent,
+    context_strategy=ContextStrategy.ISOLATED,
+)
+```
+
+## SharedMemory
+
+Multiple agents can share state through `SharedMemoryManager`:
+
+```python
+from qitos.core.shared_memory import SharedMemoryManager, InMemorySharedMemory
+
+manager = SharedMemoryManager(InMemorySharedMemory())
+
+# Create namespaces
+parent_ns = manager.namespace("parent")
+child_ns = manager.namespace("child")
+
+# Parent writes
+parent_ns.write("task", "Analyze code")
+
+# Child reads via read-only view
+child_view = manager.namespace("parent", read_only=True)
+task = child_view.read("task")  # "Analyze code"
+
+# Read-only view cannot write
+child_view.write("task", "modified")  # raises PermissionError
+```
+
+## HandoffContext Fine-Grained Control
+
+`HandoffContext` provides finer control beyond the context strategy:
+
+```python
+from qitos.core.agent_spec import HandoffContext, ContextStrategy
+
+spec = AgentSpec(
+    name="sub_agent",
+    description="Sub-agent",
+    agent=sub_agent,
+    handoff_context=HandoffContext(
+        strategy=ContextStrategy.SUMMARY,
+        shared_state_fields=["task", "result"],  # Only share these state fields
+        max_history_rounds=5,  # Keep at most 5 history rounds
+    ),
+)
+```
+
+## Tracing
+
+Handoff events are automatically recorded in the trace:
+
+- `HANDOFF_START` — records source agent, target agent, context strategy
+- `HANDOFF_END` — records target agent confirmation
+
+With `TracingProvider` enabled, handoff creates `HandoffSpanData` spans:
+
+```python
+from qitos.tracing import TracingProvider
+
+provider = TracingProvider()
+engine = Engine(agent=my_agent, tracing_provider=provider)
+```

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Dict, Generic, List, Optional, TypeVar
+
+_logger = logging.getLogger("qitos.engine._env_runtime")
 
 from ..core.decision import Decision
 from ..core.env import Env, EnvObservation, EnvSpec, EnvStepResult
@@ -11,6 +14,7 @@ from ..core.observation import Observation
 from ..core.state import StateSchema
 from ..core.task import Task
 from ..core.tool_result import ToolResult
+from ._protocol import _EngineProtocol
 from .states import RuntimePhase
 
 
@@ -20,7 +24,7 @@ ActionT = TypeVar("ActionT")
 
 
 class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
-    def __init__(self, engine: Any):
+    def __init__(self, engine: _EngineProtocol):
         self.engine = engine
 
     def build_env_view(
@@ -147,7 +151,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 groups = getattr(spec, "required_ops", None)
                 if isinstance(groups, list):
                     required.update(str(x) for x in groups if str(x))
-        except Exception:
+        except Exception as exc:
+            _logger.debug("Failed to collect required ops: %s", exc)
             return required
         return required
 
@@ -230,14 +235,16 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 from ..kit.env import RepoEnv
 
                 return RepoEnv(workspace_root=workspace_root)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create RepoEnv: %s", exc)
                 return None
         if env_type in {"host", "local"}:
             try:
                 from ..kit.env import HostEnv
 
                 return HostEnv(workspace_root=workspace_root)
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create HostEnv: %s", exc)
                 return None
         if env_type in {"docker", "container"}:
             try:
@@ -252,7 +259,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                 return DockerEnv(
                     container=container, workspace_root=container_workspace
                 )
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create DockerEnv: %s", exc)
                 return None
         if env_type in {"tmux", "terminal"}:
             try:
@@ -265,7 +273,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                     session_name=session_name,
                     auto_kill=auto_kill,
                 )
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create TmuxEnv: %s", exc)
                 return None
         if env_type in {"screenshot", "gui", "multimodal"}:
             try:
@@ -284,7 +293,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                     ui_candidates=list(config.get("ui_candidates") or []),
                     metadata=dict(config.get("metadata") or {}),
                 )
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create ScreenshotEnv: %s", exc)
                 return None
         if env_type in {"desktop", "computer_use", "gui_desktop"}:
             try:
@@ -356,7 +366,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
                     screen_size=screen_size,
                     metadata=metadata,
                 )
-            except Exception:
+            except Exception as exc:
+                _logger.debug("Failed to create DesktopEnv: %s", exc)
                 return None
         return None
 
@@ -366,8 +377,8 @@ class _EnvRuntime(Generic[StateT, ObservationT, ActionT]):
             return
         try:
             engine.env.teardown()
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.warning("Env teardown failed: %s", exc)
 
     def run_env_step(
         self, decision: Decision[ActionT], action_results: List[Any]

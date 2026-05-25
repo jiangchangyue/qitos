@@ -12,7 +12,7 @@ import re
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class VulnScanToolSet:
@@ -185,7 +185,7 @@ class VulnScanToolSet:
         }
         return mapping.get(severity.lower(), "⚪")
 
-    @tool(name="nuclei_scan")
+    @function_tool(name="nuclei_scan", needs_approval=True)
     def nuclei_scan(
         self,
         target: str,
@@ -300,7 +300,7 @@ class VulnScanToolSet:
             },
         }
 
-    @tool(name="nikto_scan")
+    @function_tool(name="nikto_scan", needs_approval=True)
     def nikto_scan(
         self, target: str, tuning: str = "123457890", ports: str = "80,443"
     ) -> Dict[str, Any]:
@@ -382,7 +382,7 @@ class VulnScanToolSet:
             },
         }
 
-    @tool(name="searchsploit")
+    @function_tool(name="searchsploit", needs_approval=True)
     def searchsploit(
         self, query: str, exclude_sourced: bool = False, exact: bool = False
     ) -> Dict[str, Any]:
@@ -465,7 +465,7 @@ class VulnScanToolSet:
             },
         }
 
-    @tool(name="vuln_quick")
+    @function_tool(name="vuln_quick", needs_approval=True)
     def vuln_quick(self, target: str) -> Dict[str, Any]:
         """
         Quick vulnerability assessment combining multiple scanners.
@@ -528,7 +528,7 @@ class VulnScanToolSet:
             },
         }
 
-    @tool(name="cve_query")
+    @function_tool(name="cve_query", needs_approval=True)
     def cve_query(self, service: str, version: str = "") -> Dict[str, Any]:
         """
         Query known CVEs for a specific service and version.

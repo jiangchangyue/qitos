@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from qitos.core.tool import tool
+from qitos.core.function_tool_decorator import function_tool
 
 
 class ReportToolSet:
@@ -159,7 +159,7 @@ class ReportToolSet:
         with open(findings_path, "w") as f:
             json.dump(self._findings, f, indent=2, default=str)
 
-    @tool(name="finding_add")
+    @function_tool(name="finding_add", needs_approval=True)
     def finding_add(
         self,
         title: str,
@@ -247,7 +247,7 @@ class ReportToolSet:
             "data": {"finding_id": finding["id"], "finding": finding},
         }
 
-    @tool(name="attack_map")
+    @function_tool(name="attack_map", needs_approval=True)
     def attack_map(self, techniques: List[str] = None) -> Dict[str, Any]:
         """
         Map findings and techniques to the MITRE ATT&CK framework.
@@ -353,7 +353,7 @@ class ReportToolSet:
             },
         }
 
-    @tool(name="summary_generate")
+    @function_tool(name="summary_generate", needs_approval=True)
     def summary_generate(
         self,
         title: str = "Security Assessment Report",
@@ -488,7 +488,7 @@ class ReportToolSet:
             },
         }
 
-    @tool(name="generate_report")
+    @function_tool(name="generate_report", needs_approval=True)
     def generate_report(
         self, format: str = "markdown", output_file: str = ""
     ) -> Dict[str, Any]:
@@ -653,7 +653,7 @@ class ReportToolSet:
             },
         }
 
-    @tool(name="finding_export")
+    @function_tool(name="finding_export", needs_approval=True)
     def finding_export(
         self, format: str = "json", output_file: str = ""
     ) -> Dict[str, Any]:
