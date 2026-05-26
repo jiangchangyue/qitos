@@ -19,6 +19,7 @@ def _policy_files() -> list[Path]:
             for path in root.rglob("*")
             if path.is_file()
             and "__pycache__" not in path.parts
+            and "internal" not in path.parts  # Skip internal planning docs
             and path.suffix in {".py", ".md", ".mdx", ".txt"}
         )
     return files

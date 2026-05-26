@@ -1,0 +1,143 @@
+---
+title: "Checkpoint and Fork"
+description: "Save, resume, and branch agent runs with QitOS checkpointing."
+---
+
+# Checkpoint and Fork
+
+QitOS checkpoints let you save an agent's state at any step, resume a run after interruption, and fork a run to explore alternative paths — all without rerunning from scratch.
+
+This is essential for:
+- **Long-running tasks** that may be interrupted (network errors, budget limits)
+- **Branching experiments** where you want to explore "what if?" from a particular step
+- **Time-travel debugging** where you restore state from an earlier checkpoint
+
+## Step 1: Basic Checkpointing
+
+Create a `CheckpointStore` and configure the Engine to use it:
+
+```python
+from qitos.checkpoint import InMemoryCheckpointStore, CheckpointConfig
+
+# Create an in-memory store (use SqliteCheckpointStore for persistence)
+store = InMemoryCheckpointStore()
+
+# Pass it to the Engine
+from qitos.engine import Engine
+from my_agent import MyAgent
+
+agent = MyAgent()
+engine = Engine(agent, checkpoint_store=store, auto_approve=True)
+
+# Run the agent — checkpoints are saved automatically
+result = engine.run("Analyze the dataset")
+
+# Access the latest checkpoint
+config = CheckpointConfig(thread_id=result.run_id)
+latest = store.get_tuple(config)
+print(f"Checkpoint at step {latest.checkpoint.step}")
+```
+
+For persistent storage across sessions, use `SqliteCheckpointStore`:
+
+```python
+from qitos.checkpoint import SqliteCheckpointStore
+
+store = SqliteCheckpointStore("./checkpoints.db")
+```
+
+## Step 2: Resuming a Run
+
+If a run is interrupted, resume from the last checkpoint:
+
+```python
+from qitos.checkpoint import CheckpointConfig
+
+# The thread_id identifies the run (usually the run_id)
+config = CheckpointConfig(thread_id="my-run-001")
+
+# Resume the run
+result = engine.run("Continue the analysis", checkpoint_config=config)
+```
+
+The Engine restores the state from the latest checkpoint and continues execution from where it left off.
+
+## Step 3: Forking a Checkpoint
+
+Forking creates a new branch from an existing checkpoint, allowing you to explore alternative paths without affecting the original run:
+
+```python
+from qitos.checkpoint import fork_checkpoint, CheckpointConfig
+
+# Point to a specific checkpoint (e.g., step 3)
+source_config = CheckpointConfig(
+    thread_id="my-run-001",
+    checkpoint_id="abc123",  # The checkpoint to fork from
+)
+
+# Fork into a new thread (true branch)
+fork_config = fork_checkpoint(store, source_config, new_thread_id="my-run-001-branch-a")
+
+# Run the agent from the forked state with a different prompt
+result = engine.run(
+    "Try a different strategy",
+    checkpoint_config=fork_config,
+)
+```
+
+The original run is untouched. The forked run starts from the same state but can follow a different path.
+
+## Step 4: Time-Travel (Same-Thread Fork)
+
+If you omit `new_thread_id`, the fork replaces the current state within the same thread — useful for "undo and retry" scenarios:
+
+```python
+from qitos.checkpoint import fork_checkpoint, CheckpointConfig
+
+# Fork within the same thread (time-travel)
+config = CheckpointConfig(
+    thread_id="my-run-001",
+    checkpoint_id="step2-checkpoint-id",
+)
+time_travel_config = fork_checkpoint(store, config)
+
+# Re-run from the earlier state
+result = engine.run("Redo from step 2 with modified instructions", checkpoint_config=time_travel_config)
+```
+
+## Step 5: Durability Modes
+
+Control how aggressively checkpoints are persisted:
+
+```python
+from qitos.checkpoint import DurabilityMode
+
+# SYNC: Write to disk before continuing (safest, slower)
+engine = Engine(agent, checkpoint_store=store, checkpoint_durability=DurabilityMode.SYNC)
+
+# Default: Checkpoints are saved but durability depends on the store implementation
+```
+
+## Step 6: State Version Tracking
+
+Track which state fields changed between checkpoints:
+
+```python
+from qitos.checkpoint import StateVersionTracker
+
+tracker = StateVersionTracker()
+
+# After each step, track changes
+config = CheckpointConfig(thread_id="my-run-001")
+tuple_ = store.get_tuple(config)
+versions = tuple_.checkpoint.state_versions
+print(f"State field versions: {versions}")
+# e.g., {'scratchpad': 3, 'current_step': 5, 'final_result': 1}
+```
+
+---
+
+<CardGroup cols={2}>
+  <Card href="/tutorials/critic-system" title="Critic System" description="Control agent behavior quality at runtime" />
+  <Card href="/tutorials/hook-lifecycle" title="Hook Lifecycle" description="Observe and extend the Engine loop" />
+</CardGroup>

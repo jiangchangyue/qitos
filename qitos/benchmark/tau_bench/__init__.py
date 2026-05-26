@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib
 
+_PKG_NAME = "tau_bench"
+
 _LAZY_ATTRS = {
     "TauBenchAdapter": (".adapter", "TauBenchAdapter"),
     "load_tau_bench_tasks": (".adapter", "load_tau_bench_tasks"),
@@ -18,6 +20,15 @@ _LAZY_ATTRS = {
 
 def __getattr__(name: str):
     target = _LAZY_ATTRS.get(name)
+    if target is not None:
+        import warnings
+
+        warnings.warn(
+            f"Importing {name!r} from qitos.benchmark.{_PKG_NAME} is deprecated. "
+            f"Use qitos.recipes.benchmarks instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attr_name = target

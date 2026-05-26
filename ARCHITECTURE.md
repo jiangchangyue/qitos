@@ -94,13 +94,96 @@ Trace artifacts and qita views are part of the framework contract, not an aftert
 - `examples/`: canonical patterns and reference agents
 - `templates/`: starter agent layouts
 
-## Core vs Kit vs Recipes vs Examples vs Zoo
+## Repository Layers
 
-- Core: `qitos.core`, `qitos.engine`, `qitos.trace`, and `qitos.qita` define the stable kernel and observability contracts.
-- Kit: `qitos.kit`, `qitos.models`, `qitos.protocols`, and `qitos.render` provide curated framework extensions when they are generic and reusable.
-- Recipes: `qitos.recipes` contains reusable research baselines and benchmark methods, not full applications.
-- Examples: `examples/` is a small teaching path with one concept per file.
-- Zoo: `qitos-zoo` owns product-grade and showcase-grade applications such as `qitos-coder` and `qitos-cyber-agent`.
+### Stable Core Framework Surface
+
+The stable surface is:
+
+- `qitos.core`
+- `qitos.engine`
+- `qitos.trace`
+- `qitos.qita`
+- basic model/provider abstractions needed by the engine
+- public contracts such as `AgentModule`, `StateSchema`, `Decision`, `Action`, `BaseTool`, `ToolRegistry`, trace artifacts, run specs, and hook contracts
+
+Top-level `qitos` imports should stay limited to these kernel contracts and compatibility-critical public contracts.
+
+### Curated Framework Extensions
+
+The following may remain in this repository when they are generic, reusable, and not tied to one product agent:
+
+- `qitos.kit`
+- `qitos.kit.tool`
+- `qitos.kit.toolset`
+- `qitos.prompting`
+- `qitos.protocols`
+- `qitos.models`
+- `qitos.render`
+
+These APIs are useful framework extensions, but they are not all equally stable. They should avoid product naming, product workflows, and high-risk default exports.
+
+### Recipes And Benchmarks
+
+`qitos.recipes` may contain reusable research baselines or canonical benchmark methods. Recipes should be callable from thin examples instead of duplicated inside examples.
+
+`qitos.benchmark` (deprecated, migrating to `qitos.recipes.benchmarks` and Snowl-evals) may contain framework-level adapters, runners, scorers, and dataset-neutral glue. They must not vendor benchmark datasets, large external assets, or product-specific workflows.
+
+### Examples Policy
+
+`examples/` is a small canonical learning path, not an app gallery. Examples should:
+
+- teach one QitOS concept at a time
+- run locally or with one standard model-provider path
+- be short enough to read as documentation
+- demonstrate canonical authoring flow
+- avoid heavy hidden dependencies
+- avoid standalone product behavior
+
+Full applications live in `qitos-zoo`.
+
+### qitos-zoo
+
+Move or prepare to move examples and apps that:
+
+- reproduce mature agent products
+- require many files, configs, prompts, workflows, or assets
+- are showcase-grade instead of teaching-first
+- are cybersecurity/pentesting product agents
+- are Claude Code-style product agents
+- have their own roadmap, UI, CLI, benchmark harness, or workflow state
+
+Recommended names:
+
+- `qitos_coder`: Claude Code-inspired coding agent built with QitOS.
+- `qitos_cyber`: PentAGI-inspired cybersecurity agent built with QitOS.
+- `qitos_auditor`: DeepAudit-inspired code security audit agent built with QitOS.
+
+#### qitos_zoo structure
+
+```
+qitos_zoo/
+  __init__.py
+  qitos_coder/       — coding agent + tests/ + README.md
+  qitos_cyber/       — cyber agent + tests/ + README.md
+  qitos_auditor/     — audit agent + tests/ + README.md
+  experimental/      — product candidates needing hardening
+  docs/              — adding_a_new_agent.md, app_template.md, safety_and_scope.md
+```
+
+#### E2E test ownership
+
+Agent application e2e tests belong in `qitos_zoo/<app>/tests/`. The core `tests/` directory only contains framework-level tests. No agent-specific e2e tests should reside in the core repository.
+
+#### Zero duplication
+
+No file may exist in both `examples/` and `qitos_zoo/` with identical content. Once code is migrated to `qitos_zoo/`, the original must be removed from `examples/`.
+
+## Security-Sensitive Rule
+
+Cybersecurity research tooling must never be part of the default public surface. It may exist only as explicit experimental modules with clear warnings, or as qitos-zoo applications with controlled documented use.
+
+Do not export offensive or high-risk tools from `qitos.__init__`, `qitos.kit` default imports, `qit demo`, or quickstart examples.
 
 ## What Must Not Enter Core
 
@@ -113,7 +196,24 @@ Trace artifacts and qita views are part of the framework contract, not an aftert
 
 ## Promotion Rule
 
-Code can move from zoo to QitOS only if it is generic, tested, documented, dependency-conscious, and needed by multiple independent apps. Product-specific code stays in qitos-zoo.
+Code may move from qitos-zoo into QitOS only if it is generic, tested, documented, and needed by at least two independent apps. Product-specific code stays in qitos-zoo.
+
+## Decision Table
+
+| Item | Belongs in core? | Decision |
+| --- | --- | --- |
+| Engine loop | Yes | Stable core |
+| Agent contracts | Yes | Stable core |
+| Trace/qita artifacts | Yes | Stable observability |
+| Generic tool protocol | Yes | Stable core or kit |
+| `CodingToolSet` | Maybe | Keep only if generic and minimal |
+| Claude Code-style agent | No | qitos-zoo |
+| PentAGI-style cyber agent | No | qitos-zoo |
+| SWE product workflow | No | qitos-zoo unless reduced to minimal recipe |
+| OpenAI CUA product clone | No | qitos-zoo unless reduced to minimal desktop smoke test |
+| Benchmark adapters | Yes | Only if thin and dataset-neutral |
+| Benchmark datasets/assets | No | External or qitos-zoo |
+| Experimental security tools | Opt-in only | Never default-exported |
 
 ## Non-Goals
 

@@ -1,0 +1,192 @@
+---
+title: "@function_tool API"
+description: "创建 QitOS 工具最快的方式：用一个装饰器将任意 Python 函数转换为完整的 FunctionTool。"
+---
+
+`@function_tool` 装饰器是从普通 Python 函数到 QitOS 工具的最短路径。它会检查函数签名、类型注解和文档字符串，然后构建一个完整的 `FunctionTool` 实例及丰富的 `ToolSpec`——无需子类化。
+
+## Step 1: 基本装饰器用法
+
+不带参数地应用装饰器。函数名即为工具名，文档字符串即为描述：
+
+```python
+from qitos import function_tool
+
+@function_tool
+def greet(name: str) -> str:
+    """Say hello to someone."""
+    return f"Hello, {name}!"
+```
+
+需要传递参数时也可以使用带括号的形式（下一节介绍）：
+
+```python
+@function_tool()
+def greet(name: str) -> str:
+    """Say hello to someone."""
+    return f"Hello, {name}!"
+```
+
+两种形式都会返回一个 `FunctionTool` 实例，其 `spec` 包含参数 schema、必填字段和描述。
+
+## Step 2: 装饰器参数
+
+通过关键字参数覆盖默认值并控制执行策略：
+
+```python
+from qitos import function_tool
+
+@function_tool(
+    name="search_files",
+    description="Search for files matching a pattern",
+    needs_approval=True,
+    timeout_s=30.0,
+    max_retries=2,
+    read_only=True,
+    concurrency_safe=True,
+)
+def search(pattern: str, max_results: int = 10) -> list[str]:
+    """Search for files matching a pattern."""
+    # ... implementation
+    return []
+```
+
+可用参数如下：
+
+| 参数 | 类型 | 默认值 | 用途 |
+|---|---|---|---|
+| `name` | `str` | 函数名 | 覆盖工具名称 |
+| `description` | `str` | 文档字符串 | 覆盖工具描述 |
+| `needs_approval` | `bool` | `False` | 执行前需要人工审批 |
+| `timeout_s` | `float` | `None` | 最大执行时间（秒） |
+| `max_retries` | `int` | `0` | 失败后自动重试次数 |
+| `read_only` | `bool` | `False` | 标记工具为无副作用 |
+| `concurrency_safe` | `bool` | `False` | 表示工具可安全并行执行 |
+
+## Step 3: 类型注解自动转换为 ToolSpec 参数
+
+装饰器会检查函数的类型注解，并将其转换为 `ToolSpec.parameters` 中的 JSON Schema 条目。支持的类型包括：
+
+```python
+from typing import Literal, Optional
+from qitos import function_tool
+
+@function_tool
+def configure(
+    host: str,                        # {"type": "string"}
+    port: int,                        # {"type": "integer"}
+    verbose: bool = False,            # {"type": "boolean", "default": false}
+    retries: Optional[int] = None,    # {"type": "integer", "nullable": true}
+    mode: Literal["fast", "safe"] = "safe",  # {"type": "string", "enum": ["fast", "safe"]}
+    tags: list[str] = [],             # {"type": "array", "items": {"type": "string"}}
+) -> dict:
+    """Configure the service.
+
+    Args:
+        host: The server hostname.
+        port: The server port number.
+        verbose: Enable verbose logging.
+        retries: Optional retry count.
+        mode: Execution mode.
+        tags: List of tags.
+    """
+    return {"host": host, "port": port, "mode": mode}
+```
+
+没有默认值的参数会被标记为必填。参数描述从文档字符串的 Google 风格 `Args:` 段中提取。
+
+## Step 4: 在 ToolRegistry 中注册函数工具
+
+获得 `FunctionTool` 后，将其注册到 `ToolRegistry` 中，以便智能体发现和调用：
+
+```python
+from qitos import ToolRegistry, function_tool
+
+@function_tool(read_only=True)
+def lookup_user(user_id: str) -> dict:
+    """Look up a user by ID."""
+    return {"id": user_id, "name": "Alice"}
+
+registry = ToolRegistry()
+registry.register(lookup_user)
+
+# 工具现在可以通过名称访问
+descriptions = registry.get_tool_descriptions()
+```
+
+也可以批量注册工具并覆盖名称：
+
+```python
+@function_tool
+def create_user(name: str) -> dict:
+    """Create a new user."""
+    return {"name": name}
+
+@function_tool
+def delete_user(user_id: str) -> dict:
+    """Delete a user by ID."""
+    return {"deleted": user_id}
+
+registry.register(create_user)
+registry.register(delete_user, name="remove_user")
+```
+
+## Step 5: @function_tool 与类式 BaseTool 对比
+
+QitOS 提供两种定义工具的方式，请按需选择：
+
+**`@function_tool` -- 适合简单的无状态操作：**
+
+```python
+from qitos import function_tool
+
+@function_tool(read_only=True)
+def get_time() -> str:
+    """Return the current time."""
+    from datetime import datetime
+    return datetime.now().isoformat()
+```
+
+**`BaseTool` 子类 -- 适合有状态的工具或需要复杂初始化的场景：**
+
+```python
+from qitos import BaseTool, ToolSpec, ToolMeta
+
+class GetTimeTool(BaseTool):
+    def __init__(self):
+        meta = ToolMeta(name="get_time", read_only=True)
+        spec = ToolSpec(
+            name="get_time",
+            description="Return the current time.",
+            parameters={},
+            required=[],
+        )
+        super().__init__(spec)
+
+    def execute(self, **kwargs) -> str:
+        from datetime import datetime
+        return datetime.now().isoformat()
+```
+
+选择指南：
+
+| 关注点 | `@function_tool` | `BaseTool` 子类 |
+|---|---|---|
+| 简单函数 | 最佳选择 | 过于繁琐 |
+| `__init__` 中有状态或配置 | 不支持 | 支持 |
+| 自定义 `execute` 逻辑 | 不适用 | 完全控制 |
+| 从签名自动生成 schema | 自动 | 手动 |
+| 样板代码 | 极少 | 较多 |
+
+大多数工具都是简单函数。先从 `@function_tool` 开始，只有在需要构造器状态或自定义执行行为时才使用 `BaseTool`。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="MCP 集成" icon="plug" href="/tutorials/mcp-integration">
+    将外部 MCP 服务器工具桥接到 QitOS，复用同一 FunctionTool 接口。
+  </Card>
+  <Card title="构建你的第一个智能体" icon="code" href="/guides/build-your-first-agent">
+    在 AgentModule 中使用你的工具，运行真实的大模型循环。
+  </Card>
+</CardGroup>

@@ -78,6 +78,21 @@ QitOS ships with canonical implementations of four established reasoning pattern
 
 QitOS includes adapters for GAIA, Tau-Bench, and CyBench that run on the same `AgentModule + Engine` kernel you use for your own agents. You don't need a separate evaluation harness.
 
+### Critics and hooks
+
+QitOS provides two complementary runtime extension mechanisms:
+
+- **Critics** control agent behavior quality at runtime. A critic can continue, stop, or retry a step — and on retry, it can patch the agent's instructions or state. This is unique to QitOS: no other framework offers runtime behavior correction with instruction and state patches.
+- **Hooks** observe the Engine loop at defined lifecycle points without controlling execution. Use hooks for logging, metrics collection, and audit trails.
+
+### Checkpoint and fork
+
+Save an agent's state at any step, resume after interruption, and fork a run to explore alternative paths. QitOS checkpointing supports both in-memory and SQLite storage, time-travel within the same thread, and true branching into new threads.
+
+### MCP integration
+
+Bridge Model Context Protocol (MCP) servers into QitOS agent tool registries. Connect to MCP servers via stdio or HTTP transport, filter which tools to expose, and manage async server lifecycles.
+
 ## Featured designs
 
 These are the design decisions that distinguish QitOS from a loose collection of agent utilities.

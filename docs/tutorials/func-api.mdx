@@ -1,0 +1,192 @@
+---
+title: "@function_tool API"
+description: "The fastest way to create QitOS tools: turn any Python function into a fully-specified FunctionTool with a single decorator."
+---
+
+The `@function_tool` decorator is the quickest path from a plain Python function to a QitOS tool. It inspects your function's signature, type hints, and docstring, then builds a complete `FunctionTool` instance with an enriched `ToolSpec` -- no subclassing required.
+
+## Step 1: Basic decorator usage
+
+Apply the decorator without arguments. The function name becomes the tool name and the docstring becomes the description:
+
+```python
+from qitos import function_tool
+
+@function_tool
+def greet(name: str) -> str:
+    """Say hello to someone."""
+    return f"Hello, {name}!"
+```
+
+You can also use it with parentheses when you need to pass parameters (covered in the next step):
+
+```python
+@function_tool()
+def greet(name: str) -> str:
+    """Say hello to someone."""
+    return f"Hello, {name}!"
+```
+
+Both forms return a `FunctionTool` instance with a populated `spec` that includes the parameter schema, required fields, and description.
+
+## Step 2: Decorator parameters
+
+Pass keyword arguments to the decorator to override defaults and control execution policy:
+
+```python
+from qitos import function_tool
+
+@function_tool(
+    name="search_files",
+    description="Search for files matching a pattern",
+    needs_approval=True,
+    timeout_s=30.0,
+    max_retries=2,
+    read_only=True,
+    concurrency_safe=True,
+)
+def search(pattern: str, max_results: int = 10) -> list[str]:
+    """Search for files matching a pattern."""
+    # ... implementation
+    return []
+```
+
+The available parameters are:
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `name` | `str` | function name | Override the tool name |
+| `description` | `str` | docstring | Override the tool description |
+| `needs_approval` | `bool` | `False` | Require human approval before execution |
+| `timeout_s` | `float` | `None` | Maximum execution time in seconds |
+| `max_retries` | `int` | `0` | Number of automatic retries on failure |
+| `read_only` | `bool` | `False` | Mark the tool as side-effect-free |
+| `concurrency_safe` | `bool` | `False` | Signal that the tool can run in parallel |
+
+## Step 3: Type hints become ToolSpec parameters
+
+The decorator inspects your function's type hints and converts them into JSON Schema entries inside `ToolSpec.parameters`. Supported types include:
+
+```python
+from typing import Literal, Optional
+from qitos import function_tool
+
+@function_tool
+def configure(
+    host: str,                        # {"type": "string"}
+    port: int,                        # {"type": "integer"}
+    verbose: bool = False,            # {"type": "boolean", "default": false}
+    retries: Optional[int] = None,    # {"type": "integer", "nullable": true}
+    mode: Literal["fast", "safe"] = "safe",  # {"type": "string", "enum": ["fast", "safe"]}
+    tags: list[str] = [],             # {"type": "array", "items": {"type": "string"}}
+) -> dict:
+    """Configure the service.
+
+    Args:
+        host: The server hostname.
+        port: The server port number.
+        verbose: Enable verbose logging.
+        retries: Optional retry count.
+        mode: Execution mode.
+        tags: List of tags.
+    """
+    return {"host": host, "port": port, "mode": mode}
+```
+
+Parameters without defaults are marked as required. Parameter descriptions are extracted from the Google-style `Args:` section of the docstring.
+
+## Step 4: Registering function tools in ToolRegistry
+
+Once you have a `FunctionTool`, register it with a `ToolRegistry` so agents can discover and call it:
+
+```python
+from qitos import ToolRegistry, function_tool
+
+@function_tool(read_only=True)
+def lookup_user(user_id: str) -> dict:
+    """Look up a user by ID."""
+    return {"id": user_id, "name": "Alice"}
+
+registry = ToolRegistry()
+registry.register(lookup_user)
+
+# The tool is now available by name
+descriptions = registry.get_tool_descriptions()
+```
+
+You can also register multiple tools at once and override names:
+
+```python
+@function_tool
+def create_user(name: str) -> dict:
+    """Create a new user."""
+    return {"name": name}
+
+@function_tool
+def delete_user(user_id: str) -> dict:
+    """Delete a user by ID."""
+    return {"deleted": user_id}
+
+registry.register(create_user)
+registry.register(delete_user, name="remove_user")
+```
+
+## Step 5: Comparing @function_tool with class-based BaseTool
+
+QitOS offers two ways to define tools. Use the one that fits your needs:
+
+**`@function_tool` -- best for simple, stateless operations:**
+
+```python
+from qitos import function_tool
+
+@function_tool(read_only=True)
+def get_time() -> str:
+    """Return the current time."""
+    from datetime import datetime
+    return datetime.now().isoformat()
+```
+
+**`BaseTool` subclass -- best for stateful tools or complex initialization:**
+
+```python
+from qitos import BaseTool, ToolSpec, ToolMeta
+
+class GetTimeTool(BaseTool):
+    def __init__(self):
+        meta = ToolMeta(name="get_time", read_only=True)
+        spec = ToolSpec(
+            name="get_time",
+            description="Return the current time.",
+            parameters={},
+            required=[],
+        )
+        super().__init__(spec)
+
+    def execute(self, **kwargs) -> str:
+        from datetime import datetime
+        return datetime.now().isoformat()
+```
+
+When to choose which:
+
+| Concern | `@function_tool` | `BaseTool` subclass |
+|---|---|---|
+| Simple functions | Best fit | Overkill |
+| State or config in `__init__` | Not supported | Supported |
+| Custom `execute` logic | N/A | Full control |
+| Auto schema from signature | Automatic | Manual |
+| Boilerplate | Minimal | More |
+
+Most tools are simple functions. Start with `@function_tool` and reach for `BaseTool` only when you need constructor state or custom execution behavior.
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="MCP Integration" icon="plug" href="/tutorials/mcp-integration">
+    Bridge external MCP server tools into QitOS using the same FunctionTool interface.
+  </Card>
+  <Card title="Build your first agent" icon="code" href="/guides/build-your-first-agent">
+    Use your tools inside an AgentModule with a real LLM loop.
+  </Card>
+</CardGroup>

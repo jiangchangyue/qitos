@@ -1,1 +1,0 @@
-"""QitOS example applications."""

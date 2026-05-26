@@ -1,0 +1,194 @@
+---
+title: "MCP Integration"
+description: "Bridge external MCP servers into QitOS as FunctionTool instances, with filtering and async lifecycle management."
+---
+
+The Model Context Protocol (MCP) is an open standard for connecting AI systems to external tools and data sources. QitOS provides a built-in bridge that discovers tools on an MCP server, converts their JSON Schema into QitOS `ToolSpec` objects, and wraps each one in a `FunctionTool` -- so MCP tools work just like native QitOS tools.
+
+## Step 1: Connecting to an MCP server
+
+QitOS ships two transport implementations. For most local MCP servers that run as command-line processes, use `MCPServerStdio`:
+
+```python
+from qitos.mcp import MCPServerStdio
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+await server.connect()
+```
+
+For remote MCP servers that expose an HTTP endpoint, use `MCPServerStreamableHttp`:
+
+```python
+from qitos.mcp import MCPServerStreamableHttp
+
+server = MCPServerStreamableHttp(
+    url="http://localhost:8080/mcp",
+    headers={"Authorization": "Bearer token123"},
+)
+await server.connect()
+```
+
+Both transports perform the MCP initialization handshake automatically during `connect()`. After connecting, you can list available tools:
+
+```python
+tools = await server.list_tools()
+for tool in tools:
+    print(f"  {tool.name}: {tool.description}")
+```
+
+Each `MCPToolInfo` returned by `list_tools()` carries `name`, `description`, and `input_schema`.
+
+## Step 2: Bridging MCP tools into QitOS
+
+The `mcp_server_to_function_tools` function converts every tool on a connected MCP server into a `FunctionTool` instance:
+
+```python
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+await server.connect()
+
+tools = await mcp_server_to_function_tools(server)
+```
+
+Each returned `FunctionTool` wraps a remote MCP call. When the tool is executed, QitOS sends a `tools/call` JSON-RPC request to the MCP server and returns the result.
+
+You can add a name prefix to disambiguate tools when bridging multiple servers into the same registry:
+
+```python
+fs_tools = await mcp_server_to_function_tools(server, name_prefix="fs")
+# Tool names become: fs__read_file, fs__write_file, etc.
+```
+
+Register the bridged tools in a `ToolRegistry` just like any other tool:
+
+```python
+from qitos import ToolRegistry
+
+registry = ToolRegistry()
+for tool in fs_tools:
+    registry.register(tool)
+```
+
+## Step 3: Filtering tools
+
+MCP servers often expose many tools, but your agent may only need a subset. `ToolFilter` controls which tools are bridged:
+
+**Allow only specific tools:**
+
+```python
+from qitos.mcp import ToolFilter, mcp_server_to_function_tools
+
+tool_filter = ToolFilter(allowed_tool_names={"read_file", "list_directory"})
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+**Block specific tools:**
+
+```python
+tool_filter = ToolFilter(blocked_tool_names={"delete_file", "move_file"})
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+**Custom filter function:**
+
+```python
+tool_filter = ToolFilter(filter_func=lambda name: name.startswith("read_"))
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+You can combine allowed and blocked lists. A tool name must be in the allowed list (if set) and not in the blocked list:
+
+```python
+tool_filter = ToolFilter(
+    allowed_tool_names={"read_file", "write_file", "delete_file"},
+    blocked_tool_names={"delete_file"},
+)
+# Only read_file and write_file pass
+```
+
+The evaluation order is:
+
+1. If `filter_func` is set, its result is authoritative.
+2. If `allowed_tool_names` is set, only names in the set pass.
+3. If `blocked_tool_names` is set, names in the set are excluded.
+4. Otherwise the name passes (no filtering).
+
+## Step 4: Async lifecycle
+
+MCP server connections hold resources (subprocesses, HTTP clients) that must be cleaned up. Always pair `connect()` with `cleanup()`:
+
+```python
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools, ToolFilter
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+
+try:
+    await server.connect()
+
+    tools = await mcp_server_to_function_tools(
+        server,
+        tool_filter=ToolFilter(blocked_tool_names={"dangerous_op"}),
+        name_prefix="fs",
+    )
+
+    # Use tools in your agent...
+    for tool in tools:
+        print(f"Bridged: {tool.spec.name}")
+
+finally:
+    await server.cleanup()
+```
+
+`MCPServerStdio.cleanup()` terminates the subprocess (first `SIGTERM`, then `SIGKILL` after a 5-second timeout). `MCPServerStreamableHttp.cleanup()` closes the HTTP client session.
+
+For the full integration pattern with an agent, see the complete example:
+
+```python
+from qitos import ToolRegistry
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools, ToolFilter
+
+async def build_registry_with_mcp():
+    server = MCPServerStdio(
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    )
+    await server.connect()
+
+    try:
+        mcp_tools = await mcp_server_to_function_tools(
+            server,
+            tool_filter=ToolFilter(allowed_tool_names={"read_file", "list_directory"}),
+            name_prefix="fs",
+        )
+
+        registry = ToolRegistry()
+        for tool in mcp_tools:
+            registry.register(tool)
+        return registry, server
+    except Exception:
+        await server.cleanup()
+        raise
+```
+
+Remember to call `await server.cleanup()` when the agent session ends.
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="@function_tool API" icon="wrench" href="/tutorials/func-api">
+    Learn the decorator-based way to create native QitOS tools from Python functions.
+  </Card>
+  <Card title="Build your first agent" icon="code" href="/guides/build-your-first-agent">
+    Use bridged MCP tools inside an AgentModule with a real LLM loop.
+  </Card>
+</CardGroup>

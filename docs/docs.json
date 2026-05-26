@@ -41,6 +41,11 @@
                   "tutorials/planact",
                   "tutorials/claude-code",
                   "tutorials/code-security-audit",
+                  "tutorials/critic-system",
+                  "tutorials/hook-lifecycle",
+                  "tutorials/func-api",
+                  "tutorials/mcp-integration",
+                  "tutorials/checkpoint-and-fork",
                   "tutorials/switch-model-families",
                   "tutorials/reproducible-benchmark-runs",
                   "tutorials/replay-and-inspect-failed-runs",
@@ -104,6 +109,12 @@
                   "reference/cli",
                   "reference/configuration"
                 ]
+              },
+              {
+                "group": "Contributing",
+                "pages": [
+                  "contributing/development"
+                ]
               }
             ]
           },
@@ -151,6 +162,11 @@
                   "zh/tutorials/planact",
                   "zh/tutorials/claude-code",
                   "zh/tutorials/code-security-audit",
+                  "zh/tutorials/critic-system",
+                  "zh/tutorials/hook-lifecycle",
+                  "zh/tutorials/func-api",
+                  "zh/tutorials/mcp-integration",
+                  "zh/tutorials/checkpoint-and-fork",
                   "zh/tutorials/switch-model-families",
                   "zh/tutorials/reproducible-benchmark-runs",
                   "zh/tutorials/replay-and-inspect-failed-runs",
@@ -214,6 +230,12 @@
                   "zh/reference/model-family-matrix",
                   "zh/reference/cli",
                   "zh/reference/configuration"
+                ]
+              },
+              {
+                "group": "贡献",
+                "pages": [
+                  "zh/contributing/development"
                 ]
               }
             ]

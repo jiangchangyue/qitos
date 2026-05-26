@@ -1,0 +1,194 @@
+---
+title: "MCP 集成"
+description: "将外部 MCP 服务器桥接到 QitOS，转化为 FunctionTool 实例，支持工具过滤与异步生命周期管理。"
+---
+
+Model Context Protocol（MCP）是一个开放标准，用于将 AI 系统连接到外部工具和数据源。QitOS 提供了内置桥接功能：发现 MCP 服务器上的工具，将其 JSON Schema 转换为 QitOS `ToolSpec` 对象，并封装为 `FunctionTool`——因此 MCP 工具与原生 QitOS 工具的使用方式完全一致。
+
+## Step 1: 连接 MCP 服务器
+
+QitOS 内置两种传输实现。对于以命令行进程方式运行的本地 MCP 服务器，使用 `MCPServerStdio`：
+
+```python
+from qitos.mcp import MCPServerStdio
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+await server.connect()
+```
+
+对于提供 HTTP 端点的远程 MCP 服务器，使用 `MCPServerStreamableHttp`：
+
+```python
+from qitos.mcp import MCPServerStreamableHttp
+
+server = MCPServerStreamableHttp(
+    url="http://localhost:8080/mcp",
+    headers={"Authorization": "Bearer token123"},
+)
+await server.connect()
+```
+
+两种传输都会在 `connect()` 期间自动完成 MCP 初始化握手。连接成功后，可以列出可用工具：
+
+```python
+tools = await server.list_tools()
+for tool in tools:
+    print(f"  {tool.name}: {tool.description}")
+```
+
+`list_tools()` 返回的每个 `MCPToolInfo` 包含 `name`、`description` 和 `input_schema`。
+
+## Step 2: 将 MCP 工具桥接到 QitOS
+
+`mcp_server_to_function_tools` 函数将已连接的 MCP 服务器上的每个工具转换为 `FunctionTool` 实例：
+
+```python
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+await server.connect()
+
+tools = await mcp_server_to_function_tools(server)
+```
+
+每个返回的 `FunctionTool` 封装了一次远程 MCP 调用。当工具被执行时，QitOS 向 MCP 服务器发送 `tools/call` JSON-RPC 请求并返回结果。
+
+当需要将多个服务器桥接到同一注册表时，可以添加名称前缀来消除歧义：
+
+```python
+fs_tools = await mcp_server_to_function_tools(server, name_prefix="fs")
+# 工具名称变为：fs__read_file、fs__write_file 等
+```
+
+像注册其他工具一样，将桥接后的工具注册到 `ToolRegistry`：
+
+```python
+from qitos import ToolRegistry
+
+registry = ToolRegistry()
+for tool in fs_tools:
+    registry.register(tool)
+```
+
+## Step 3: 过滤工具
+
+MCP 服务器通常暴露很多工具，但你的智能体可能只需要其中一部分。`ToolFilter` 控制哪些工具会被桥接：
+
+**仅允许特定工具：**
+
+```python
+from qitos.mcp import ToolFilter, mcp_server_to_function_tools
+
+tool_filter = ToolFilter(allowed_tool_names={"read_file", "list_directory"})
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+**阻止特定工具：**
+
+```python
+tool_filter = ToolFilter(blocked_tool_names={"delete_file", "move_file"})
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+**自定义过滤函数：**
+
+```python
+tool_filter = ToolFilter(filter_func=lambda name: name.startswith("read_"))
+tools = await mcp_server_to_function_tools(server, tool_filter=tool_filter)
+```
+
+可以同时组合允许列表和阻止列表。工具名必须在允许列表中（如果设置了的话）且不在阻止列表中：
+
+```python
+tool_filter = ToolFilter(
+    allowed_tool_names={"read_file", "write_file", "delete_file"},
+    blocked_tool_names={"delete_file"},
+)
+# 只有 read_file 和 write_file 通过
+```
+
+评估顺序如下：
+
+1. 如果设置了 `filter_func`，其返回值为最终结果。
+2. 如果设置了 `allowed_tool_names`，只有集合中的名称通过。
+3. 如果设置了 `blocked_tool_names`，集合中的名称被排除。
+4. 否则名称通过（无过滤）。
+
+## Step 4: 异步生命周期
+
+MCP 服务器连接持有资源（子进程、HTTP 客户端），必须进行清理。务必将 `connect()` 与 `cleanup()` 配对使用：
+
+```python
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools, ToolFilter
+
+server = MCPServerStdio(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+)
+
+try:
+    await server.connect()
+
+    tools = await mcp_server_to_function_tools(
+        server,
+        tool_filter=ToolFilter(blocked_tool_names={"dangerous_op"}),
+        name_prefix="fs",
+    )
+
+    # 在智能体中使用工具...
+    for tool in tools:
+        print(f"Bridged: {tool.spec.name}")
+
+finally:
+    await server.cleanup()
+```
+
+`MCPServerStdio.cleanup()` 终止子进程（先 `SIGTERM`，5 秒超时后 `SIGKILL`）。`MCPServerStreamableHttp.cleanup()` 关闭 HTTP 客户端会话。
+
+完整的智能体集成模式示例：
+
+```python
+from qitos import ToolRegistry
+from qitos.mcp import MCPServerStdio, mcp_server_to_function_tools, ToolFilter
+
+async def build_registry_with_mcp():
+    server = MCPServerStdio(
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    )
+    await server.connect()
+
+    try:
+        mcp_tools = await mcp_server_to_function_tools(
+            server,
+            tool_filter=ToolFilter(allowed_tool_names={"read_file", "list_directory"}),
+            name_prefix="fs",
+        )
+
+        registry = ToolRegistry()
+        for tool in mcp_tools:
+            registry.register(tool)
+        return registry, server
+    except Exception:
+        await server.cleanup()
+        raise
+```
+
+当智能体会话结束时，记得调用 `await server.cleanup()`。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="@function_tool API" icon="wrench" href="/tutorials/func-api">
+    学习用装饰器方式从 Python 函数创建原生 QitOS 工具。
+  </Card>
+  <Card title="构建你的第一个智能体" icon="code" href="/guides/build-your-first-agent">
+    在 AgentModule 中使用桥接的 MCP 工具，运行真实的大模型循环。
+  </Card>
+</CardGroup>

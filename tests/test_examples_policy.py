@@ -59,7 +59,7 @@ def test_zoo_candidates_are_valid_python() -> None:
 
 
 def test_migration_staging_manifest_exists() -> None:
-    root = ROOT / "plans" / "qitos_zoo_migration"
+    root = ROOT / "docs" / "internal" / "plans" / "qitos_zoo_migration"
     assert (root / "README.md").exists()
     assert (root / "MIGRATION_MANIFEST.md").exists()
     assert (root / "apps" / "qitos-coder").exists()

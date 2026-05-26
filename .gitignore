@@ -175,6 +175,9 @@ examples/playground/
 # API secrets (never push)
 api_info.md
 
+# Auto-generated security reports
+security_report*.md
+
 # Auto-generated API reference pages (built by docs hook)
 docs/reference/api_generated/
 docs/zh/reference/api_generated/

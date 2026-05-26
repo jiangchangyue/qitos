@@ -74,3 +74,73 @@ The single-run temporal playback view.
 ### qita diff
 
 The summary-level comparison view for two runs, focused on stop reason, result, step/event counts, parser diagnostics, config differences, and token/latency/cost summaries.
+
+## Quality control terms
+
+### Critic
+
+A runtime quality controller that evaluates agent behavior after each step. A critic returns a `CriticResult` with an action (continue, stop, or retry), a reason, a score, and optional patches to the agent's instructions or state.
+
+### CriticResult
+
+The structured output of a critic evaluation. Contains `action` (continue/stop/retry), `reason`, `score` (0.0–1.0), and optional `instruction_patch`, `state_patch`, or `modified_prompt` for retry actions.
+
+### instruction_patch
+
+Additional instruction text appended to the agent's system prompt on the next iteration when a critic returns a retry action.
+
+### state_patch
+
+Key-value pairs merged into the agent's state before the next iteration when a critic returns a retry action.
+
+## Runtime extensibility terms
+
+### EngineHook
+
+The base class for runtime extension points. Hooks observe the Engine loop at defined lifecycle points (step start/end, tool use, critic evaluation, etc.) without controlling execution flow.
+
+### HookContext
+
+The dataclass passed to hook callbacks, containing the current step ID, phase, state, observation, decision, and action results.
+
+### ToolHookContext
+
+An extended `HookContext` for tool-level events, adding `tool_name`, `tool_args`, `tool_result`, and `permission_decision` fields.
+
+## Tool system terms
+
+### @function_tool
+
+A decorator that turns a Python function into a QitOS `FunctionTool` by automatically inferring the tool schema from type hints and docstrings.
+
+### ToolFilter
+
+A filter applied when bridging MCP server tools into a QitOS tool registry, controlling which tools are exposed based on name patterns or custom predicates.
+
+## Persistence terms
+
+### CheckpointStore
+
+The abstract interface for saving and loading agent run state. Implementations include `InMemoryCheckpointStore` and `SqliteCheckpointStore`.
+
+### Fork
+
+Creating a new checkpoint branch from an existing checkpoint without overwriting the original. Supports time-travel (same thread) and true branching (new thread).
+
+### DurabilityMode
+
+Controls how aggressively checkpoints are persisted. `SYNC` mode writes to disk before continuing the run.
+
+### StateVersionTracker
+
+Tracks per-field version numbers in agent state, enabling fine-grained change detection between checkpoints.
+
+## Integration terms
+
+### MCP Bridge
+
+A component that connects a Model Context Protocol (MCP) server to QitOS, converting MCP tool definitions into `FunctionTool` instances that can be registered in an agent's `ToolRegistry`.
+
+### MCPServerStdio
+
+An MCP server transport that communicates with a subprocess via stdin/stdout JSON-RPC.
