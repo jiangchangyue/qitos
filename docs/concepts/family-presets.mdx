@@ -71,12 +71,15 @@ The first QitOS gold presets are:
 - `gpt-oss`
 - `gemma-4`
 
-All five currently target OpenAI-compatible serving, but they do **not** all share the same protocol defaults.
+In addition, five **compatibility presets** provide correct defaults for broader model families:
 
-For example:
+- `openai`
+- `anthropic`
+- `gemini`
+- `deepseek`
+- `glm`
 
-- Qwen, Kimi, `gpt-oss`, and Gemma 4 default to `json_decision_v1`
-- MiniMax keeps `minimax_tool_call_v1`
+All 10 currently target OpenAI-compatible serving, but they do **not** all share the same protocol defaults.
 
 That protocol default is not always the full story.
 
@@ -122,3 +125,35 @@ That means `qita` can show:
 - context policy
 
 without inventing a second trace format.
+
+## Override a preset
+
+When a built-in preset does not match your needs, use `preset.override()` to create a customized copy without editing source:
+
+```python
+from dataclasses import replace
+from qitos.harness import resolve_family_preset
+
+qwen = resolve_family_preset("qwen")
+custom = qwen.override(
+    context_policy=replace(qwen.context_policy, context_window_hint=256_000),
+    notes="Extended context for long-horizon runs",
+)
+```
+
+The `override()` method returns a new `FamilyPreset` — the original is never mutated. Nested policies (`tool_policy`, `context_policy`) are replaced wholesale, so use `replace()` on the policy first.
+
+## Advisory defaults
+
+Gold presets include optional advisory fields for research baselines:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `recommended_max_steps` | `int \| None` | Suggested step budget per run |
+| `recommended_max_tokens` | `int \| None` | Suggested total token budget |
+| `recommended_retry_budget` | `int \| None` | Max critic-retry attempts per step |
+| `recommended_temperature` | `float \| None` | Default sampling temperature |
+
+These fields are **advisory only** — the engine does not auto-apply them. They exist so that researchers can reference a documented baseline without guessing. Use them as starting points, then tune for your specific task.
+
+These fields appear in `preset.to_dict()` and in trace metadata, so you can always see what defaults were suggested even if you chose different values.

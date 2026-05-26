@@ -147,6 +147,11 @@ def _bench_main(argv: list[str]) -> int:
     p_export.add_argument("--run", required=True)
     p_export.add_argument("--html", required=True)
 
+    p_list = sub.add_parser("list", help="List available benchmarks and splits")
+    p_list.add_argument("--benchmark", default=None, help="Show splits for a specific benchmark")
+
+    p_presets = sub.add_parser("presets", help="List available model-family presets")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _bench_run(args)
@@ -156,6 +161,10 @@ def _bench_main(argv: list[str]) -> int:
         return _bench_replay(args)
     if args.command == "export":
         return _bench_export(args)
+    if args.command == "list":
+        return _bench_list(args)
+    if args.command == "presets":
+        return _bench_presets(args)
     return 1
 
 
@@ -244,6 +253,49 @@ def _bench_replay(args: argparse.Namespace) -> int:
 
 def _bench_export(args: argparse.Namespace) -> int:
     return qita_export(run=str(args.run), html_path=str(args.html))
+
+
+def _bench_list(args: argparse.Namespace) -> int:
+    if args.benchmark:
+        benchmark = normalize_benchmark_name(args.benchmark)
+        try:
+            tasks = load_benchmark_tasks(benchmark=benchmark, split="test")
+            print(f"benchmark={benchmark}  test_tasks={len(tasks)}")
+        except Exception as exc:
+            print(f"Could not load benchmark {benchmark}: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    known_benchmarks = [
+        ("gaia", "GAIA — general AI assistant benchmark"),
+        ("tau-bench", "Tau-Bench — tool-use agent benchmark (airline/retail)"),
+        ("cybench", "CyBench — cybersecurity CTF benchmark"),
+        ("cybergym", "CyberGym — cyber risk assessment benchmark"),
+        ("desktop-starter", "Desktop Starter — mock desktop environment tasks"),
+        ("osworld", "OSWorld — real desktop OS interaction benchmark"),
+    ]
+    for name, description in known_benchmarks:
+        print(f"  {name:20s}  {description}")
+    return 0
+
+
+def _bench_presets(args: argparse.Namespace) -> int:
+    from qitos.harness._presets import known_family_presets
+
+    gold_ids = {"qwen", "kimi", "minimax", "gpt-oss", "gemma-4"}
+    for preset in known_family_presets():
+        marker = " *" if preset.id in gold_ids else ""
+        ctx = preset.context_policy.context_window_hint
+        ctx_str = f"{ctx // 1000}k" if ctx else "-"
+        models = ", ".join(preset.recommended_models[:2]) if preset.recommended_models else "-"
+        print(
+            f"  {preset.id:12s}{marker}  {preset.display_name:16s}  "
+            f"{preset.default_protocol:26s}  {preset.tool_policy.primary_delivery:18s}  "
+            f"ctx={ctx_str:>6s}  {models}"
+        )
+    print()
+    print("  * = gold preset (most thoroughly tested)")
+    return 0
 
 
 def _experiment_main(argv: list[str]) -> int:

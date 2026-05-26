@@ -28,6 +28,10 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         ),
         notes="Research default for Qwen served through OpenAI-compatible endpoints, with native tool calls preferred before text parsing.",
         recommended_models=("Qwen/Qwen3-8B", "qwen-plus", "Qwen/Qwen3-32B"),
+        recommended_max_steps=30,
+        recommended_max_tokens=500_000,
+        recommended_retry_budget=3,
+        recommended_temperature=0.2,
     ),
     FamilyPreset(
         id="kimi",
@@ -48,6 +52,10 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         ),
         notes="Moonshot/Kimi models keep the JSON-first harness with light fallback to ReAct text.",
         recommended_models=("kimi-k2-0905-preview", "moonshot-v1-128k"),
+        recommended_max_steps=30,
+        recommended_max_tokens=500_000,
+        recommended_retry_budget=3,
+        recommended_temperature=0.2,
     ),
     FamilyPreset(
         id="minimax",
@@ -68,6 +76,10 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         ),
         notes="MiniMax keeps its protocol-specific parser and fallback chain.",
         recommended_models=("MiniMax-M2.5",),
+        recommended_max_steps=30,
+        recommended_max_tokens=500_000,
+        recommended_retry_budget=3,
+        recommended_temperature=0.2,
     ),
     FamilyPreset(
         id="gpt-oss",
@@ -86,6 +98,10 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         ),
         notes="Targets open-weight or third-party OpenAI-compatible serving, not OpenAI-hosted API access.",
         recommended_models=("gpt-oss-120b", "gpt-oss-20b"),
+        recommended_max_steps=30,
+        recommended_max_tokens=500_000,
+        recommended_retry_budget=3,
+        recommended_temperature=0.2,
     ),
     FamilyPreset(
         id="gemma-4",
@@ -105,6 +121,10 @@ _PRESETS: tuple[FamilyPreset, ...] = (
         ),
         notes="OpenAI-compatible serving path for Gemma 4 without binding to the Gemini SDK.",
         recommended_models=("gemma-4-31b-it", "gemma-4-26b-a4b-it"),
+        recommended_max_steps=30,
+        recommended_max_tokens=500_000,
+        recommended_retry_budget=3,
+        recommended_temperature=0.2,
     ),
     FamilyPreset(
         id="openai",
@@ -117,8 +137,11 @@ _PRESETS: tuple[FamilyPreset, ...] = (
             primary_delivery="api_parameter",
             fallback_delivery="prompt_injection",
         ),
-        context_policy=ContextPolicy(context_window_hint=128_000),
-        notes="Compatibility preset retained for existing model-profile inference.",
+        context_policy=ContextPolicy(
+            context_window_hint=1_047_576,
+            fallback_context_window=128_000,
+        ),
+        notes="Compatibility preset retained for existing model-profile inference. gpt-4.1 models have ~1M context; gpt-4o and older models have 128k.",
         recommended_models=("gpt-4.1", "gpt-4o"),
     ),
     FamilyPreset(

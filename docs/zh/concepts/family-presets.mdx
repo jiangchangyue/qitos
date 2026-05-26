@@ -66,7 +66,15 @@ QitOS v0.4 首批内建的黄金预设（gold presets）是：
 - `gpt-oss`
 - `gemma-4`
 
-这 5 个家族当前都走 OpenAI 兼容服务，但默认协议并不完全相同。
+此外，还有 5 个**兼容预设**为更广泛的模型家族提供正确默认值：
+
+- `openai`
+- `anthropic`
+- `gemini`
+- `deepseek`
+- `glm`
+
+这 10 个家族当前都走 OpenAI 兼容服务，但默认协议并不完全相同。
 
 例如：
 
@@ -125,3 +133,35 @@ QitOS 通过 `RunSpec.metadata` 把预设和适配层信息写进追踪记录。
 - 上下文策略
 
 而不需要引入第二套追踪记录格式。
+
+## 覆盖预设
+
+当内建预设不完全符合需求时，用 `preset.override()` 创建自定义副本，无需修改源码：
+
+```python
+from dataclasses import replace
+from qitos.harness import resolve_family_preset
+
+qwen = resolve_family_preset("qwen")
+custom = qwen.override(
+    context_policy=replace(qwen.context_policy, context_window_hint=256_000),
+    notes="Extended context for long-horizon runs",
+)
+```
+
+`override()` 返回一个新的 `FamilyPreset`——原始预设不会被修改。嵌套策略（`tool_policy`、`context_policy`）整体替换，因此需要先用 `replace()` 处理策略对象。
+
+## 推荐默认值
+
+黄金预设包含可选的推荐字段，用于研究基线：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `recommended_max_steps` | `int \| None` | 建议的单次运行步数预算 |
+| `recommended_max_tokens` | `int \| None` | 建议的总 token 预算 |
+| `recommended_retry_budget` | `int \| None` | 每步最大 critic 重试次数 |
+| `recommended_temperature` | `float \| None` | 默认采样温度 |
+
+这些字段**仅供参考**——引擎不会自动应用它们。它们存在的目的是让研究者可以参考已记录的基线，而不是靠猜测。把它们作为起点，然后根据具体任务调优。
+
+这些字段会出现在 `preset.to_dict()` 和追踪元数据中，因此即使你选择了不同的值，也能看到推荐的默认值。

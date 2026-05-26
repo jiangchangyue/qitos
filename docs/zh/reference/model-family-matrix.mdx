@@ -1,15 +1,26 @@
 ---
 title: "模型家族矩阵"
-description: "QitOS v0.4 内建黄金预设的默认适配层策略矩阵。"
+description: "QitOS v0.4 内建家族预设的默认适配层策略矩阵。"
 ---
 
-| 家族 | 传输层 | 默认协议 | 后备链 | 工具交付方式 | 说明 |
-|---|---|---|---|---|---|
-| Qwen | OpenAI 兼容 | `json_decision_v1` | `xml_decision_v1 -> react_text_v1` | `api_parameter` | 如果端点返回 `tool_calls`，会优先走原生工具调用通道 |
-| Kimi | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `api_parameter` | 在不明显改提示词的前提下切换到 Kimi |
-| MiniMax | OpenAI 兼容 | `minimax_tool_call_v1` | `terminus_xml_v1 -> terminus_json_v1 -> json_decision_v1` | `api_parameter` | 保留 MiniMax 特有解析器优势 |
-| `gpt-oss` | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `api_parameter` | 面向开放权重与第三方兼容服务 |
-| Gemma 4 | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `prompt_injection` | 面向已部署的 Gemma 4，不绑定 Gemini SDK |
+| 家族 | 传输层 | 默认协议 | 后备链 | 工具交付方式 | 上下文窗口 | 推荐模型 |
+|---|---|---|---|---|---|---|
+| Qwen | OpenAI 兼容 | `json_decision_v1` | `xml_decision_v1 → react_text_v1` | `api_parameter` | 128k | `Qwen/Qwen3-8B`, `qwen-plus`, `Qwen/Qwen3-32B` |
+| Kimi | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `kimi-k2-0905-preview`, `moonshot-v1-128k` |
+| MiniMax | OpenAI 兼容 | `minimax_tool_call_v1` | `terminus_xml_v1 → terminus_json_v1 → json_decision_v1` | `api_parameter` | 128k | `MiniMax-M2.5` |
+| `gpt-oss` | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `gpt-oss-120b`, `gpt-oss-20b` |
+| Gemma 4 | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `prompt_injection` | 128k | `gemma-4-31b-it`, `gemma-4-26b-a4b-it` |
+| OpenAI | OpenAI 兼容 | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `gpt-4.1`, `gpt-4o` |
+| Anthropic | OpenAI 兼容 | `react_text_v1` | `json_decision_v1` | `prompt_injection` | 200k | `claude-sonnet-4-5` |
+| Gemini | OpenAI 兼容 | `xml_decision_v1` | `json_decision_v1 → react_text_v1` | `prompt_injection` | 1M | `gemini-2.5-pro` |
+| DeepSeek | OpenAI 兼容 | `json_decision_v1` | `tool_use_xml_v1 → react_text_v1` | `api_parameter` | 128k | `ds-v4-pro`, `ds-v4-flash`, `deepseek-chat` |
+| GLM | OpenAI 兼容 | `json_decision_v1` | `xml_decision_v1 → tool_use_xml_v1 → react_text_v1` | `api_parameter` | 128k | `glm5.1-w4a8-4maas`, `glm-4` |
+
+## 黄金预设
+
+前五个家族（Qwen、Kimi、MiniMax、`gpt-oss`、Gemma 4）是**黄金预设**——QitOS 团队在每次发版时验证得最充分的配置。当你刚上手或需要跑基准对比时，优先选择黄金预设。
+
+后五个（OpenAI、Anthropic、Gemini、DeepSeek、GLM）是**兼容预设**。它们为各自的家族提供了正确的协议和上下文默认值，但随着专用适配器的加入可能会演进。
 
 ## 正确理解这张表
 
@@ -19,8 +30,8 @@ description: "QitOS v0.4 内建黄金预设的默认适配层策略矩阵。"
 
 如果你需要改某一项，请显式覆盖：
 
-- 覆盖协议
-- 覆盖基础 URL
-- 覆盖模型名称
+- 用 `build_model_for_preset(protocol=...)` 覆盖协议
+- 用 `build_model_for_preset(tool_delivery=...)` 覆盖工具交付方式
+- 用 `preset.override()` 扩展预设——参见[家族预设](/zh/concepts/family-presets)
 
 不要把整个示例分叉成另一套实现。

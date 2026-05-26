@@ -1,15 +1,26 @@
 ---
 title: "Model family matrix"
-description: "The built-in QitOS v0.4 gold presets and their default harness policies."
+description: "The built-in QitOS v0.4 family presets and their default harness policies."
 ---
 
-| Family | Transport (API adapter) | Default protocol (output format) | Fallback chain | Tool delivery | Notes |
-|---|---|---|---|---|---|
-| Qwen | OpenAI-compatible | `json_decision_v1` | `xml_decision_v1 -> react_text_v1` | `api_parameter` | Native tool calls are preferred when the endpoint returns `tool_calls` |
-| Kimi | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `api_parameter` | Keep the same coding-agent shape with minimal prompt churn |
-| MiniMax | OpenAI-compatible | `minimax_tool_call_v1` | `terminus_xml_v1 -> terminus_json_v1 -> json_decision_v1` | `api_parameter` | Preserves the MiniMax-specific parser advantage |
-| `gpt-oss` | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `api_parameter` | Targets open-weight or third-party compatible serving |
-| Gemma 4 | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `prompt_injection` | Served Gemma 4 path, not native Gemini SDK binding |
+| Family | Transport | Default protocol | Fallback chain | Tool delivery | Context window | Recommended models |
+|---|---|---|---|---|---|---|
+| Qwen | OpenAI-compatible | `json_decision_v1` | `xml_decision_v1 → react_text_v1` | `api_parameter` | 128k | `Qwen/Qwen3-8B`, `qwen-plus`, `Qwen/Qwen3-32B` |
+| Kimi | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `kimi-k2-0905-preview`, `moonshot-v1-128k` |
+| MiniMax | OpenAI-compatible | `minimax_tool_call_v1` | `terminus_xml_v1 → terminus_json_v1 → json_decision_v1` | `api_parameter` | 128k | `MiniMax-M2.5` |
+| `gpt-oss` | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `gpt-oss-120b`, `gpt-oss-20b` |
+| Gemma 4 | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `prompt_injection` | 128k | `gemma-4-31b-it`, `gemma-4-26b-a4b-it` |
+| OpenAI | OpenAI-compatible | `json_decision_v1` | `react_text_v1` | `api_parameter` | 128k | `gpt-4.1`, `gpt-4o` |
+| Anthropic | OpenAI-compatible | `react_text_v1` | `json_decision_v1` | `prompt_injection` | 200k | `claude-sonnet-4-5` |
+| Gemini | OpenAI-compatible | `xml_decision_v1` | `json_decision_v1 → react_text_v1` | `prompt_injection` | 1M | `gemini-2.5-pro` |
+| DeepSeek | OpenAI-compatible | `json_decision_v1` | `tool_use_xml_v1 → react_text_v1` | `api_parameter` | 128k | `ds-v4-pro`, `ds-v4-flash`, `deepseek-chat` |
+| GLM | OpenAI-compatible | `json_decision_v1` | `xml_decision_v1 → tool_use_xml_v1 → react_text_v1` | `api_parameter` | 128k | `glm5.1-w4a8-4maas`, `glm-4` |
+
+## Gold presets
+
+The first five families (Qwen, Kimi, MiniMax, `gpt-oss`, Gemma 4) are the **gold presets** — the most thoroughly tested configurations that the QitOS team validates on every release. When you are getting started or running a benchmark comparison, prefer a gold preset.
+
+The remaining five (OpenAI, Anthropic, Gemini, DeepSeek, GLM) are **compatibility presets**. They provide correct protocol and context defaults for their families but may evolve as dedicated adapters are added.
 
 ## Use the matrix correctly
 
@@ -19,8 +30,8 @@ It shows the default harness (the wiring layer that connects a transport, parser
 
 If you need to override one part, do it explicitly:
 
-- override the protocol
-- override the base URL
-- override the model name
+- override the protocol with `build_model_for_preset(protocol=...)`
+- override the tool delivery with `build_model_for_preset(tool_delivery=...)`
+- extend a preset with `preset.override()` — see [Family presets](/concepts/family-presets)
 
 Do not silently fork the whole example.

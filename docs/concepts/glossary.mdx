@@ -144,3 +144,17 @@ A component that connects a Model Context Protocol (MCP) server to QitOS, conver
 ### MCPServerStdio
 
 An MCP server transport that communicates with a subprocess via stdin/stdout JSON-RPC.
+
+## Harness and preset terms
+
+### Preset override
+
+Creating a customized copy of a built-in `FamilyPreset` using `preset.override(**kwargs)`. The original preset is never mutated; `override()` returns a new instance with the specified fields replaced.
+
+### MaxTokensCriteria
+
+A stop criterion that halts the Engine when cumulative token usage exceeds a budget. The Engine tracks `total_tokens` across all steps and passes it in `runtime_info`.
+
+### Advisory defaults
+
+Optional fields on `FamilyPreset` (`recommended_max_steps`, `recommended_max_tokens`, `recommended_retry_budget`, `recommended_temperature`) that document tested baseline values. These are advisory only — the engine does not auto-apply them.

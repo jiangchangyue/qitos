@@ -58,6 +58,10 @@ class FamilyPreset:
     context_policy: ContextPolicy = field(default_factory=ContextPolicy)
     notes: str = ""
     recommended_models: tuple[str, ...] = field(default_factory=tuple)
+    recommended_max_steps: Optional[int] = None
+    recommended_max_tokens: Optional[int] = None
+    recommended_retry_budget: Optional[int] = None
+    recommended_temperature: Optional[float] = None
 
     def matches(self, value: str | None) -> bool:
         normalized = str(value or "").strip().lower()
@@ -82,7 +86,27 @@ class FamilyPreset:
             "context_policy": self.context_policy.to_dict(),
             "notes": self.notes,
             "recommended_models": list(self.recommended_models),
+            "recommended_max_steps": self.recommended_max_steps,
+            "recommended_max_tokens": self.recommended_max_tokens,
+            "recommended_retry_budget": self.recommended_retry_budget,
+            "recommended_temperature": self.recommended_temperature,
         }
+
+    def override(self, **kwargs: Any) -> FamilyPreset:
+        """Return a copy of this preset with specified fields overridden.
+
+        Nested policies (tool_policy, context_policy) are replaced wholesale.
+        Use ``replace()`` on the policy first, then pass the result here.
+
+        Example::
+
+            from dataclasses import replace
+            custom = qwen.override(
+                context_policy=replace(qwen.context_policy, context_window_hint=256_000),
+                notes="Extended context variant",
+            )
+        """
+        return replace(self, **kwargs)
 
 
 class ModelAdapter:

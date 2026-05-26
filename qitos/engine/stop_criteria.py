@@ -72,6 +72,27 @@ class MaxRuntimeCriteria(StopCriteria):
         return False, None, None
 
 
+class MaxTokensCriteria(StopCriteria):
+    def __init__(self, max_tokens: int):
+        self.max_tokens = max_tokens
+
+    def should_stop(
+        self,
+        state: Any,
+        step_count: int,
+        runtime_info: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[bool, Optional[StopReason], Optional[str]]:
+        info = runtime_info or {}
+        tokens = int(info.get("total_tokens", 0))
+        if tokens >= self.max_tokens:
+            return (
+                True,
+                StopReason.BUDGET_TOKENS,
+                f"total_tokens={tokens} >= max_tokens={self.max_tokens}",
+            )
+        return False, None, None
+
+
 class StagnationCriteria(StopCriteria):
     def __init__(
         self,
@@ -108,5 +129,6 @@ __all__ = [
     "MaxStepsCriteria",
     "FinalResultCriteria",
     "MaxRuntimeCriteria",
+    "MaxTokensCriteria",
     "StagnationCriteria",
 ]

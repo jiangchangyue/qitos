@@ -167,6 +167,30 @@ from qitos.engine.stop_criteria import StagnationCriteria
 
 criterion = StagnationCriteria(
     max_stagnant_steps=3,
+```
+
+**`MaxTokensCriteria`**
+
+Stops when cumulative token usage exceeds a budget. The Engine passes `total_tokens` in `runtime_info` on each step, so this criterion tracks real token consumption across the entire run.
+
+```python
+from qitos.engine.stop_criteria import MaxTokensCriteria
+
+criterion = MaxTokensCriteria(max_tokens=500_000)
+```
+
+Use this when you need a hard token budget independent of step count or wall-clock time. Pair it with gold preset advisory values:
+
+```python
+from qitos.harness import resolve_family_preset
+
+preset = resolve_family_preset("qwen")
+criterion = MaxTokensCriteria(max_tokens=preset.recommended_max_tokens or 500_000)
+```
+
+```python
+criterion = StagnationCriteria(
+    max_stagnant_steps=3,
     signature_fn=lambda s: (s.final_result, getattr(s, "cursor", None)),
 )
 ```

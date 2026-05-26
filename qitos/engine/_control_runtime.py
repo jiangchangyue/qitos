@@ -299,6 +299,7 @@ class _ControlRuntime(Generic[StateT, ObservationT, ActionT]):
                 step_id,
                 runtime_info={
                     "elapsed_seconds": elapsed_seconds,
+                    "total_tokens": int(engine._token_usage),
                     "budget_max_steps": engine.budget.max_steps,
                     "budget_max_runtime_seconds": engine.budget.max_runtime_seconds,
                     "budget_max_tokens": engine.budget.max_tokens,

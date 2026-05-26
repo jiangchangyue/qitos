@@ -1,133 +1,159 @@
 ---
-title: "Switch model families in one example"
-description: "Use the same Claude Code-style agent across Qwen, Kimi, MiniMax, gpt-oss, and Gemma 4."
+title: "Switch model families with presets"
+description: "Run the same agent across Qwen, Kimi, DeepSeek, and other model families using family presets — without rewriting agent code."
 ---
 
-This tutorial is the practical entry point for QitOS v0.4.
+Family presets (pre-configured defaults for a model family) let you switch model families with minimal code changes. This tutorial shows you how to build an agent that runs on multiple families, override a preset when you need to, and compare the results in qita.
 
-The goal is simple:
+## Step 1 — Build a model with a preset
 
-- keep one agent implementation
-- switch only model family configuration
-- preserve traces, protocols, and tool behavior visibility
+The fastest way to get a model configured for a specific family is `build_model_for_preset`:
 
-The example is:
+```python
+from qitos.harness import build_model_for_preset
 
-`examples/real/claude_code_agent.py`
-
-## What changed in v0.4
-
-The example no longer hardcodes one transport path.
-
-Instead it resolves:
-
-1. family preset (a reusable configuration bundle for a model family)
-2. harness policy (the wiring layer that connects a transport, parser, and protocol)
-3. model transport (the adapter that sends requests to and receives responses from a model API)
-4. parser (a component that converts raw model output into a typed Decision) and protocol (the output format the model is asked to follow)
-
-The same agent can now switch between:
-
-- Qwen
-- Kimi
-- MiniMax
-- `gpt-oss`
-- Gemma 4
-
-## The environment variables
-
-```bash
-export OPENAI_API_KEY="your_api_key"
-export OPENAI_BASE_URL="https://api.siliconflow.cn/v1/"
-export QITOS_MODEL_FAMILY="qwen"
-export QITOS_MODEL="Qwen/Qwen3-8B"
+llm = build_model_for_preset(
+    model_name="Qwen/Qwen3-8B",
+    api_key="sk-...",
+    base_url="https://api.siliconflow.cn/v1/",
+)
 ```
 
-Optional advanced override:
+This returns a fully configured model object with the Qwen family preset already applied — the right protocol, parser, tool delivery mode, and context window.
 
-```bash
-export QITOS_PROTOCOL="json_decision_v1"
+## Step 2 — Run the same agent with different families
+
+The key insight is that your agent code does not change. Only the model construction changes:
+
+```python
+from qitos.harness import build_model_for_preset
+
+configs = [
+    ("qwen", "Qwen/Qwen3-8B", "https://api.siliconflow.cn/v1/"),
+    ("kimi", "moonshot-v1-128k", "https://api.moonshot.ai/v1/"),
+    ("deepseek", "deepseek-chat", "https://api.deepseek.com/v1/"),
+]
+
+for family_id, model_name, base_url in configs:
+    llm = build_model_for_preset(
+        model_name=model_name,
+        api_key="sk-...",
+        base_url=base_url,
+    )
+    # agent = MyAgent(llm=llm, ...)
+    # result = agent.run(task="...", max_steps=20)
 ```
 
-## The CLI override layer
+Each `build_model_for_preset` call resolves the correct protocol, parser, tool delivery, and context policy for that family.
 
-CLI beats environment variables.
+## Step 3 — Override a preset
 
-```bash
-python examples/real/claude_code_agent.py \
-  --model-family kimi \
-  --model-name kimi-k2-0905-preview \
-  --base-url https://api.moonshot.ai/v1
+When a built-in preset does not match your needs, use `preset.override()` to create a customized copy:
+
+```python
+from dataclasses import replace
+from qitos.harness import resolve_family_preset
+
+qwen = resolve_family_preset("qwen")
+
+# Extend Qwen with a larger context window and different stop budget
+custom_qwen = qwen.override(
+    context_policy=replace(qwen.context_policy, context_window_hint=256_000),
+    recommended_max_steps=50,
+    notes="Extended context variant for long-horizon tasks",
+)
 ```
 
-Priority order:
+The `override()` method returns a new `FamilyPreset` instance — the original is never mutated.
 
-1. explicit CLI
-2. environment variables
-3. family preset defaults
-4. framework fallback
+## Step 4 — Explore available presets
 
-## The five v0.4 switching examples
-
-### Qwen
+Use the CLI to see which presets are available:
 
 ```bash
+qit bench presets
+```
+
+This prints a table showing each preset's ID, protocol, tool delivery mode, context window, and recommended models.
+
+You can also list available benchmarks:
+
+```bash
+qit bench list
+```
+
+## Step 5 — Compare runs in qita
+
+After running the same task with different families, launch qita to compare:
+
+```bash
+qita board --logdir runs
+```
+
+In the board view, select two runs and click **Compare** to see:
+
+- which protocol each run used
+- the parser and tool delivery mode
+- step count, token usage, and cost
+- where runs diverged
+
+This makes it easy to see how different presets affect agent behavior on the same task.
+
+## Recommended defaults
+
+Gold presets (Qwen, Kimi, MiniMax, gpt-oss, Gemma 4) include advisory defaults for research baselines:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `recommended_max_steps` | 30 | Suggested step budget per run |
+| `recommended_max_tokens` | 500,000 | Suggested total token budget |
+| `recommended_retry_budget` | 3 | Max critic-retry attempts per step |
+| `recommended_temperature` | 0.2 | Default sampling temperature |
+
+These are advisory — the engine does not auto-apply them. Use them as starting points for your own experiments.
+
+## The CLI switching pattern
+
+The `examples/real/claude_code_agent.py` example demonstrates the full switching workflow via CLI:
+
+```bash
+# Qwen
 python examples/real/claude_code_agent.py \
   --model-family qwen \
   --model-name Qwen/Qwen3-8B \
   --base-url https://api.siliconflow.cn/v1/
-```
 
-### Kimi
-
-```bash
+# Kimi
 python examples/real/claude_code_agent.py \
   --model-family kimi \
   --model-name kimi-k2-0905-preview \
   --base-url https://api.moonshot.ai/v1
-```
 
-### MiniMax
-
-```bash
+# DeepSeek
 python examples/real/claude_code_agent.py \
-  --model-family minimax \
-  --model-name MiniMax-M2.5 \
-  --base-url https://api.minimax.chat/v1
+  --model-family deepseek \
+  --model-name deepseek-chat \
+  --base-url https://api.deepseek.com/v1
 ```
 
-### gpt-oss
+Priority order for model configuration:
 
-```bash
-python examples/real/claude_code_agent.py \
-  --model-family gpt-oss \
-  --model-name gpt-oss-120b \
-  --base-url https://api.siliconflow.cn/v1/
-```
+1. explicit CLI flags
+2. environment variables (`QITOS_MODEL_FAMILY`, `QITOS_MODEL`, `OPENAI_BASE_URL`)
+3. family preset defaults
+4. framework fallback
 
-### Gemma 4
-
-```bash
-python examples/real/claude_code_agent.py \
-  --model-family gemma-4 \
-  --model-name gemma-4-31b-it \
-  --base-url https://api.siliconflow.cn/v1/
-```
-
-## What to inspect in qita
-
-After each run, inspect:
-
-- `family preset`
-- `model family`
-- `prompt protocol`
-- `parser`
-- `tool schema delivery`
-
-That is how you confirm the same agent code switched harness (the wiring layer that connects a transport, parser, and protocol) policy rather than silently changing behavior in an ad-hoc way.
-
-## Why this matters
-
-This pattern is the v0.4 research default.
-
-It lets you compare model families while keeping the agent implementation stable.
+<CardGroup cols={2}>
+  <Card title="Family presets concept" icon="cube" href="/concepts/family-presets">
+    Understand what each preset field means
+  </Card>
+  <Card title="Model family matrix" icon="table" href="/reference/model-family-matrix">
+    See all 10 built-in presets and their defaults
+  </Card>
+  <Card title="Add a family preset" icon="plus" href="/guides/add-a-family-preset">
+    Extend QitOS with a new model family
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/guides/observability">
+    Learn how preset metadata appears in traces
+  </Card>
+</CardGroup>

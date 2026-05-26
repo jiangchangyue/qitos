@@ -171,6 +171,25 @@ criterion = StagnationCriteria(
 )
 ```
 
+**`MaxTokensCriteria`**
+
+当累计 token 用量超过预算时停止。Engine 在每个步骤中通过 `runtime_info` 传递 `total_tokens`，因此该准则追踪整个运行的实际 token 消耗。
+
+```python
+from qitos.engine.stop_criteria import MaxTokensCriteria
+
+criterion = MaxTokensCriteria(max_tokens=500_000)
+```
+
+当你需要独立于步数或时间的硬性 token 预算时使用它。可以搭配黄金预设的推荐值：
+
+```python
+from qitos.harness import resolve_family_preset
+
+preset = resolve_family_preset("qwen")
+criterion = MaxTokensCriteria(max_tokens=preset.recommended_max_tokens or 500_000)
+```
+
 ### 给运行传入停止条件
 
 ```python
