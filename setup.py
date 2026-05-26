@@ -54,6 +54,7 @@ setup(
             "docs*",
             "plans*",
             "qitos.examples*",
+            "qitos_zoo*",
         ]
     ),
     python_requires=">=3.10",
