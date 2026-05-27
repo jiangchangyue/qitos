@@ -27,6 +27,10 @@ from qitos.qita._cli_app import _cmd_replay as qita_replay
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "--version":
+        from qitos import __version__
+        print(f"qit {__version__}")
+        return 0
     if args and args[0] in {"-h", "--help"}:
         parser = argparse.ArgumentParser(
             prog="qit", description="QitOS CLI for demos, benchmarks, and developer workflows"
@@ -416,6 +420,8 @@ _METHOD_TEMPLATES = {
     "debate": "Debate — multi-agent debate for reasoning",
     "manager_worker": "Manager-Worker — orchestration with delegation",
     "planner_executor": "Planner-Executor — plan decomposition with execution",
+    "self_refine": "Self-Refine — iterative generate, critique, and refine",
+    "reflexion": "Reflexion — act, reflect, and retry with memory",
     "lats": "LATS — Monte Carlo tree search with language evaluation",
     "moa": "MoA — parallel proposals and aggregation",
     "magentic_one": "Magentic-One — orchestrator with specialist workers",

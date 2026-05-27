@@ -15,21 +15,46 @@ How to update:
 - Move `Unreleased` notes into a dated or versioned section when publishing a release
 - Prefer user-facing changes, upgrade notes, and important engineering changes over low-level edit logs
 
-## Unreleased
+## v0.5.0 (2026-05-27)
 
 ### Added
 
 - Added `CORE_BOUNDARY.md`, a core governance audit, a dependency audit, and a staged `qitos-zoo` migration manifest for product-grade agents.
 - Added regression tests for public API and examples governance.
+- Added `FamilyPreset.override()` for programmatic preset customization and `recommended_models`, `recommended_protocol`, `recommended_parser` advisory fields.
+- Added `MaxTokensCriteria` stop criterion so engines can halt when accumulated output tokens exceed a budget.
+- Added `CriticTrace` and `HandoffTrace` export APIs for programmatic access to critic decisions and multi-agent handoff data.
+- Added `EngineConfig` export API for inspecting engine configuration outside the engine runtime.
+- Added `ToolPermissionSpec` for declarative tool permission policies.
+- Added `WandbTraceProcessor` for W&B experiment tracking integration (`pip install qitos[wandb]`).
+- Added `MlflowTraceProcessor` for MLflow experiment tracking integration (`pip install qitos[mlflow]`).
+- Added qita cost panel showing token usage and cost metrics in the run overview.
+- Added `qit --version` and `qita --version` CLI flags.
+- Added `qit new --template <name>` CLI for scaffolding new agent projects from built-in cookiecutter templates.
+- Added `qit list-templates` CLI for listing built-in scaffold and method templates.
+- Added 5 method template recipe implementations:
+  - `qitos.recipes.self_refine` — Self-Refine pattern (generate → critique → refine)
+  - `qitos.recipes.reflexion` — Reflexion pattern (act → reflect → retry with memory)
+  - `qitos.recipes.lats` — LATS pattern (Monte Carlo tree search with UCB1 scoring and reflection)
+  - `qitos.recipes.moa` — MoA pattern (parallel proposals + aggregation layers)
+  - `qitos.recipes.magentic_one` — Magentic-One pattern (orchestrator + specialist workers with stall detection)
+- Added 12 method template directories under `templates/` with `paper.md`, `config.yaml`, `agent.py`, and `__init__.py`:
+  - react, plan_act, swe_agent, voyager, debate, manager_worker, planner_executor, self_refine, reflexion, lats, moa, magentic_one
+- Added eval config YAML files for LATS, MoA, and Magentic-One under `qitos/recipes/benchmarks/eval_configs/`.
+- Added bilingual method-templates guide covering all 12 templates with quickstart code, parameters, and state fields.
+- Added LATS, MoA, and Magentic-One terms to bilingual glossary.
+- Added `cookiecutter` optional extra (`pip install qitos[cookiecutter]`).
 
 ### Changed
 
 - Tightened QitOS public/default surfaces around kernel-first contracts and moved product-grade agent positioning toward `qitos-zoo`.
 - Updated examples policy so canonical examples are teaching-first and product-like agents are marked for migration.
+- Refreshed README.md with v0.5.0 content: 12 method templates table, `qit --version` in quickstart, Beta status, optional extras, and method-templates guide link.
 
 ### Fixed
 
 - Restored engine final/wait lifecycle behavior so reduce, parser feedback, hooks, checkpoints, and memory records are preserved.
+- Fixed `_TEMPLATES_DIR` path resolution in `qit new` so template directories at repo root are found correctly.
 
 ## v0.4.0 (2026-05-13)
 

@@ -90,6 +90,137 @@ PRs are reviewed for:
 - test coverage for new behavior
 - consistency with existing architecture boundaries
 
+## Method Template Contribution
+
+Add a new method template — an Agent + Critic pair implementing an agentic reasoning pattern.
+
+**Directory structure:**
+```
+qitos/recipes/<method_name>/__init__.py   # AgentModule + Critic subclasses + State dataclass
+templates/<method_name>/                   # Template assets
+  __init__.py
+  agent.py                                # Config dataclass + build_registry()
+  config.yaml                             # Default configuration
+  paper.md                                # Pattern description and QitOS mapping
+tests/test_<method_name>.py               # Unit tests for Agent, Critic, State
+```
+
+**AgentModule requirements:**
+- Subclass `AgentModule` with `build_system_prompt()` that includes state-aware context (e.g., reflections, proposals, facts)
+- Implement `reduce()` to extract state updates from `Decision` objects
+- Define a `<Method>State` dataclass tracking method-specific fields
+
+**Critic requirements:**
+- Subclass `Critic` with `evaluate()` returning `CriticResult`
+- Use `action="continue" | "stop" | "retry"` with `instruction_patch` for guidance
+- Implement method-specific stopping conditions (e.g., max reflections, quality threshold, stall detection)
+
+**paper.md format:**
+```markdown
+# <Method Name> Template Notes
+
+## Source idea
+<Brief description of the original paper's algorithm>
+
+## Mapping in QitOS
+- `<Method>Agent` manages ... with `build_system_prompt()` ...
+- `<Method>Critic` detects ... and returns ...
+- `<Method>State` tracks ...
+
+## Key differences from the paper
+- <Notable adaptations or simplifications>
+
+## Scope in this template
+<What the template covers and what extensions users might add>
+```
+
+**config.yaml format:**
+```yaml
+name: <method_name>_template
+max_steps: 15
+<method-specific parameters>
+model:
+  provider: openai_compatible
+  base_url: https://api.siliconflow.cn/v1/
+  api_key: ${OPENAI_API_KEY}
+  model: Qwen/Qwen3-8B
+  model_name: Qwen/Qwen3-8B
+  temperature: 0.0
+  max_tokens: 2048
+```
+
+**Test requirements:**
+- Test `Agent.build_system_prompt()` returns non-empty prompt
+- Test `Agent.reduce()` updates state correctly from `Decision`
+- Test `Critic.evaluate()` returns correct `CriticResult.action` for continue/stop/retry cases
+- Test edge cases: max iterations, empty state, error conditions
+- At least 15 tests per method template
+
+**PR checklist:**
+- [ ] Agent subclasses `AgentModule` with `build_system_prompt()` and `reduce()`
+- [ ] Critic subclasses `Critic` with `evaluate()` returning `CriticResult`
+- [ ] State dataclass with method-specific fields
+- [ ] `templates/<method_name>/` has `__init__.py`, `agent.py`, `config.yaml`, `paper.md`
+- [ ] Method name added to `_METHOD_TEMPLATES` in `qitos/cli.py`
+- [ ] Tests cover Agent, Critic, and State with edge cases
+- [ ] paper.md explains mapping from paper to QitOS and key differences
+
+---
+
+## Issue Reporting
+
+### Bug Reports
+
+When filing a bug, please include:
+
+- **QitOS version**: Output of `qit --version`
+- **Python version**: Output of `python --version`
+- **Steps to reproduce**: Minimal code or CLI command
+- **Expected behavior**: What you expected to happen
+- **Actual behavior**: What happened instead, including full traceback
+- **Environment**: OS, model provider, relevant env vars (redact API keys)
+
+### Feature Requests
+
+When requesting a feature, please describe:
+
+- **Use case**: What problem does this solve?
+- **Proposed approach**: How should it work? (optional)
+- **Alternatives considered**: Other approaches you've thought about
+
+---
+
+## qitos-zoo Contribution Path
+
+Product-grade agents and showcase applications should target `qitos-zoo`, not the core QitOS package. This keeps the core framework lean while enabling richer applications.
+
+**When to contribute to qitos-zoo instead of qitos:**
+- Production-grade agents (e.g., `qitos-coder`, `qitos-cyber-agent`)
+- Domain-specific applications with heavy dependencies
+- Multi-agent systems with custom orchestration beyond built-in templates
+- Agents requiring persistent state or external service integrations
+
+**When to contribute to qitos core:**
+- Method templates (Agent + Critic pairs)
+- Framework-level tools, parsers, or critics
+- Benchmark adapters
+- Engine or observability improvements
+
+---
+
+## Documentation Contribution
+
+QitOS maintains bilingual documentation in `docs/` (English) and `docs/zh/` (Chinese).
+
+**Sync expectations:**
+- New pages should be added to both `docs/` and `docs/zh/` directories
+- Update `docs/docs.json` navigation for both locales
+- Technical terms should be consistent across languages
+- Code examples must be identical in both versions (only prose differs)
+- Glossary terms in `docs/concepts/glossary.mdx` and `docs/zh/concepts/glossary.mdx` should stay in sync
+
+---
+
 ## Good First Areas
 
 - walkthrough clarifications
@@ -97,6 +228,7 @@ PRs are reviewed for:
 - benchmark docs
 - toolset ergonomics
 - qita UX improvements
+- method template examples and docs
 
 ---
 

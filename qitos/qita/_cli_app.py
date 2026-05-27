@@ -42,6 +42,10 @@ _DESIGN_FONT_MONO = "var(--font-mono)"
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    if argv and argv[0] == "--version":
+        from qitos import __version__
+        print(f"qita {__version__}")
+        return 0
     parser = argparse.ArgumentParser(prog="qita", description="QitOS trace tools")
     sub = parser.add_subparsers(dest="command", required=True)
 
