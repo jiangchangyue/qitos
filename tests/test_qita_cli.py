@@ -488,3 +488,107 @@ def test_main_export(tmp_path: Path):
     rc = main(["export", "--run", str(run), "--html", str(out)])
     assert rc == 0
     assert out.exists()
+
+
+def _make_multi_agent_run(root: Path, run_id: str) -> Path:
+    """Create a run directory with multiple agents and handoff events."""
+    run = root / run_id
+    run.mkdir(parents=True, exist_ok=True)
+    (run / "manifest.json").write_text(json.dumps({
+        "run_id": run_id,
+        "status": "completed",
+        "step_count": 4,
+        "event_count": 6,
+        "handoff_count": 2,
+        "agent_topology": "sequential",
+        "summary": {
+            "stop_reason": "completed",
+            "final_result": "done",
+            "steps": 4,
+            "failure_report": {},
+        },
+        "token_usage": {"total": 3000},
+        "latency_seconds": 30.0,
+        "cost": 0.05,
+    }))
+    events = [
+        {"run_id": run_id, "step_id": 0, "phase": "think", "ok": True, "ts": "2026-01-01T00:00:01Z"},
+        {"run_id": run_id, "step_id": 0, "phase": "act", "ok": True, "ts": "2026-01-01T00:00:02Z"},
+        {"run_id": run_id, "step_id": 1, "phase": "handoff_start", "ok": True, "ts": "2026-01-01T00:00:03Z",
+         "payload": {"from": "planner", "to": "coder"}},
+        {"run_id": run_id, "step_id": 1, "phase": "handoff_end", "ok": True, "ts": "2026-01-01T00:00:04Z"},
+        {"run_id": run_id, "step_id": 2, "phase": "think", "ok": True, "ts": "2026-01-01T00:00:05Z"},
+        {"run_id": run_id, "step_id": 3, "phase": "handoff_start", "ok": True, "ts": "2026-01-01T00:00:06Z",
+         "payload": {"from": "coder", "to": "reviewer"}},
+    ]
+    (run / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events))
+    steps = [
+        {"step_id": 0, "agent_id": "planner", "observation": {}, "decision": {"thought": "plan"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [], "state_diff": {}},
+        {"step_id": 1, "agent_id": "planner", "observation": {}, "decision": {"thought": "delegate"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [], "state_diff": {}},
+        {"step_id": 2, "agent_id": "coder", "observation": {}, "decision": {"thought": "code"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [], "state_diff": {}},
+        {"step_id": 3, "agent_id": "reviewer", "observation": {}, "decision": {"thought": "review"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [], "state_diff": {}},
+    ]
+    (run / "steps.jsonl").write_text("\n".join(json.dumps(s) for s in steps))
+    return run
+
+
+def test_handoff_gantt_section_in_run_page(tmp_path: Path):
+    """Handoff gantt section is rendered for multi-agent runs."""
+    run = _make_multi_agent_run(tmp_path, "h1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_lines = [
+        json.loads(line)
+        for line in (run / "steps.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    payload = {
+        "run": str(run),
+        "run_id": "h1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": step_lines,
+        "events_by_step": {
+            "0": [e for e in event_lines if e["step_id"] == 0],
+            "1": [e for e in event_lines if e["step_id"] == 1],
+            "2": [e for e in event_lines if e["step_id"] == 2],
+            "3": [e for e in event_lines if e["step_id"] == 3],
+        },
+    }
+    html = _render_run_html(payload, embedded=False)
+    assert "handoff gantt" in html
+    assert "handoffGantt" in html
+    assert "buildHandoffGantt" in html
+
+
+def test_handoff_gantt_hidden_for_single_agent(tmp_path: Path):
+    """Single-agent runs should hide the handoff gantt section."""
+    run = _make_run(tmp_path, "sa1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_data = json.loads((run / "steps.jsonl").read_text(encoding="utf-8").strip())
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    # No handoff events, single agent
+    manifest["handoff_count"] = 0
+    payload = {
+        "run": str(run),
+        "run_id": "sa1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": [step_data],
+        "events_by_step": {"0": event_lines},
+    }
+    html = _render_run_html(payload, embedded=False)
+    assert "buildHandoffGantt" in html  # function defined
+    assert "No handoff events recorded" in html

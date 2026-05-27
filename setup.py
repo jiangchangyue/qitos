@@ -71,6 +71,7 @@ setup(
         "wandb": ["wandb>=0.16.0"],
         "mlflow": ["mlflow>=2.0.0"],
         "cookiecutter": ["cookiecutter>=2.1.0"],
+        "hf": ["huggingface_hub>=0.24.0"],
         "dev": [
             "build>=1.2.1",
             "twine>=5.1.1",

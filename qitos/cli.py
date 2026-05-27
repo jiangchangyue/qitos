@@ -42,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
         subparsers.add_parser("experiment", help="Run parameter-sweep experiments")
         subparsers.add_parser("new", help="Scaffold a new agent from a template")
         subparsers.add_parser("list-templates", help="List built-in agent templates")
+        subparsers.add_parser("leaderboard", help="Local benchmark leaderboard")
+        subparsers.add_parser("push", help="Push trace artifacts to HF Hub")
+        subparsers.add_parser("pull", help="Pull trace artifacts from HF Hub")
         parser.print_help()
         return 0
     if args:
@@ -59,6 +62,12 @@ def main(argv: list[str] | None = None) -> int:
             return _new_main(remaining)
         if command == "list-templates":
             return _list_templates_main(remaining)
+        if command == "leaderboard":
+            return _leaderboard_main(remaining)
+        if command == "push":
+            return _push_main(remaining)
+        if command == "pull":
+            return _pull_main(remaining)
     parser = argparse.ArgumentParser(
         prog="qit", description="QitOS CLI for demos, benchmarks, and developer workflows"
     )
@@ -69,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("experiment", help="Run parameter-sweep experiments")
     subparsers.add_parser("new", help="Scaffold a new agent from a template")
     subparsers.add_parser("list-templates", help="List built-in agent templates")
+    subparsers.add_parser("leaderboard", help="Local benchmark leaderboard")
+    subparsers.add_parser("push", help="Push trace artifacts to HF Hub")
+    subparsers.add_parser("pull", help="Pull trace artifacts from HF Hub")
     parser.print_help()
     return 1
 
@@ -538,6 +550,180 @@ def _new_main(argv: list[str]) -> int:
     except Exception as exc:
         print(f"Error generating project: {exc}", file=sys.stderr)
         return 1
+
+
+# ---------------------------------------------------------------------------
+# qit leaderboard
+# ---------------------------------------------------------------------------
+
+
+def _leaderboard_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="qit leaderboard", description="Local benchmark leaderboard")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_submit = sub.add_parser("submit", help="Submit benchmark results to the leaderboard")
+    p_submit.add_argument("--results", help="Path to JSONL results file")
+    p_submit.add_argument("--run-dir", help="Path to a single run directory")
+    p_submit.add_argument("--db", default="./runs/leaderboard.db", help="Leaderboard database path")
+
+    p_show = sub.add_parser("show", help="Show leaderboard entries")
+    p_show.add_argument("--benchmark", help="Filter by benchmark name")
+    p_show.add_argument("--split", help="Filter by split")
+    p_show.add_argument("--model", help="Filter by model name")
+    p_show.add_argument("--official", action="store_true", help="Show only official runs")
+    p_show.add_argument("--sort-by", default="submitted_at", help="Sort field")
+    p_show.add_argument("--limit", type=int, default=50, help="Max rows to show")
+    p_show.add_argument("--db", default="./runs/leaderboard.db", help="Leaderboard database path")
+
+    p_summary = sub.add_parser("summary", help="Show aggregated statistics")
+    p_summary.add_argument("--benchmark", required=True, help="Benchmark name")
+    p_summary.add_argument("--split", required=True, help="Split name")
+    p_summary.add_argument("--official", action="store_true", help="Official runs only")
+    p_summary.add_argument("--db", default="./runs/leaderboard.db", help="Leaderboard database path")
+
+    args = parser.parse_args(argv)
+
+    from qitos.leaderboard.store import LeaderboardStore
+
+    if args.command == "submit":
+        store = LeaderboardStore(args.db)
+        try:
+            if args.results:
+                count = store.submit_results_file(args.results)
+                print(f"Submitted {count} results from {args.results}")
+            elif args.run_dir:
+                sid = store.submit_run_dir(args.run_dir)
+                print(f"Submitted run {args.run_dir} as {sid}")
+            else:
+                print("Error: provide --results or --run-dir", file=sys.stderr)
+                return 1
+        finally:
+            store.close()
+        return 0
+
+    if args.command == "show":
+        store = LeaderboardStore(args.db)
+        try:
+            rows = store.query(
+                benchmark=args.benchmark,
+                split=args.split,
+                model_name=args.model,
+                is_official=args.official or None,
+                sort_by=args.sort_by,
+                limit=args.limit,
+            )
+            if not rows:
+                print("No entries found.")
+                return 0
+            print(f"{'model':30s} {'bench':15s} {'split':10s} {'ok':3s} {'steps':6s} {'lat':8s} {'official':3s} {'submitted':20s}")
+            for r in rows:
+                print(
+                    f"{r.model_name:30s} {r.benchmark:15s} {r.split:10s} "
+                    f"{'Y' if r.success else 'N':3s} {r.steps:6d} {r.latency_seconds:8.1f} "
+                    f"{'Y' if r.is_official else 'N':3s} {r.submitted_at[:19]:20s}"
+                )
+        finally:
+            store.close()
+        return 0
+
+    if args.command == "summary":
+        store = LeaderboardStore(args.db)
+        try:
+            s = store.summary(args.benchmark, args.split, is_official=args.official)
+            print(json.dumps(s, ensure_ascii=False, indent=2))
+        finally:
+            store.close()
+        return 0
+
+    return 1
+
+
+# ---------------------------------------------------------------------------
+# qit push / qit pull
+# ---------------------------------------------------------------------------
+
+
+def _push_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="qit push", description="Push trace artifacts to HF Hub")
+    parser.add_argument("--run", help="Path to a single run directory")
+    parser.add_argument("--logdir", help="Push all runs in a logdir")
+    parser.add_argument("--repo", required=True, help="HF Hub dataset repo ID")
+    parser.add_argument("--token", help="HF Hub API token")
+    parser.add_argument("--revision", help="Git revision/branch")
+    parser.add_argument("--private", action="store_true", default=True, help="Make repo private (default)")
+    parser.add_argument("--public", action="store_false", dest="private", help="Make repo public")
+
+    args = parser.parse_args(argv)
+
+    try:
+        from qitos.hf.hub import push_run
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.run:
+        try:
+            url = push_run(
+                args.run, args.repo, token=args.token,
+                revision=args.revision, private=args.private,
+            )
+            print(f"Pushed to {url}")
+        except Exception as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    if args.logdir:
+        logdir = Path(args.logdir).expanduser().resolve()
+        if not logdir.is_dir():
+            print(f"Error: {args.logdir} is not a directory", file=sys.stderr)
+            return 1
+        count = 0
+        for run_dir in sorted(logdir.iterdir()):
+            if run_dir.is_dir() and (run_dir / "manifest.json").exists():
+                try:
+                    url = push_run(
+                        run_dir, args.repo, token=args.token,
+                        revision=args.revision, private=args.private,
+                    )
+                    print(f"Pushed {run_dir.name} -> {url}")
+                    count += 1
+                except Exception as exc:
+                    print(f"Warning: skipped {run_dir.name}: {exc}", file=sys.stderr)
+        print(f"Pushed {count} runs")
+        return 0
+
+    print("Error: provide --run or --logdir", file=sys.stderr)
+    return 1
+
+
+def _pull_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="qit pull", description="Pull trace artifacts from HF Hub")
+    parser.add_argument("--run-id", required=True, help="Run ID to download")
+    parser.add_argument("--repo", required=True, help="HF Hub dataset repo ID")
+    parser.add_argument("--output", default="./runs", help="Local output directory")
+    parser.add_argument("--token", help="HF Hub API token")
+    parser.add_argument("--revision", help="Git revision/branch")
+
+    args = parser.parse_args(argv)
+
+    try:
+        from qitos.hf.hub import pull_run
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        local_path = pull_run(
+            args.run_id, args.repo, args.output,
+            token=args.token, revision=args.revision,
+        )
+        print(f"Pulled to {local_path}")
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":

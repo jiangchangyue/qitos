@@ -1230,6 +1230,12 @@ def _render_run_html(payload: Dict[str, Any], embedded: bool) -> str:
 .trow{{display:grid;grid-template-columns:82px 1fr 64px;gap:8px;align-items:center;margin:6px 0}}
 .tlabel{{font-size:12px;color:var(--muted)}}
 .track{{height:16px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--radius-pill);overflow:hidden;position:relative}}
+.gantt-svg{{width:100%;height:auto;display:block;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--radius-lg)}}
+.gantt-lane{{fill:var(--surface-2);stroke:var(--line);stroke-width:1}}
+.gantt-bar{{fill-opacity:0.7;rx:4;ry:4}}
+.gantt-arrow{{fill:none;stroke:#bfa04e;stroke-width:2;marker-end:url(#hArrow)}}
+.gantt-label{{fill:var(--muted);font-size:11px;font-family:var(--font-body)}}
+.gantt-step-label{{fill:var(--subtle);font-size:10px;font-family:var(--font-mono)}}
 .seg{{height:100%;display:inline-block}}
 .heat0{{filter:brightness(0.85)}} .heat1{{filter:brightness(1)}} .heat2{{filter:brightness(1.15)}} .heat3{{filter:brightness(1.3)}}
 .tdur{{font-size:11px;color:var(--muted);text-align:right}}
@@ -1318,6 +1324,10 @@ pre{{margin:0;background:var(--surface-2);border:1px solid var(--line);padding:1
         <section class="timeline">
           <h4>phase timeline (gantt-like)</h4>
           <div id="timeline"></div>
+        </section>
+        <section class="timeline" id="handoffGanttSection">
+          <h4>handoff gantt</h4>
+          <div id="handoffGantt"></div>
         </section>
         <section class="timeline">
           <h4>context timeline</h4>
@@ -2069,6 +2079,66 @@ function buildTimeline(items){{
   }}
   timelineRoot.innerHTML = rows.join('') || '<div class="muted">No event timing data.</div>';
 }}
+function buildHandoffGantt(items){{
+  const el = document.getElementById('handoffGantt');
+  if(!el) return;
+  const agentOrder = [];
+  const agentSteps = {{}};
+  const handoffs = [];
+  const agentColors = ['#5e6ad2','#27a644','#e5c100','#e5484d','#6b8fc4','#d97bf0','#3dc9b0','#f59e42'];
+  function agentColor(aid){{ return agentColors[agentOrder.indexOf(aid) % agentColors.length]; }}
+  items.forEach(function(it){{
+    const aid = it.step && it.step.agent_id;
+    if(aid && !agentOrder.includes(aid)) agentOrder.push(aid);
+    if(aid){{ if(!agentSteps[aid]) agentSteps[aid] = []; agentSteps[aid].push(it.sid); }}
+    (it.events || []).forEach(function(e){{
+      const ph = String(e.phase || '').toLowerCase();
+      if(ph === 'handoff_start'){{
+        handoffs.push({{ sid: it.sid, from: (e.payload && e.payload.from) || aid || '?', to: (e.payload && e.payload.to) || '?' }});
+      }}
+    }});
+  }});
+  if(agentOrder.length < 2 && handoffs.length === 0){{
+    el.innerHTML = '<div class="muted">No handoff events recorded.</div>';
+    document.getElementById('handoffGanttSection').style.display = 'none';
+    return;
+  }}
+  const laneH = 36, labelW = 120, padTop = 20, padBottom = 28, padRight = 18, width = 980;
+  const totalSteps = items.length;
+  const plotW = width - labelW - padRight;
+  const totalH = padTop + agentOrder.length * laneH + padBottom;
+  const stepW = totalSteps > 1 ? plotW / (totalSteps - 1) : plotW;
+  function stepX(sid){{ const idx = items.findIndex(function(it){{ return it.sid === String(sid); }}); return labelW + (idx >= 0 ? idx * stepW : 0); }}
+  function laneY(ai){{ return padTop + ai * laneH + laneH / 2; }}
+  const p = [];
+  p.push('<svg class="gantt-svg" viewBox="0 0 '+width+' '+totalH+'" role="img" aria-label="Handoff gantt chart">');
+  p.push('<defs><marker id="hArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#bfa04e"/></marker></defs>');
+  items.forEach(function(it){{
+    p.push('<text class="gantt-step-label" x="'+stepX(it.sid)+'" y="'+(totalH-6)+'" text-anchor="middle">S'+esc(it.sid)+'</text>');
+  }});
+  agentOrder.forEach(function(aid, i){{
+    const y = padTop + i * laneH;
+    p.push('<rect class="gantt-lane" x="'+labelW+'" y="'+y+'" width="'+plotW+'" height="'+laneH+'"/>');
+    p.push('<text class="gantt-label" x="'+(labelW-8)+'" y="'+(y+laneH/2+4)+'" text-anchor="end">'+esc(aid)+'</text>');
+    const sids = agentSteps[aid] || [];
+    if(sids.length > 0){{
+      const mn = Math.min.apply(null, sids.map(Number));
+      const mx = Math.max.apply(null, sids.map(Number));
+      const x1 = stepX(String(mn)) - Math.min(10, stepW/2);
+      const x2 = stepX(String(mx)) + Math.min(10, stepW/2);
+      p.push('<rect class="gantt-bar" x="'+x1+'" y="'+(y+6)+'" width="'+(x2-x1)+'" height="'+(laneH-12)+'" fill="'+agentColor(aid)+'"/>');
+    }}
+  }});
+  handoffs.forEach(function(h){{
+    const fi = agentOrder.indexOf(h.from), ti = agentOrder.indexOf(h.to);
+    if(fi < 0 || ti < 0) return;
+    const x = stepX(h.sid), y1 = laneY(fi), y2 = laneY(ti);
+    const cd = y2 > y1 ? -20 : 20;
+    p.push('<path class="gantt-arrow" d="M'+x+','+y1+' C'+(x+cd)+','+((y1+y2)/2)+' '+(x+cd)+','+((y1+y2)/2)+' '+x+','+y2+'"><title>STEP '+h.sid+': '+h.from+' -> '+h.to+'</title></path>');
+  }});
+  p.push('</svg>');
+  el.innerHTML = p.join('');
+}}
 function buildContextTimeline(items){{
   const points = items.map(function(it){{
     const ctx = (it.step && typeof it.step.context === 'object') ? it.step.context : {{}};
@@ -2388,6 +2458,7 @@ function render(){{
   paintOverview(items);
   buildVisualTimeline(items);
   buildTimeline(items);
+  buildHandoffGantt(items);
   buildContextTimeline(items);
   buildParserTimeline(items);
   buildCriticTimeline(items);
