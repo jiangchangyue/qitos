@@ -1,0 +1,201 @@
+---
+title: "方法模板"
+description: "使用内置方法模板（Self-Refine、Reflexion）以最少的样板代码实现经过验证的智能体模式。"
+---
+
+QitOS 提供**方法模板**——即现成的 Agent + Critic 组合，实现了知名的智能体推理模式。每个模板封装了专用的状态、评论器和智能体，让你无需重写控制循环即可应用该模式。
+
+## 什么是方法模板？
+
+方法模板由以下部分组成：
+
+| 组件 | 角色 |
+|---|---|
+| **State** | `StateSchema` 子类，包含模式专用字段（反思记录、草稿、精炼次数等） |
+| **Critic** | `Critic` 子类，通过在适当时机返回 `retry`、`continue` 或 `stop` 来驱动模式循环 |
+| **Agent** | `AgentModule` 子类，具有模式感知的 `build_system_prompt()`、`prepare()` 和 `reduce()` |
+
+评论器是核心：它评估每个步骤，决定是否重试（附带指令补丁）、继续或停止。智能体通过模式上下文（先前的反思、草稿版本、批评意见）丰富提示词。
+
+## Self-Refine
+
+**Self-Refine** 模式（Madaan et al. 2023）迭代过程：**生成 → 批评 → 精炼**，直到质量达到阈值或达到最大精炼次数。
+
+### 适用场景
+
+- 质量比速度更重要的文本生成任务
+- 摘要、翻译、带自评估的代码生成
+- 任何迭代改进能可靠产生更好输出的任务
+
+### 快速开始
+
+```python
+from qitos.recipes.self_refine import SelfRefineAgent, SelfRefineCritic
+
+agent = SelfRefineAgent(llm=my_llm)
+result = agent.run(
+    task="撰写关于...研究论文的简洁摘要",
+    critics=[SelfRefineCritic(max_refinements=3, quality_threshold=0.7)],
+    max_steps=10,
+    return_state=True,
+)
+print(result.state.draft)        # 精炼后的输出
+print(result.state.final_result) # 如果提取到 FINAL ANSWER
+```
+
+### 工作原理
+
+1. **生成**：智能体生成初始草稿。
+2. **批评**：`SelfRefineCritic` 使用启发式评分评估草稿质量（经过更多精炼的较长草稿得分更高；非常短的草稿会被惩罚）。在生产环境中，请替换为基于 LLM 的评分器。
+3. **精炼**：如果分数低于 `quality_threshold` 且仍有精炼次数，评论器返回 `retry` 并附带 `instruction_patch` 要求智能体改进。智能体在下一次提示中可以看到之前的草稿和批评。
+4. **接受**：当分数达到阈值或达到 `max_refinements` 时，评论器返回 `continue` 或 `stop`。
+
+### SelfRefineCritic 参数
+
+| 参数 | 默认值 | 描述 |
+|---|---|---|
+| `max_refinements` | 3 | 最大精炼迭代次数 |
+| `quality_threshold` | 0.7 | 接受草稿的最低分数（0.0–1.0） |
+
+### SelfRefineState 字段
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `draft` | `str` | 当前草稿文本 |
+| `refinement_count` | `int` | 目前已进行的精炼次数 |
+| `max_refinements` | `int` | 精炼预算 |
+| `critique_history` | `List[str]` | 累积的批评记录 |
+
+## Reflexion
+
+**Reflexion** 模式（Shinn et al. 2023）迭代过程：**行动 → 评估 → 反思 → 带记忆重试**。在失败时，评论器生成语言反思存储在状态中，并注入到未来的提示词中。
+
+### 适用场景
+
+- 调试和纠错任务，智能体需要从失败中学习
+- 失败后应尝试不同策略的任务
+- 多次尝试的问题（编码、推理），反思能改进后续尝试
+
+### 快速开始
+
+```python
+from qitos.recipes.reflexion import ReflexionAgent, ReflexionCritic
+
+agent = ReflexionAgent(llm=my_llm)
+result = agent.run(
+    task="调试 tests/test_module.py 中失败的测试",
+    critics=[ReflexionCritic(max_reflections=3)],
+    max_steps=15,
+    return_state=True,
+)
+print(result.state.reflections)    # 语言反思列表
+print(result.state.final_result)  # 如果提取到 FINAL ANSWER
+```
+
+### 工作原理
+
+1. **行动**：智能体采取行动完成任务。
+2. **评估**：`ReflexionCritic` 检查是否失败（错误、非零返回码、空结果）。
+3. **反思**：在失败时，评论器从错误上下文生成语言反思，并以 `instruction_patch` 形式返回 `retry`。反思存储在 `state.reflections` 中。
+4. **带记忆重试**：智能体的 `build_system_prompt()` 包含所有先前的反思，因此 LLM 可以避免重复相同的错误。
+
+### ReflexionCritic 参数
+
+| 参数 | 默认值 | 描述 |
+|---|---|---|
+| `max_reflections` | 3 | 强制停止前的最大反思迭代次数 |
+| `success_threshold` | 0.6 | 认为轨迹成功的最低分数 |
+
+### ReflexionState 字段
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `reflections` | `List[str]` | 累积的语言反思 |
+| `reflection_count` | `int` | 已生成的反思数量 |
+| `max_reflections` | `int` | 反思预算 |
+| `last_action_success` | `bool` | 上一步是否成功 |
+| `attempt` | `int` | 当前尝试编号 |
+
+## 脚手架工具
+
+使用 `qit new` CLI 命令从内置 cookiecutter 模板脚手架生成新智能体项目：
+
+```bash
+# 使用默认设置创建新智能体
+pip install qitos[cookiecutter]
+qit new --agent-name my_agent --agent-description "我的自定义智能体"
+
+# 列出可用模板
+qit list-templates
+
+# 完全自定义创建
+qit new \
+  --agent-name code_reviewer \
+  --agent-description "审查代码中的安全问题" \
+  --author "我的团队" \
+  --default-model qwen-plus \
+  --max-steps 20
+```
+
+脚手架生成的项目包括：
+
+- `src/agent.py` — 包含 State、init_state、build_system_prompt、reduce 的 Agent 类
+- `configs/default.yaml` — 默认模型和步骤配置
+- `tests/test_agent.py` — 基本冒烟测试
+- `snowl_compat.py` — Snowl 评估兼容适配器
+- `eval_config.yaml` — 评估配置
+
+## 构建自定义方法模板
+
+要创建自定义方法模板，请遵循相同的 Agent + Critic 模式：
+
+1. **定义状态**，扩展 `StateSchema` 并添加模式的跟踪字段
+2. **实现评论器**，当模式需要迭代时返回带有 `instruction_patch` 和 `state_patch` 的 `retry`
+3. **实现智能体**，其 `build_system_prompt()` 从状态中注入模式上下文
+
+```python
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
+from qitos import AgentModule, Decision, StateSchema
+from qitos.engine.critic import Critic
+from qitos.engine.critic_result import CriticResult
+from qitos.kit.parser import ReActTextParser
+
+@dataclass
+class MyMethodState(StateSchema):
+    iteration: int = 0
+    max_iterations: int = 5
+    history: List[str] = field(default_factory=list)
+
+class MyMethodCritic(Critic):
+    def evaluate(self, state, decision, results):
+        if not isinstance(state, MyMethodState):
+            return CriticResult(action="continue")
+        if state.iteration < state.max_iterations:
+            return CriticResult(
+                action="retry",
+                score=0.5,
+                instruction_patch="尝试不同的方法。",
+                state_patch={"iteration": state.iteration + 1},
+            )
+        return CriticResult(action="stop", reason="已达最大迭代次数。")
+
+class MyMethodAgent(AgentModule[MyMethodState, Dict[str, Any], Any]):
+    def __init__(self, llm=None, **kwargs):
+        super().__init__(llm=llm, model_parser=ReActTextParser(), **kwargs)
+
+    def init_state(self, task, **kwargs):
+        return MyMethodState(task=task, max_steps=kwargs.get("max_steps", 10))
+
+    def build_system_prompt(self, state):
+        prompt = "你是一个方法智能体。迭代直到完成。"
+        if state.history:
+            prompt += "\n\n之前的尝试：\n" + "\n".join(state.history)
+        return prompt
+
+    def prepare(self, state, observation):
+        return f"任务：{state.task}\n迭代：{state.iteration}"
+
+    def reduce(self, state, observation, decision, action_results):
+        return state
+```

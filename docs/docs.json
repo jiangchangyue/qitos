@@ -86,6 +86,7 @@
                   "guides/qwen-family-best-practice",
                   "guides/memory-and-history",
                   "guides/critics-and-stop-criteria",
+                  "guides/method-templates",
                   "guides/observability",
                   "guides/wandb-integration",
                   "guides/mlflow-integration"
@@ -209,6 +210,7 @@
                   "zh/guides/qwen-family-best-practice",
                   "zh/guides/memory-and-history",
                   "zh/guides/critics-and-stop-criteria",
+                  "zh/guides/method-templates",
                   "zh/guides/observability",
                   "zh/guides/wandb-integration"
                 ]

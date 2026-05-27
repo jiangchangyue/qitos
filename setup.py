@@ -70,6 +70,7 @@ setup(
         "benchmarks": ["datasets>=2.20.0", "huggingface_hub>=0.24.0"],
         "wandb": ["wandb>=0.16.0"],
         "mlflow": ["mlflow>=2.0.0"],
+        "cookiecutter": ["cookiecutter>=2.1.0"],
         "dev": [
             "build>=1.2.1",
             "twine>=5.1.1",
@@ -89,6 +90,7 @@ setup(
             "huggingface_hub>=0.24.0",
             "wandb>=0.16.0",
             "mlflow>=2.0.0",
+            "cookiecutter>=2.1.0",
         ],
     },
     package_data={
