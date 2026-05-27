@@ -7,6 +7,7 @@ from .repo_env import RepoEnv
 from .screenshot_env import ScreenshotEnv, ScreenshotObserverOps, MockGUIControllerOps
 from .text_web_env import TextWebEnv, TextWebBrowserOps
 from .tmux_env import TmuxEnv, TmuxTerminalCapability
+from .web import MockBrowserProvider, PlaywrightBrowserProvider, WebBrowserEnv
 
 __all__ = [
     "HostEnv",
@@ -23,4 +24,7 @@ __all__ = [
     "TextWebBrowserOps",
     "TmuxEnv",
     "TmuxTerminalCapability",
+    "WebBrowserEnv",
+    "MockBrowserProvider",
+    "PlaywrightBrowserProvider",
 ]

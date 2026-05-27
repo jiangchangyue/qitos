@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from ..harness._presets import known_family_presets
 
@@ -16,6 +16,108 @@ class ModelProfile:
     fallback_protocols: tuple[str, ...] = field(default_factory=tuple)
     tool_schema_style: str = "react"
     notes: str = ""
+
+
+@dataclass(frozen=True)
+class MultimodalCapabilityProfile:
+    """Describes what visual inputs a model supports for multimodal observation adaptation."""
+
+    model_name: str
+    supports_screenshot: bool = True
+    supports_dom: bool = True
+    preferred_observation_mode: str = "screenshot_first"  # screenshot_first | dom_first | text_only
+    max_visual_inputs: int = 4
+
+    def adapt_observation(self, observation_pack: Dict[str, Any]) -> Dict[str, Any]:
+        """Adapt an ObservationPack dict based on model capabilities.
+
+        Returns a modified observation pack suitable for this model.
+        """
+        pack = dict(observation_pack) if isinstance(observation_pack, dict) else {}
+
+        if not self.supports_screenshot:
+            # Remove screenshot, rely on DOM + OCR text
+            pack.pop("screenshot", None)
+            if not self.supports_dom:
+                # Text-only: extract OCR text as the primary observation
+                ocr_spans = pack.get("ocr", [])
+                if isinstance(ocr_spans, list):
+                    text_parts = [str(s.get("text", "")) for s in ocr_spans if isinstance(s, dict)]
+                    pack["text"] = pack.get("text", "") + "\n" + " ".join(text_parts)
+                pack.pop("dom", None)
+                pack.pop("accessibility_tree", None)
+                pack.pop("ui_candidates", None)
+
+        return pack
+
+
+# Known multimodal capability profiles for popular model families
+_MULTIMODAL_PROFILES: Dict[str, MultimodalCapabilityProfile] = {
+    "gpt-4o": MultimodalCapabilityProfile(
+        model_name="gpt-4o",
+        supports_screenshot=True,
+        supports_dom=True,
+        preferred_observation_mode="screenshot_first",
+        max_visual_inputs=4,
+    ),
+    "gpt-4-turbo": MultimodalCapabilityProfile(
+        model_name="gpt-4-turbo",
+        supports_screenshot=True,
+        supports_dom=True,
+        preferred_observation_mode="screenshot_first",
+        max_visual_inputs=1,
+    ),
+    "claude-3": MultimodalCapabilityProfile(
+        model_name="claude-3",
+        supports_screenshot=True,
+        supports_dom=True,
+        preferred_observation_mode="screenshot_first",
+        max_visual_inputs=4,
+    ),
+    "qwen-vl": MultimodalCapabilityProfile(
+        model_name="qwen-vl",
+        supports_screenshot=True,
+        supports_dom=True,
+        preferred_observation_mode="screenshot_first",
+        max_visual_inputs=5,
+    ),
+    "text-only": MultimodalCapabilityProfile(
+        model_name="text-only",
+        supports_screenshot=False,
+        supports_dom=True,
+        preferred_observation_mode="dom_first",
+        max_visual_inputs=0,
+    ),
+}
+
+
+def infer_multimodal_capability(model_name: Optional[str]) -> MultimodalCapabilityProfile:
+    """Infer multimodal capability profile from model name.
+
+    Falls back to a text-only profile for unknown models.
+    """
+    normalized = _normalize(model_name)
+    if not normalized:
+        return _MULTIMODAL_PROFILES["text-only"]
+
+    # Check known profile keys
+    for key, profile in _MULTIMODAL_PROFILES.items():
+        if key in normalized or normalized.startswith(key):
+            return profile
+
+    # Heuristic: models with "vl", "vision", "visual" in name likely support screenshots
+    vision_indicators = ("vl", "vision", "visual", "multimodal", "gpt-4o", "gpt-4-turbo", "claude-3", "gemini")
+    if any(ind in normalized for ind in vision_indicators):
+        return MultimodalCapabilityProfile(
+            model_name=model_name or "",
+            supports_screenshot=True,
+            supports_dom=True,
+            preferred_observation_mode="screenshot_first",
+            max_visual_inputs=4,
+        )
+
+    # Default: text-only for unknown text models
+    return _MULTIMODAL_PROFILES["text-only"]
 
 
 def _tool_schema_style(default_protocol: str) -> str:
@@ -80,7 +182,9 @@ def known_model_profiles() -> Iterable[ModelProfile]:
 
 __all__ = [
     "ModelProfile",
+    "MultimodalCapabilityProfile",
     "infer_model_profile",
     "infer_default_protocol",
+    "infer_multimodal_capability",
     "known_model_profiles",
 ]

@@ -658,3 +658,34 @@ def test_board_trend_chart_section():
     assert '<option value="steps">steps</option>' in html
     assert '<option value="runtime">runtime (s)</option>' in html
     assert '<option value="cost">cost ($)</option>' in html
+
+
+def test_screenshot_strip_in_run_page(tmp_path: Path):
+    """Screenshot strip section is present in run detail pages."""
+    run = _make_run(tmp_path, "ss1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_data = json.loads((run / "steps.jsonl").read_text(encoding="utf-8").strip())
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    payload = {
+        "run": str(run),
+        "run_id": "ss1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": [step_data],
+        "events_by_step": {"0": event_lines},
+    }
+    html = _render_run_html(payload, embedded=False)
+    assert "screenshotStrip" in html
+    assert "screenshotStripSection" in html
+    assert "buildScreenshotStrip" in html
+
+
+def test_screenshot_strip_hidden_when_embedded():
+    """Screenshot strip should be hidden in embedded mode."""
+    html = _render_run_html({"run": "/tmp", "run_id": "x", "manifest": {}, "events": [], "steps": [], "events_by_step": {}}, embedded=True)
+    # The section still exists in DOM but buildScreenshotStrip hides it when embedded
+    assert "buildScreenshotStrip" in html

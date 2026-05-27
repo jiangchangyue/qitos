@@ -129,7 +129,24 @@ class DelegateTool(BaseTool):
         )
 
         trace_writer = runtime_context.get("trace_writer")
-        sub_trace_writer = self._build_sub_trace_writer(trace_writer)
+        sub_trace_writer = self._build_sub_trace_writer(trace_writer, current_depth)
+
+        # Build tool registry: use override if provided, else keep agent's default
+        if self.agent_spec.tools_override is not None:
+            sub_agent.tool_registry = self.agent_spec.tools_override
+
+        # Resolve model override if provided
+        llm = None
+        if self.agent_spec.model_override:
+            try:
+                from ...models.profile_registry import resolve_model
+                llm = resolve_model(self.agent_spec.model_override)
+            except Exception:
+                pass
+        if llm is None:
+            llm = getattr(sub_agent, "llm", None)
+        if llm is not None and hasattr(sub_agent, "llm"):
+            sub_agent.llm = llm
 
         return Engine(
             agent=sub_agent,
@@ -138,11 +155,12 @@ class DelegateTool(BaseTool):
             trace_writer=sub_trace_writer,
             delegate_depth=current_depth + 1,
             shared_memory=self.agent_spec.shared_memory,
+            agent_registry=self.agent_registry,
             stop_criteria=[FinalResultCriteria()],
         )
 
     def _build_sub_trace_writer(
-        self, parent_trace_writer: Optional[TraceWriter]
+        self, parent_trace_writer: Optional[TraceWriter], current_depth: int = 0
     ) -> Optional[TraceWriter]:
         if parent_trace_writer is None:
             return None
@@ -152,7 +170,7 @@ class DelegateTool(BaseTool):
         parent_run_id = getattr(parent_trace_writer, "run_id", "")
         output_dir = getattr(parent_trace_writer, "output_dir", "runs")
 
-        sub_run_id = f"{parent_run_id}__delegate_{self.agent_spec.name}"
+        sub_run_id = f"{parent_run_id}__delegate_{self.agent_spec.name}_depth{current_depth}"
         metadata = dict(getattr(parent_trace_writer, "metadata", {}) or {})
         metadata["parent_run_id"] = parent_run_id
         metadata["agent_name"] = self.agent_spec.name

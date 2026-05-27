@@ -55,6 +55,12 @@ class AgentSpec:
     state_adapter: Optional[StateAdapter] = None
     handoff_context: Optional[HandoffContext] = None
     shared_memory: Optional[Any] = None  # SharedMemory instance
+    model_override: Optional[str] = None
+    tools_override: Optional[Any] = None  # ToolRegistry instance
+
+    def __post_init__(self) -> None:
+        if not self.name or not self.name.strip():
+            raise ValueError("AgentSpec.name must be non-empty")
 
 
 class AgentRegistry:
@@ -93,3 +99,19 @@ class AgentRegistry:
         from ..kit.tool.fanout import FanOutTool
 
         return FanOutTool(agent_registry=self, max_workers=max_workers, per_task_timeout=per_task_timeout)
+
+    def get_handoff_tools(self) -> List[Any]:
+        """Return a HandoffTool for each registered agent spec.
+
+        HandoffTools enable Decision-mode agent switching in the Engine loop.
+        Imports lazily to avoid circular imports.
+        """
+        from ..kit.tool.handoff_tool import HandoffTool
+
+        return [
+            HandoffTool(
+                target_name=spec.name,
+                target_description=spec.description,
+            )
+            for spec in self._specs.values()
+        ]

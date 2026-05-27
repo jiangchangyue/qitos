@@ -72,6 +72,7 @@ setup(
         "mlflow": ["mlflow>=2.0.0"],
         "cookiecutter": ["cookiecutter>=2.1.0"],
         "hf": ["huggingface_hub>=0.24.0"],
+        "web": ["playwright>=1.40.0"],
         "dev": [
             "build>=1.2.1",
             "twine>=5.1.1",

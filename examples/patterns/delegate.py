@@ -54,6 +54,73 @@ class ResearcherAgent(AgentModule[ResearcherState, dict[str, Any], Action]):
             tool_registry=registry, llm=llm, model_parser=ReActTextParser()
         )
 
+
+# ── Sub-agent: reviewer (demonstrates multi-delegation) ────────────────────
+
+@dataclass
+class ReviewerState(StateSchema):
+    scratchpad: list[str] = field(default_factory=list)
+
+
+class ReviewerAgent(AgentModule[ReviewerState, dict[str, Any], Action]):
+    """Read-only agent that reviews code changes and reports issues."""
+
+    def __init__(self, llm: Any, workspace_root: str):
+        registry = ToolRegistry()
+        registry.include(
+            CodingToolSet(
+                workspace_root=workspace_root,
+                include_notebook=False,
+                enable_lsp=False,
+                enable_tasks=False,
+                enable_web=False,
+                expose_modern_names=False,
+            )
+        )
+        super().__init__(
+            tool_registry=registry, llm=llm, model_parser=ReActTextParser()
+        )
+
+    def init_state(self, task: str, **kwargs: Any) -> ReviewerState:
+        return ReviewerState(task=task, max_steps=int(kwargs.get("max_steps", 3)))
+
+    def build_system_prompt(self, state: ReviewerState) -> str | None:
+        return render_prompt(
+            REACT_SYSTEM_PROMPT,
+            {"tool_schema": self.tool_registry.get_tool_descriptions()},
+        )
+
+    def prepare(self, state: ReviewerState) -> str:
+        lines = [
+            f"Task: {state.task}",
+            f"Step: {state.current_step}/{state.max_steps}",
+        ]
+        if state.scratchpad:
+            lines.append("Recent trajectory:")
+            lines.extend(state.scratchpad[-8:])
+        return "\n".join(lines)
+
+    def reduce(
+        self,
+        state: ReviewerState,
+        observation: dict[str, Any],
+        decision: Decision[Action],
+    ) -> ReviewerState:
+        action_results = (
+            observation.get("action_results", [])
+            if isinstance(observation, dict)
+            else []
+        )
+        if decision.rationale:
+            state.scratchpad.append(f"Thought: {decision.rationale}")
+        if decision.actions:
+            state.scratchpad.append(f"Action: {format_action(decision.actions[0])}")
+        if action_results:
+            first = action_results[0]
+            state.scratchpad.append(f"Observation: {first}")
+        state.scratchpad = state.scratchpad[-20:]
+        return state
+
     def init_state(self, task: str, **kwargs: Any) -> ResearcherState:
         return ResearcherState(
             task=task, max_steps=int(kwargs.get("max_steps", 5))
@@ -221,8 +288,13 @@ def main() -> None:
 
     # Build the sub-agent
     researcher = ResearcherAgent(llm=llm, workspace_root=str(WORKSPACE))
+    reviewer = ReviewerAgent(llm=llm, workspace_root=str(WORKSPACE))
 
-    # Register it in an AgentRegistry
+    # Register sub-agents in an AgentRegistry
+    # Context strategies:
+    #   ISOLATED — sub-agent receives only the task string (no parent context)
+    #   SUMMARY  — sub-agent receives last 4 scratchpad entries from parent
+    #   FULL     — sub-agent receives last 16 scratchpad entries from parent
     agent_registry = AgentRegistry()
     agent_registry.register(
         AgentSpec(
@@ -235,6 +307,18 @@ def main() -> None:
             agent=researcher,
             context_strategy=ContextStrategy.ISOLATED,
             max_steps_override=5,
+        )
+    )
+    agent_registry.register(
+        AgentSpec(
+            name="reviewer",
+            description=(
+                "Delegate a code review subtask to check for bugs, style issues, "
+                "or correctness problems. Use this after making code changes."
+            ),
+            agent=reviewer,
+            context_strategy=ContextStrategy.SUMMARY,  # Reviewer needs some parent context
+            max_steps_override=3,
         )
     )
 

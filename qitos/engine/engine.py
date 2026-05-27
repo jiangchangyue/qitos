@@ -336,8 +336,14 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
 
         # Build interceptor chain from interceptors list
         self._interceptor_chain: Optional[InterceptorChain] = None
-        if interceptors:
-            self._interceptor_chain = InterceptorChain(interceptors)
+        all_interceptors: List[ToolInterceptor] = list(interceptors or [])
+        self._delegate_interceptor: Optional[Any] = None
+        if agent_registry is not None:
+            from .interceptors import DelegateEventInterceptor
+            self._delegate_interceptor = DelegateEventInterceptor(event_sink=None)
+            all_interceptors.append(self._delegate_interceptor)
+        if all_interceptors:
+            self._interceptor_chain = InterceptorChain(all_interceptors)
 
         self.auto_approve = auto_approve
         self.executor = (
@@ -387,6 +393,10 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         self._trace_runtime: _TraceRuntime[StateT] = _TraceRuntime(self)
         self._handoff_runtime = _HandoffRuntime(self)
         self._handoff_history: list[str] = []  # tracks agent names for loop detection
+        # NOTE (v0.6): Handoff Decision-mode handling is stable for v0.6.
+        # Changes to the Engine loop for full handoff context strategies,
+        # shared memory, and canonical multi-agent templates are deferred to v0.7.
+        # See docs/internal/plans/v0.7_handoff_scope.md for details.
         self.stream_callback: Optional[Any] = None  # Callable[[str], None] for streaming
         self._context_runtime = _ContextRuntime(self)
         self._context_runtime.apply_config(self.context_config)
@@ -772,6 +782,9 @@ class Engine(Generic[StateT, ObservationT, ActionT]):
         _resume_step = kwargs.pop("_resume_step", None)
 
         self._reset_run_state()
+        # Wire delegate interceptor to engine's event list
+        if self._delegate_interceptor is not None:
+            self._delegate_interceptor._event_sink = self.events
         memory = self._memory()
         if memory is not None:
             try:

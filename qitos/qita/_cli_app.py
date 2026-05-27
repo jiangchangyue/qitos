@@ -155,6 +155,23 @@ def _build_handler(root: Path):
                     )
                 )
                 return
+            if route.startswith("/compare-branches/"):
+                # /compare-branches/{run_id}/{step_id}
+                parts = route.split("/")
+                if len(parts) >= 4:
+                    cb_run_id = _slug_run_id(parts[2])
+                    cb_step_id = parts[3]
+                    cb_dir = _resolve_run(root, cb_run_id)
+                    if cb_dir is None:
+                        self._send_html(_render_not_found(cb_run_id), status=404)
+                        return
+                    cb_payload = _load_run_payload(cb_dir)
+                    self._send_html(
+                        _render_branch_comparison_html(cb_payload, cb_step_id)
+                    )
+                    return
+                self._send_html(_render_compare_prompt(), status=400)
+                return
             if route == "/api/runs":
                 self._send_json(_discover_runs(root))
                 return
@@ -1306,6 +1323,73 @@ th{{color:var(--muted);font-weight:700}} .full{{margin-top:12px}} code{{backgrou
 </body></html>"""
 
 
+def _render_branch_comparison_html(payload: Dict[str, Any], step_id: str) -> str:
+    """Render a page comparing branch candidates at a given step."""
+    import html as _html
+
+    safe_run = _html.escape(str(payload.get("run_id", "")))
+    safe_step = _html.escape(str(step_id))
+    steps = payload.get("steps", [])
+    step_data = None
+    for s in steps:
+        if str(getattr(s, "step_id", s.get("step_id", ""))) == str(step_id):
+            step_data = s
+            break
+
+    step_info = "Step not found"
+    if step_data is not None:
+        sd = step_data if isinstance(step_data, dict) else {}
+        step_info = _html.escape(json.dumps(sd, ensure_ascii=False, indent=2)[:2000])
+
+    candidates = []
+    if isinstance(step_data, dict):
+        candidates = step_data.get("candidates", [])
+
+    cand_rows = ""
+    for i, c in enumerate(candidates):
+        c_escaped = _html.escape(json.dumps(c, ensure_ascii=False, indent=2)[:1000])
+        cand_rows += f'<div class="card"><div style="font-weight:700">Candidate {i}</div><pre style="font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">{c_escaped}</pre></div>'
+
+    if not cand_rows:
+        cand_rows = '<div class="muted">No branch candidates recorded for this step.</div>'
+
+    # Check for grounding failure
+    grounding_banner = ""
+    if isinstance(step_data, dict):
+        critic_outputs = step_data.get("critic_outputs", [])
+        for co in critic_outputs:
+            if isinstance(co, dict) and co.get("action") == "retry":
+                reason = str(co.get("reason", ""))
+                if "grounding" in reason.lower() or "element not found" in reason.lower() or "coordinates" in reason.lower():
+                    grounding_banner = f'<div style="padding:10px;margin:8px 0;border-radius:var(--radius-md);background:#e5484d11;border:2px solid var(--err);color:var(--err);font-weight:600">Grounding failure: {_html.escape(reason)}</div>'
+                    break
+
+    return f"""<!doctype html>
+<html><head><meta charset="utf-8"/><title>branch compare · {safe_run} · step {safe_step}</title>
+<style>{_DESIGN_TOKENS}</style>
+<style>
+*{{box-sizing:border-box}} body{{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--txt)}}
+.wrap{{max-width:960px;margin:0 auto;padding:24px 18px}}
+.card{{background:var(--surface-1);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px;margin:8px 0}}
+.id{{font-weight:700;font-size:18px}} .muted{{color:var(--muted);font-size:12px}}
+.grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
+.btn{{display:inline-flex;align-items:center;border:1px solid var(--line);color:var(--txt);background:var(--surface-1);padding:6px 10px;border-radius:var(--radius-md);font-size:12px;text-decoration:none;cursor:pointer}}
+.btn:hover{{border-color:var(--accent)}}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="id">Branch compare · {safe_run} · step {safe_step}</div>
+  <a class="btn" href="/run/{safe_run}" style="margin:8px 0">back to run</a>
+  {grounding_banner}
+  <div class="grid">{cand_rows}</div>
+  <div class="card" style="margin-top:12px">
+    <div style="font-weight:700;margin-bottom:8px">Step data</div>
+    <pre style="font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">{step_info}</pre>
+  </div>
+</div>
+</body></html>"""
+
+
 def _render_run_html(payload: Dict[str, Any], embedded: bool) -> str:
     run_id = html.escape(str(payload.get("run_id", "")))
     run_path = html.escape(str(payload.get("run", "")))
@@ -1452,6 +1536,10 @@ pre{{margin:0;background:var(--surface-2);border:1px solid var(--line);padding:1
           <button class="btn" id="fontReset" type="button">A</button>
           <button class="btn" id="fontUp" type="button">A+</button>
         </div>
+        <section class="timeline" id="screenshotStripSection" style="display:none">
+          <h4>screenshot strip</h4>
+          <div id="screenshotStrip" style="display:flex;gap:6px;overflow-x:auto;padding:8px 0"></div>
+        </section>
         <section class="timeline">
           <h4>visual timeline</h4>
           <div id="visualTimeline"></div>
@@ -1809,6 +1897,34 @@ function renderVisualOverlay(item){{
   }}
   return parts.length ? ('<div class="voverlay">' + parts.join('') + '</div>') : '';
 }}
+function buildScreenshotStrip(){{
+  const strip = document.getElementById('screenshotStrip');
+  const section = document.getElementById('screenshotStripSection');
+  if(!strip || !section) return;
+  const rows = Array.isArray(payload.visual_timeline) ? payload.visual_timeline : [];
+  if(!rows.length || embedded){{ section.style.display = 'none'; return; }}
+  section.style.display = '';
+  strip.innerHTML = '';
+  for(const item of rows){{
+    const shot = (item && typeof item === 'object') ? item.screenshot : null;
+    const path = shot && typeof shot === 'object' ? String(shot.path || '') : '';
+    const hasRetry = (item.critic_retry_count || 0) > 0;
+    const groundOk = item.grounding_present;
+    const div = document.createElement('div');
+    div.style.cssText = 'flex:0 0 80px;cursor:pointer;text-align:center;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;position:relative;';
+    if(path){{
+      div.innerHTML = '<img src="' + esc(assetHref(path)) + '" style="width:80px;height:45px;object-fit:cover;display:block" alt="step '+esc(String(item.step_id))+'"/><div style="font-size:9px;padding:2px 4px;background:var(--surface-2);color:var(--muted)">S'+esc(String(item.step_id))+'</div>' + (hasRetry ? '<div style="position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:var(--err)"></div>' : '') + (groundOk === false ? '<div style="position:absolute;top:2px;left:2px;width:8px;height:8px;border-radius:50%;background:#e5c100"></div>' : '');
+    }} else {{
+      div.innerHTML = '<div style="width:80px;height:45px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px">S'+esc(String(item.step_id))+'</div><div style="font-size:9px;padding:2px 4px;background:var(--surface-2);color:var(--muted)">S'+esc(String(item.step_id))+'</div>';
+    }}
+    const sid = String(item.step_id);
+    div.addEventListener('click', function(){{
+      const card = document.getElementById('step-'+sid);
+      if(card) card.scrollIntoView({{behavior:'smooth',block:'center'}});
+    }});
+    strip.appendChild(div);
+  }}
+}}
 function buildVisualTimeline(items){{
   const rows = Array.isArray(payload.visual_timeline) ? payload.visual_timeline : [];
   if(!rows.length){{
@@ -1838,6 +1954,42 @@ function buildVisualTimeline(items){{
   }}
   visualTimelineRoot.innerHTML = '<div class="vtimeline">' + cards.join('') + '</div>';
 }}
+function renderActionOverlay(step){{
+  const st = (step && typeof step === 'object') ? step : {{}};
+  const actions = Array.isArray(st.actions) ? st.actions : [];
+  const retryCount = Array.isArray(st.critic_outputs) ? st.critic_outputs.filter(function(x){{ return x && typeof x === 'object' && x.action === 'retry'; }}).length : 0;
+  let parts = [];
+  // Grounding failure banner
+  const criticOutputs = Array.isArray(st.critic_outputs) ? st.critic_outputs : [];
+  for(const co of criticOutputs){{
+    if(co && typeof co === 'object' && co.action === 'retry'){{
+      const reason = String(co.reason || '').toLowerCase();
+      if(reason.includes('grounding') || reason.includes('element not found') || reason.includes('coordinates') || reason.includes('out of bounds')){{
+        parts.push('<div style="padding:6px 10px;margin:4px 0;border-radius:var(--radius-md);background:#e5484d11;border:2px solid var(--err);color:var(--err);font-size:11px;font-weight:600">Grounding failure: '+esc(String(co.reason || ''))+'</div>');
+        break;
+      }}
+    }}
+  }}
+  if(!actions.length && !parts.length) return '';
+  for(const a of actions){{
+    if(!a || typeof a !== 'object') continue;
+    const at = String(a.action_type || a.name || '');
+    const args = a.args || a;
+    if((at === 'click' || at === 'move_to' || at === 'right_click' || at === 'double_click') && args.x !== undefined && args.y !== undefined){{
+      const color = retryCount > 0 ? 'var(--err)' : 'var(--ok)';
+      parts.push('<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;margin:2px;border-radius:var(--radius-pill);font-size:10px;background:var(--surface-2);border:1px solid '+color+';color:'+color+'"><span style="width:6px;height:6px;border-radius:50%;background:'+color+'"></span>'+esc(at)+' ('+esc(String(args.x))+','+esc(String(args.y))+')</div>');
+    }} else if(at === 'type_text'){{
+      const text = String(args.text || '').slice(0,40);
+      parts.push('<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;margin:2px;border-radius:var(--radius-pill);font-size:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--txt)">type "'+esc(text)+'"</div>');
+    }} else if(at === 'navigate'){{
+      const url = String(args.url || '').slice(0,60);
+      parts.push('<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;margin:2px;border-radius:var(--radius-pill);font-size:10px;background:var(--surface-2);border:1px solid var(--accent);color:var(--accent)">&#x2192; '+esc(url)+'</div>');
+    }} else if(at === 'scroll'){{
+      parts.push('<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;margin:2px;border-radius:var(--radius-pill);font-size:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)">&#x2195; scroll</div>');
+    }}
+  }}
+  return parts.length ? '<div style="margin:4px 0">'+parts.join('')+'</div>' : '';
+}}
 function renderVisualAssets(step){{
   const st = (step && typeof step === 'object') ? step : {{}};
   const assets = Array.isArray(st.visual_assets) ? st.visual_assets : [];
@@ -1856,6 +2008,48 @@ function renderVisualAssets(step){{
   const label = firstActionLabel(st.actions || []);
   if(label) headerRows.push(kvRow('action taken', label));
   let htmlBlocks = headerRows.length ? kvBlock(headerRows) : '';
+  // Action overlay markers
+  htmlBlocks += renderActionOverlay(st);
+  // Observation pack viewer toggle
+  const obsPack = multimodal.multimodal || {{}};
+  const hasObsData = obsPack.text || obsPack.dom || obsPack.accessibility_tree || (Array.isArray(obsPack.ocr) && obsPack.ocr.length) || (Array.isArray(obsPack.ui_candidates) && obsPack.ui_candidates.length) || obsPack.grounding_metadata;
+  if(hasObsData){{
+    const sid = String(st.step_id || 0);
+    htmlBlocks += '<button class="btn" style="margin:6px 0;font-size:11px" onclick="var el=document.getElementById(\\'obspack-'+sid+'\\');if(el){{el.style.display=el.style.display===\\'none\\'?\\'block\\':\\'none\\';}}">observation pack</button>';
+    htmlBlocks += '<div id="obspack-'+sid+'" style="display:none;margin-top:4px;border:1px dashed var(--line-strong);border-radius:var(--radius-md);padding:8px;background:var(--surface-1)">';
+    if(obsPack.text) htmlBlocks += kvBlock([kvRow('text', truncateText(String(obsPack.text), 200))]);
+    if(obsPack.dom){{
+      const domStr = typeof obsPack.dom === 'string' ? truncateText(obsPack.dom, 500) : JSON.stringify(obsPack.dom).slice(0,500);
+      htmlBlocks += '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">DOM</summary><pre style="font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap">'+esc(domStr)+'</pre></details>';
+    }}
+    if(obsPack.accessibility_tree){{
+      const a11yStr = typeof obsPack.accessibility_tree === 'string' ? truncateText(obsPack.accessibility_tree, 500) : JSON.stringify(obsPack.accessibility_tree).slice(0,500);
+      htmlBlocks += '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">a11y tree</summary><pre style="font-size:10px;max-height:300px;overflow:auto;white-space:pre-wrap">'+esc(a11yStr)+'</pre></details>';
+    }}
+    if(Array.isArray(obsPack.ocr) && obsPack.ocr.length){{
+      let ocrRows = '';
+      for(const span of obsPack.ocr.slice(0,20)){{
+        if(!span || typeof span !== 'object') continue;
+        ocrRows += '<tr><td style="font-size:10px;padding:2px 6px">'+esc(String(span.text||''))+'</td><td style="font-size:10px;padding:2px 6px">'+esc(JSON.stringify(span.x!==undefined?{{x:span.x,y:span.y,w:span.w,h:span.h}}:span))+'</td></tr>';
+      }}
+      htmlBlocks += '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">OCR ('+obsPack.ocr.length+')</summary><table style="font-size:10px;border-collapse:collapse">'+ocrRows+'</table></details>';
+    }}
+    if(Array.isArray(obsPack.ui_candidates) && obsPack.ui_candidates.length){{
+      let uiRows = '';
+      for(const c of obsPack.ui_candidates.slice(0,20)){{
+        if(!c || typeof c !== 'object') continue;
+        uiRows += '<tr><td style="font-size:10px;padding:2px 6px">'+esc(String(c.type||''))+'</td><td style="font-size:10px;padding:2px 6px">'+esc(String(c.text||''))+'</td></tr>';
+      }}
+      htmlBlocks += '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">UI candidates ('+obsPack.ui_candidates.length+')</summary><table style="font-size:10px;border-collapse:collapse">'+uiRows+'</table></details>';
+    }}
+    if(obsPack.grounding_metadata){{
+      const gm = obsPack.grounding_metadata;
+      const boxes = Array.isArray(gm.boxes) ? gm.boxes : [];
+      const spans = Array.isArray(gm.ocr_spans) ? gm.ocr_spans : [];
+      htmlBlocks += kvBlock([kvRow('grounding boxes', boxes.length), kvRow('OCR spans', spans.length)]);
+    }}
+    htmlBlocks += '</div>';
+  }}
   if(!assets.length){{
     return htmlBlocks || '<div class="muted">No visual assets recorded.</div>';
   }}
@@ -1868,7 +2062,7 @@ function renderVisualAssets(step){{
     let preview = '';
     if(imageLike && !embedded && path){{
       const timelineItem = (Array.isArray(payload.visual_timeline) ? payload.visual_timeline.find(function(it){{ return String(it.step_id) === String(st.step_id); }}) : null) || {{}};
-      preview = '<div class="vthumb" style="margin-top:8px"><img src="' + esc(assetHref(path)) + '" alt="visual asset"/>' + renderVisualOverlay(timelineItem) + '</div>';
+      preview = '<div class="vthumb" style="margin-top:8px;position:relative"><img src="' + esc(assetHref(path)) + '" alt="visual asset"/>' + renderVisualOverlay(timelineItem) + '</div>';
     }} else if(path) {{
       preview = '<div style="margin-top:8px"><pre>' + esc(String(path)) + '</pre></div>';
     }}
@@ -2628,6 +2822,7 @@ function render(){{
   if(q) items = items.filter(function(it){{ return cardText(it.step,it.events).includes(q); }});
   items.sort(function(a,b){{ return sort==='desc' ? Number(b.sid)-Number(a.sid) : Number(a.sid)-Number(b.sid); }});
   paintOverview(items);
+  buildScreenshotStrip();
   buildVisualTimeline(items);
   buildTimeline(items);
   buildHandoffGantt(items);
