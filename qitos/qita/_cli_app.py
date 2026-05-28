@@ -2413,6 +2413,7 @@ function buildHandoffGantt(items){{
   if(!el) return;
   const agentOrder = [];
   const agentSteps = {{}};
+  const agentTokens = {{}};
   const handoffs = [];
   const agentColors = ['#5e6ad2','#27a644','#e5c100','#e5484d','#6b8fc4','#d97bf0','#3dc9b0','#f59e42'];
   function agentColor(aid){{ return agentColors[agentOrder.indexOf(aid) % agentColors.length]; }}
@@ -2420,10 +2421,24 @@ function buildHandoffGantt(items){{
     const aid = it.step && it.step.agent_id;
     if(aid && !agentOrder.includes(aid)) agentOrder.push(aid);
     if(aid){{ if(!agentSteps[aid]) agentSteps[aid] = []; agentSteps[aid].push(it.sid); }}
+    // Accumulate per-agent token usage
+    if(aid){{
+      const tok = Number((it.step && it.step.context && it.step.context.prompt_tokens) || 0);
+      const ctok = Number((it.step && it.step.context && it.step.context.completion_tokens) || 0);
+      if(!agentTokens[aid]) agentTokens[aid] = {{prompt:0, completion:0}};
+      agentTokens[aid].prompt += tok;
+      agentTokens[aid].completion += ctok;
+    }}
     (it.events || []).forEach(function(e){{
       const ph = String(e.phase || '').toLowerCase();
       if(ph === 'handoff_start'){{
-        handoffs.push({{ sid: it.sid, from: (e.payload && e.payload.from) || aid || '?', to: (e.payload && e.payload.to) || '?' }});
+        handoffs.push({{
+          sid: it.sid,
+          from: (e.payload && e.payload.from) || aid || '?',
+          to: (e.payload && e.payload.to) || '?',
+          context_strategy: (e.payload && e.payload.context_strategy) || '',
+          messages_passed: (e.payload && e.payload.messages_passed) || 0,
+        }});
       }}
     }});
   }});
@@ -2435,15 +2450,15 @@ function buildHandoffGantt(items){{
   const laneH = 36, labelW = 120, padTop = 20, padBottom = 28, padRight = 18, width = 980;
   const totalSteps = items.length;
   const plotW = width - labelW - padRight;
-  const totalH = padTop + agentOrder.length * laneH + padBottom;
+  const ganttH = padTop + agentOrder.length * laneH + padBottom;
   const stepW = totalSteps > 1 ? plotW / (totalSteps - 1) : plotW;
   function stepX(sid){{ const idx = items.findIndex(function(it){{ return it.sid === String(sid); }}); return labelW + (idx >= 0 ? idx * stepW : 0); }}
   function laneY(ai){{ return padTop + ai * laneH + laneH / 2; }}
   const p = [];
-  p.push('<svg class="gantt-svg" viewBox="0 0 '+width+' '+totalH+'" role="img" aria-label="Handoff gantt chart">');
+  p.push('<svg class="gantt-svg" viewBox="0 0 '+width+' '+ganttH+'" role="img" aria-label="Handoff gantt chart">');
   p.push('<defs><marker id="hArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#bfa04e"/></marker></defs>');
   items.forEach(function(it){{
-    p.push('<text class="gantt-step-label" x="'+stepX(it.sid)+'" y="'+(totalH-6)+'" text-anchor="middle">S'+esc(it.sid)+'</text>');
+    p.push('<text class="gantt-step-label" x="'+stepX(it.sid)+'" y="'+(ganttH-6)+'" text-anchor="middle">S'+esc(it.sid)+'</text>');
   }});
   agentOrder.forEach(function(aid, i){{
     const y = padTop + i * laneH;
@@ -2458,14 +2473,50 @@ function buildHandoffGantt(items){{
       p.push('<rect class="gantt-bar" x="'+x1+'" y="'+(y+6)+'" width="'+(x2-x1)+'" height="'+(laneH-12)+'" fill="'+agentColor(aid)+'"/>');
     }}
   }});
-  handoffs.forEach(function(h){{
+  handoffs.forEach(function(h, hi){{
     const fi = agentOrder.indexOf(h.from), ti = agentOrder.indexOf(h.to);
     if(fi < 0 || ti < 0) return;
     const x = stepX(h.sid), y1 = laneY(fi), y2 = laneY(ti);
     const cd = y2 > y1 ? -20 : 20;
-    p.push('<path class="gantt-arrow" d="M'+x+','+y1+' C'+(x+cd)+','+((y1+y2)/2)+' '+(x+cd)+','+((y1+y2)/2)+' '+x+','+y2+'"><title>STEP '+h.sid+': '+h.from+' -> '+h.to+'</title></path>');
+    const strategyLabel = h.context_strategy ? ' ['+esc(h.context_strategy.toUpperCase())+']' : '';
+    const detailId = 'handoffDetail_'+hi;
+    p.push('<g class="gantt-handoff-group" style="cursor:pointer" onclick="document.getElementById(\\''+detailId+'\\').style.display=document.getElementById(\\''+detailId+'\\').style.display===\\'none\\'?\\'block\\':\\'none\\'">');
+    p.push('<path class="gantt-arrow" d="M'+x+','+y1+' C'+(x+cd)+','+((y1+y2)/2)+' '+(x+cd)+','+((y1+y2)/2)+' '+x+','+y2+'">');
+    p.push('<title>STEP '+h.sid+': '+h.from+' -> '+h.to+strategyLabel+'</title>');
+    p.push('</path>');
+    // Strategy label on arrow
+    if(h.context_strategy){{
+      const midY = (y1 + y2) / 2;
+      const labelX = x + (cd > 0 ? -40 : 10);
+      p.push('<text x="'+labelX+'" y="'+midY+'" fill="#bfa04e" font-size="9" font-weight="600">'+esc(h.context_strategy.toUpperCase())+'</text>');
+    }}
+    p.push('</g>');
   }});
   p.push('</svg>');
+  // Per-agent token breakdown
+  let hasTokens = false;
+  agentOrder.forEach(function(aid){{ if(agentTokens[aid] && (agentTokens[aid].prompt || agentTokens[aid].completion)) hasTokens = true; }});
+  if(hasTokens){{
+    p.push('<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">');
+    agentOrder.forEach(function(aid){{
+      const t = agentTokens[aid] || {{prompt:0,completion:0}};
+      const total = t.prompt + t.completion;
+      if(total > 0){{
+        p.push('<span style="padding:2px 8px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line)"><span style="color:'+agentColor(aid)+';font-weight:600">'+esc(aid)+'</span> <span style="color:var(--text-muted)">'+total.toLocaleString()+' tokens</span></span>');
+      }}
+    }});
+    p.push('</div>');
+  }}
+  // Handoff detail panels (hidden by default)
+  handoffs.forEach(function(h, hi){{
+    const detailId = 'handoffDetail_'+hi;
+    p.push('<div id="'+detailId+'" style="display:none;margin:6px 0;padding:8px 12px;border-radius:var(--radius-md);background:var(--surface-2);border:1px solid var(--line);font-size:12px">');
+    p.push('<div style="color:var(--kind-handoff);font-weight:600">&#x21C4; Handoff Step '+esc(h.sid)+'</div>');
+    p.push('<div style="margin-top:4px"><b>From:</b> '+esc(h.from)+' &rarr; <b>To:</b> '+esc(h.to)+'</div>');
+    if(h.context_strategy) p.push('<div><b>Context strategy:</b> '+esc(h.context_strategy)+'</div>');
+    if(h.messages_passed) p.push('<div><b>Messages passed:</b> '+esc(String(h.messages_passed))+'</div>');
+    p.push('</div>');
+  }});
   el.innerHTML = p.join('');
 }}
 function buildCostPanel(items){{

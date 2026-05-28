@@ -335,6 +335,12 @@ class _HandoffRuntime(Generic[StateT, ObservationT, ActionT]):
         mgr.namespace(old_agent_name)
         mgr.namespace(target_name)
 
+        # Grant the target agent read access to the source agent's namespace
+        # if the spec declares shared_memory
+        spec = self.engine.agent_registry.resolve(target_name)
+        if spec.shared_memory is not None:
+            mgr.grant_read_access(target_name, old_agent_name)
+
     def _validate_state_compatibility(self, state: Any, spec: Any) -> None:
         """Check that state is compatible with the new agent.
 
@@ -343,15 +349,18 @@ class _HandoffRuntime(Generic[StateT, ObservationT, ActionT]):
         """
         if spec.state_adapter is not None:
             adapted = spec.state_adapter.adapt(state)
-            # Replace state in-place so the engine's reference stays valid
+            # Replace state in-place using setattr for proper descriptor handling
+            # and to avoid leaking private attributes between state types
             if adapted is not state:
-                state.__dict__.update(adapted.__dict__)
+                for key, value in adapted.__dict__.items():
+                    if not key.startswith('_'):
+                        setattr(state, key, value)
         # Without an adapter, we trust that the new agent can handle the
         # existing state type. A type mismatch will surface as an error
         # when the new agent's reduce() or build_system_prompt() is called.
 
     def _apply_handoff_context(self, state: Any, spec: Any) -> None:
-        """Apply HandoffContext settings: shared_state_fields and max_history_rounds."""
+        """Apply HandoffContext settings: shared_state_fields, max_history_rounds, and payload."""
         from ..core.agent_spec import HandoffContext
 
         hc: HandoffContext | None = spec.handoff_context
@@ -376,6 +385,15 @@ class _HandoffRuntime(Generic[StateT, ObservationT, ActionT]):
             for key in list(state.__dict__.keys()):
                 if key not in allowed:
                     state.metadata.setdefault("_handoff_removed_fields", {})[key] = state.__dict__.pop(key)
+
+        # Write payload entries to target agent's shared memory namespace
+        if hc.payload:
+            from ..core.shared_memory import SharedMemoryManager
+            mgr = getattr(self.engine, "_shared_memory_manager", None)
+            if mgr is not None and isinstance(mgr, SharedMemoryManager):
+                target_ns = mgr.namespace(spec.name)
+                for key, value in hc.payload.items():
+                    target_ns.write(f"handoff_payload:{key}", value)
 
 
 def compact_handoff_history(

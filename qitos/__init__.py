@@ -5,7 +5,7 @@ QitOS public API surface.
 
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 from .core.agent_module import AgentModule
 from .core.action import Action
@@ -35,6 +35,7 @@ from .core.tool import (
 )
 from .core.tool_registry import ToolRegistry
 from .core.agent_spec import AgentSpec, AgentRegistry, ContextStrategy, HandoffContext, StateAdapter
+from .core.shared_memory import SharedMemoryManager
 from .engine.engine import Engine, EngineResult, StepSummary
 from .engine.async_engine import AsyncEngine
 from .engine.events import EngineEvent, EngineEventType, EventStream
@@ -80,6 +81,7 @@ __all__ = [
     "ContextStrategy",
     "HandoffContext",
     "StateAdapter",
+    "SharedMemoryManager",
     "StopReason",
     "QitosRuntimeError",
 ]

@@ -37,6 +37,15 @@ class HandoffTool(BaseTool):
                     "type": "string",
                     "description": "Brief explanation of why this handoff is needed.",
                 },
+                "message": {
+                    "type": "string",
+                    "description": "Context message to pass to the target agent.",
+                },
+                "memory_keys": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Shared memory keys to expose to the target agent.",
+                },
             },
             required=[],
             read_only=True,  # No side effects — just signals intent
@@ -51,10 +60,14 @@ class HandoffTool(BaseTool):
         Note: In practice, the Engine intercepts this tool call before
         execution reaches this method. This is a fallback.
         """
+        if not isinstance(args, dict):
+            args = {}
         return {
             "handoff_target": self.target_name,
             "status": "pending",
-            "rationale": args.get("rationale", "") if isinstance(args, dict) else "",
+            "rationale": args.get("rationale", ""),
+            "message": args.get("message", ""),
+            "memory_keys": args.get("memory_keys", []),
         }
 
     @property

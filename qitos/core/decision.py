@@ -64,9 +64,15 @@ class Decision(Generic[ActionT]):
         target: str,
         rationale: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
+        handoff_message: Optional[str] = None,
+        handoff_memory_keys: Optional[List[str]] = None,
     ) -> "Decision[ActionT]":
         combined_meta = meta or {}
         combined_meta["handoff_target"] = target
+        if handoff_message is not None:
+            combined_meta["handoff_message"] = handoff_message
+        if handoff_memory_keys is not None:
+            combined_meta["handoff_memory_keys"] = handoff_memory_keys
         return cls(mode="handoff", rationale=rationale, meta=combined_meta)
 
     def validate(self) -> None:

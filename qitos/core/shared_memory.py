@@ -219,6 +219,7 @@ class SharedMemoryManager:
     def __init__(self, memory: Optional[SharedMemory] = None) -> None:
         self._memory = memory or InMemorySharedMemory()
         self._namespaces: Dict[str, SharedMemoryNamespace] = {}
+        self._access_grants: Dict[str, set] = {}  # agent_name → set of readable namespace names
 
     @property
     def memory(self) -> SharedMemory:
@@ -263,3 +264,53 @@ class SharedMemoryManager:
         """Clear all data in the backing store and reset namespace cache."""
         self._memory.clear()
         self._namespaces.clear()
+        self._access_grants.clear()
+
+    def grant_read_access(self, agent_name: str, source_namespace: str) -> None:
+        """Grant an agent read access to another agent's namespace.
+
+        Parameters
+        ----------
+        agent_name : str
+            The agent that should receive read access.
+        source_namespace : str
+            The namespace the agent should be able to read.
+        """
+        if agent_name not in self._access_grants:
+            self._access_grants[agent_name] = set()
+        self._access_grants[agent_name].add(source_namespace)
+
+    def get_accessible_namespaces(self, agent_name: str) -> List[str]:
+        """Return the list of namespace names an agent can read (besides its own).
+
+        Parameters
+        ----------
+        agent_name : str
+            The agent whose accessible namespaces to list.
+
+        Returns
+        -------
+        list[str]
+            Namespace names the agent has been granted read access to.
+        """
+        return sorted(self._access_grants.get(agent_name, set()))
+
+    def get_readonly_namespace(self, agent_name: str, source_namespace: str) -> Optional[SharedMemoryNamespace]:
+        """Get a read-only view of another agent's namespace if access was granted.
+
+        Parameters
+        ----------
+        agent_name : str
+            The requesting agent.
+        source_namespace : str
+            The namespace to read.
+
+        Returns
+        -------
+        SharedMemoryNamespace or None
+            Read-only namespace view, or None if access not granted.
+        """
+        accessible = self._access_grants.get(agent_name, set())
+        if source_namespace not in accessible:
+            return None
+        return self.namespace(source_namespace, read_only=True)

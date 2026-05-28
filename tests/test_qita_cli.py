@@ -689,3 +689,146 @@ def test_screenshot_strip_hidden_when_embedded():
     html = _render_run_html({"run": "/tmp", "run_id": "x", "manifest": {}, "events": [], "steps": [], "events_by_step": {}}, embedded=True)
     # The section still exists in DOM but buildScreenshotStrip hides it when embedded
     assert "buildScreenshotStrip" in html
+
+
+# -- v0.7 handoff gantt enhancements --
+
+
+def _make_multi_agent_run_with_context(root: Path, run_id: str) -> Path:
+    """Create a multi-agent run with context_strategy in handoff events."""
+    run = root / run_id
+    run.mkdir(parents=True, exist_ok=True)
+    (run / "manifest.json").write_text(json.dumps({
+        "run_id": run_id,
+        "status": "completed",
+        "step_count": 4,
+        "event_count": 6,
+        "handoff_count": 2,
+        "agent_topology": "sequential",
+        "summary": {
+            "stop_reason": "completed",
+            "final_result": "done",
+            "steps": 4,
+        },
+        "token_usage": {"total": 5000},
+        "latency_seconds": 30.0,
+        "cost": 0.08,
+    }))
+    events = [
+        {"run_id": run_id, "step_id": 0, "phase": "think", "ok": True, "ts": "2026-01-01T00:00:01Z"},
+        {"run_id": run_id, "step_id": 0, "phase": "act", "ok": True, "ts": "2026-01-01T00:00:02Z"},
+        {"run_id": run_id, "step_id": 1, "phase": "handoff_start", "ok": True, "ts": "2026-01-01T00:00:03Z",
+         "payload": {"from": "planner", "to": "coder", "context_strategy": "summary", "messages_passed": 6}},
+        {"run_id": run_id, "step_id": 1, "phase": "handoff_end", "ok": True, "ts": "2026-01-01T00:00:04Z"},
+        {"run_id": run_id, "step_id": 2, "phase": "think", "ok": True, "ts": "2026-01-01T00:00:05Z"},
+        {"run_id": run_id, "step_id": 3, "phase": "handoff_start", "ok": True, "ts": "2026-01-01T00:00:06Z",
+         "payload": {"from": "coder", "to": "reviewer", "context_strategy": "full", "messages_passed": 12}},
+    ]
+    (run / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events))
+    steps = [
+        {"step_id": 0, "agent_id": "planner", "observation": {}, "decision": {"thought": "plan"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [],
+         "state_diff": {}, "context": {"prompt_tokens": 500, "completion_tokens": 100}},
+        {"step_id": 1, "agent_id": "planner", "observation": {}, "decision": {"thought": "delegate"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [],
+         "state_diff": {}, "context": {"prompt_tokens": 600, "completion_tokens": 150}},
+        {"step_id": 2, "agent_id": "coder", "observation": {}, "decision": {"thought": "code"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [],
+         "state_diff": {}, "context": {"prompt_tokens": 1200, "completion_tokens": 300}},
+        {"step_id": 3, "agent_id": "reviewer", "observation": {}, "decision": {"thought": "review"},
+         "actions": [], "action_results": [], "tool_invocations": [], "critic_outputs": [],
+         "state_diff": {}, "context": {"prompt_tokens": 800, "completion_tokens": 200}},
+    ]
+    (run / "steps.jsonl").write_text("\n".join(json.dumps(s) for s in steps))
+    return run
+
+
+def test_handoff_gantt_context_strategy_labels(tmp_path: Path):
+    """Handoff gantt shows context strategy labels on arrows (SUMMARY/FULL/ISOLATED)."""
+    run = _make_multi_agent_run_with_context(tmp_path, "hctx1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_lines = [
+        json.loads(line)
+        for line in (run / "steps.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    payload = {
+        "run": str(run),
+        "run_id": "hctx1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": step_lines,
+        "events_by_step": {
+            str(i): [e for e in event_lines if e["step_id"] == i]
+            for i in range(4)
+        },
+    }
+    html = _render_run_html(payload, embedded=False)
+    # buildHandoffGantt function should include context_strategy in the data
+    assert "context_strategy" in html
+
+
+def test_handoff_gantt_per_agent_token_breakdown(tmp_path: Path):
+    """Handoff gantt section includes per-agent token breakdown."""
+    run = _make_multi_agent_run_with_context(tmp_path, "htok1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_lines = [
+        json.loads(line)
+        for line in (run / "steps.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    payload = {
+        "run": str(run),
+        "run_id": "htok1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": step_lines,
+        "events_by_step": {
+            str(i): [e for e in event_lines if e["step_id"] == i]
+            for i in range(4)
+        },
+    }
+    html = _render_run_html(payload, embedded=False)
+    # Per-agent token breakdown section should be in the JS
+    assert "agentTokens" in html
+
+
+def test_handoff_gantt_detail_panels(tmp_path: Path):
+    """Handoff detail panels (click to expand) are rendered with handoff metadata."""
+    run = _make_multi_agent_run_with_context(tmp_path, "hdet1")
+    event_lines = [
+        json.loads(line)
+        for line in (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    step_lines = [
+        json.loads(line)
+        for line in (run / "steps.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+    payload = {
+        "run": str(run),
+        "run_id": "hdet1",
+        "manifest": manifest,
+        "events": event_lines,
+        "steps": step_lines,
+        "events_by_step": {
+            str(i): [e for e in event_lines if e["step_id"] == i]
+            for i in range(4)
+        },
+    }
+    html = _render_run_html(payload, embedded=False)
+    # Detail panels should exist with handoffDetail IDs
+    assert "handoffDetail_" in html
+    assert "messages_passed" in html

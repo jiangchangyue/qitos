@@ -15,6 +15,33 @@ How to update:
 - Move `Unreleased` notes into a dated or versioned section when publishing a release
 - Prefer user-facing changes, upgrade notes, and important engineering changes over low-level edit logs
 
+## v0.7.0 (2026-05-28)
+
+### Added
+
+- **HandoffTool → Engine Pipeline**: When the LLM calls `transfer_to_{agent}`, the Engine now intercepts the tool result and converts it to a `Decision.handoff()`, enabling HandoffTool-driven agent switching in addition to `decide()`-returned handoffs.
+- **Enriched HandoffTool Parameters**: `HandoffTool` now accepts `message` (context for the target agent) and `memory_keys` (shared memory keys to expose) parameters, passed through to `Decision.handoff()` meta.
+- **Decision.handoff() enriched meta**: `Decision.handoff()` now accepts `handoff_message` and `handoff_memory_keys` keyword arguments, stored in `decision.meta`.
+- **SharedMemoryManager cross-namespace access**: `grant_read_access(agent_name, source_namespace)`, `get_accessible_namespaces(agent_name)`, and `get_readonly_namespace(agent_name, source_namespace)` for cross-agent shared memory read access during handoff.
+- **HandoffContext.payload consumption**: `HandoffContext.payload` entries are now written to the target agent's shared memory namespace (prefixed with `handoff_payload:`) during handoff.
+- **AgentRegistry.validate_topology()**: Validates the handoff graph at registration time — detects unknown handoff targets, cycles (A→B→A), and isolated agents.
+- **_execute_handoff_step()**: Extracted handoff execution into a reusable method on Engine, called from both `Decision.handoff()` and HandoffTool interception paths.
+- **qita handoff gantt enhancements**: Context strategy labels (SUMMARY/FULL/ISOLATED) on handoff arrows, per-agent token breakdown below the gantt chart, click-to-expand handoff detail panels showing context strategy and messages passed.
+- **Canonical multi-agent templates**: Three new example templates in `examples/patterns/`:
+  - `manager_worker_handoff.py` — Manager-Worker with `ContextStrategy.SUMMARY`, `HandoffContext.payload`, and shared memory
+  - `planner_executor_handoff.py` — Planner-Executor with `ContextStrategy.FULL` and `StateAdapter`
+  - `proposer_verifier_handoff.py` — Proposer-Verifier with alternating handoffs and convergence detection
+- **E2E tests for v0.7 handoff**: `tests/e2e/test_handoff_v07.py` with 6 real-model API tests covering HandoffTool interception, payload consumption, shared memory cross-read, return handoff, manager-worker template, and loop detection.
+
+### Changed
+
+- `_setup_shared_memory_namespace()`: now grants the target agent read access to the source agent's namespace when `AgentSpec.shared_memory` is set.
+- `_apply_handoff_context()`: now writes `HandoffContext.payload` entries to the target agent's shared memory namespace.
+- `_validate_state_compatibility()`: replaced fragile `__dict__.update()` with `setattr()` for proper descriptor handling and to avoid leaking private attributes.
+- Handoff observation after agent switch: now returns a typed `Observation` object instead of a plain dict.
+- `_intercept_handoff_action()`: now passes `message` and `memory_keys` from HandoffTool args through to `Decision.handoff()`.
+- `HandoffTool.execute()`: now returns `message` and `memory_keys` fields in addition to `handoff_target` and `rationale`.
+
 ## v0.6.0 (2026-05-28)
 
 ### Added

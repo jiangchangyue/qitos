@@ -115,3 +115,71 @@ class AgentRegistry:
             )
             for spec in self._specs.values()
         ]
+
+    def validate_topology(self) -> List[str]:
+        """Validate the handoff graph and return a list of warnings.
+
+        Checks:
+        - handoff_targets reference agents that exist in the registry
+        - Detects potential cycles (A→B→A)
+        - Detects isolated agents (no inbound handoff targets from other agents)
+
+        Returns
+        -------
+        list[str]
+            Warning messages. Empty list means no issues found.
+        """
+        warnings: List[str] = []
+        agent_names = set(self._specs.keys())
+
+        # Build adjacency from handoff_targets attributes
+        adjacency: Dict[str, List[str]] = {}
+        for name, spec in self._specs.items():
+            targets = getattr(spec.agent, "handoff_targets", None) or []
+            adjacency[name] = targets
+            for t in targets:
+                if t not in agent_names:
+                    warnings.append(
+                        f"Agent '{name}' references unknown handoff target '{t}'"
+                    )
+
+        # Detect cycles via DFS
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {name: WHITE for name in agent_names}
+
+        def dfs(node: str, path: List[str]) -> None:
+            color[node] = GRAY
+            path.append(node)
+            for neighbor in adjacency.get(node, []):
+                if neighbor not in color:
+                    continue
+                if color[neighbor] == GRAY:
+                    cycle_start = path.index(neighbor)
+                    cycle = path[cycle_start:] + [neighbor]
+                    warnings.append(
+                        f"Handoff cycle detected: {' → '.join(cycle)}"
+                    )
+                elif color[neighbor] == WHITE:
+                    dfs(neighbor, path)
+            path.pop()
+            color[node] = BLACK
+
+        for name in agent_names:
+            if color[name] == WHITE:
+                dfs(name, [])
+
+        # Detect isolated agents (no inbound handoff from other registered agents)
+        inbound_targets: Dict[str, int] = {name: 0 for name in agent_names}
+        for name, targets in adjacency.items():
+            for t in targets:
+                if t in inbound_targets:
+                    inbound_targets[t] += 1
+        for name, count in inbound_targets.items():
+            if count == 0 and len(agent_names) > 1:
+                # Not necessarily a problem, just informational
+                warnings.append(
+                    f"Agent '{name}' has no inbound handoff targets "
+                    f"(other agents never hand off to it)"
+                )
+
+        return warnings
