@@ -443,7 +443,7 @@ class TestHandoffContextActivation:
                 self.name = "first"
 
             def init_state(self, task, **kwargs):
-                return RichState(task=task, max_steps=5, secret="s3cret", public="pub")
+                return RichState(task=task, max_steps=5, secret="s3cret", public="pub")  # nosec B101
 
             def decide(self, state, observation):
                 return Decision.handoff(target="second")

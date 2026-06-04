@@ -1,5 +1,11 @@
 """Workflow pattern — declarative graph-based orchestration (simplified).
 
+.. deprecated::
+    Use ``qitos.workflow.WorkflowRunner`` instead, which provides the
+    full DAG engine with conditional branching, loops, parallelism,
+    and Engine integration. This module is kept for backward compatibility
+    only.
+
 Provides a lightweight DAG-based workflow where nodes are functions
 or AgentModules and edges define execution order with data flow.
 
@@ -18,6 +24,15 @@ Usage::
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "qitos.kit.patterns.workflow is deprecated. "
+    "Use qitos.workflow.WorkflowRunner instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set

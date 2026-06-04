@@ -7,7 +7,7 @@ from qitos.tracing.config import _REDACTED_FIELDS, _REDACTED_MARKER, _redact_dic
 
 def test_model_config_to_dict_masks_api_key():
     """ModelConfig.to_dict() masks non-empty api_key."""
-    cfg = ModelConfig(api_key="sk-12345-secret")
+    cfg = ModelConfig(api_key="sk-12345-secret")  # nosec B101
     d = cfg.to_dict()
     assert d["api_key"] == "***REDACTED***"
 

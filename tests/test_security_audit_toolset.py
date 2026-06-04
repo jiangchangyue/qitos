@@ -59,7 +59,7 @@ if __name__ == "__main__":
         encoding="utf-8",
     )
     (root / ".env").write_text(
-        "API_KEY=changeme\nREAL_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz1234567890\n",
+        "API_KEY=changeme\nREAL_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz1234567890\n",  # nosec B101
         encoding="utf-8",
     )
     (root / ".github" / "workflows" / "deploy.yml").write_text(
