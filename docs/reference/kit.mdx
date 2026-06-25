@@ -95,6 +95,8 @@ Prompt format and parser must match exactly. If your prompt asks for `Thought:` 
 <Accordion title="ReActTextParser">
 
 Parses ReAct-style text output with labeled blocks such as `Thought:` and `Action:`.
+It also accepts common action variants such as `Action Input: {...}`,
+XML-style `<action>...</action>` tags, and fenced JSON tool-call objects.
 
 ```python
 from qitos.kit import ReActTextParser

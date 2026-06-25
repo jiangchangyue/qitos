@@ -10,6 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from qitos.kit.parser.func_parser import parse_first_action_invocation
 
+_ACTION_INPUT_KEYS = ("actioninput", "toolinput", "input", "args", "arguments")
+_BARE_ACTION_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
+
 
 def norm(token: str) -> str:
     return re.sub(r"[\s_\-]+", "", token.strip().lower())
@@ -53,15 +56,72 @@ def parse_action_any(blob: str) -> Optional[Dict[str, Any]]:
     if parsed is not None:
         return parsed
 
-    obj = parse_object_like(text)
-    if isinstance(obj, dict):
-        name = obj.get("name")
-        args = obj.get("args", {})
-        if isinstance(name, str):
-            if not isinstance(args, dict):
-                args = {}
-            return {"name": name, "args": args}
+    obj = parse_object_like(strip_code_fences(text))
+    action = coerce_action_object(obj)
+    if action is not None:
+        return action
+
+    obj, _warnings = parse_jsonish_object(text)
+    action = coerce_action_object(obj)
+    if action is not None:
+        return action
+
+    action = parse_labeled_action_input(text)
+    if action is not None:
+        return action
     return None
+
+
+def coerce_action_object(obj: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(obj, dict):
+        return None
+    name = obj.get("name")
+    args = obj.get("args", {})
+    if isinstance(name, str):
+        if not isinstance(args, dict):
+            args = {}
+        return {"name": name, "args": args}
+    actions = extract_json_actions(obj)
+    if actions:
+        return actions[0]
+    return None
+
+
+def parse_labeled_action_input(text: str) -> Optional[Dict[str, Any]]:
+    blocks = extract_labeled_blocks(text)
+    action_text = first_block_value(blocks, ("action", "tool", "call"))
+    if not action_text:
+        return None
+
+    parsed = parse_first_action_invocation(f"Action: {action_text}")
+    if parsed is not None:
+        return parsed
+
+    nested = parse_action_any(action_text)
+    if nested is not None:
+        return nested
+
+    if not _BARE_ACTION_NAME.fullmatch(action_text):
+        return None
+
+    action_input = first_block_value(blocks, _ACTION_INPUT_KEYS)
+    return {"name": action_text, "args": parse_action_input_args(action_input)}
+
+
+def parse_action_input_args(action_input: Optional[str]) -> Dict[str, Any]:
+    if not action_input:
+        return {}
+    payload, _warnings = parse_jsonish_object(action_input)
+    if not isinstance(payload, dict):
+        return {}
+    if len(payload) == 1:
+        only_value = next(iter(payload.values()))
+        if isinstance(only_value, dict) and norm(next(iter(payload.keys()))) in {
+            "args",
+            "arguments",
+        }:
+            return only_value
+    return payload
 
 
 def parse_object_like(text: str) -> Optional[Any]:
@@ -266,6 +326,8 @@ def parse_xml_action(
             parsed = parse_action_any(body)
             if parsed is not None:
                 return parsed
+            if _BARE_ACTION_NAME.fullmatch(body):
+                return {"name": body, "args": {}}
     return None
 
 
