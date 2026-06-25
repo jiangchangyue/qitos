@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 
 from qitos import Action, AgentModule, Decision, Engine, StateSchema, ToolRegistry, tool
+from qitos.core import function_tool
 from qitos.engine import RuntimeBudget
 from qitos.kit import tool as tool_pkg
 from qitos.kit.tool import (
@@ -137,6 +138,58 @@ def test_curated_toolsets_register_cleanly(tmp_path):
         assert (
             registry.list_tools()
         ), f"{toolset.__class__.__name__} registered no tools"
+
+
+def test_coding_toolset_openai_specs_do_not_emit_invalid_any_schema(tmp_path):
+    registry = ToolRegistry()
+    registry.include(CodingToolSet(workspace_root=str(tmp_path), auto_approve=True))
+
+    offenders: dict[str, list[str]] = {}
+    kwargs_tools: dict[str, dict[str, Any]] = {}
+    for spec in registry.get_all_specs():
+        function = spec["function"]
+        parameters = function.get("parameters") or {}
+        properties = parameters.get("properties", {})
+        any_params = [
+            name
+            for name, schema in properties.items()
+            if isinstance(schema, dict) and schema.get("type") == "any"
+        ]
+        if any_params:
+            offenders[function["name"]] = any_params
+        if function["name"] in {
+            "agent_spawn",
+            "cron_create",
+            "cron_delete",
+            "lsp_query",
+        }:
+            kwargs_tools[function["name"]] = parameters
+
+    assert offenders == {}
+    assert set(kwargs_tools) == {
+        "agent_spawn",
+        "cron_create",
+        "cron_delete",
+        "lsp_query",
+    }
+    for parameters in kwargs_tools.values():
+        assert "kwargs" not in parameters.get("properties", {})
+        assert "kwargs" not in parameters.get("required", [])
+
+
+def test_function_tool_schema_uses_valid_json_schema_for_any_and_kwargs():
+    @function_tool(name="accept_any")
+    def accept_any(payload: Any, **kwargs: Any) -> dict[str, Any]:
+        return {"payload": payload, "extra": kwargs}
+
+    spec = accept_any.spec.input_schema
+    properties = spec["properties"]
+
+    assert "payload" in properties
+    assert properties["payload"].get("type") != "any"
+    assert "payload" in spec["required"]
+    assert "kwargs" not in properties
+    assert "kwargs" not in spec["required"]
 
 
 def test_tool_package_does_not_export_uncurated_cyber_toolsets():

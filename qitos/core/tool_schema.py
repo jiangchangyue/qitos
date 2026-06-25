@@ -42,6 +42,8 @@ def function_schema(func: Any) -> Dict[str, Any]:
     for name, p in sig.parameters.items():
         if name in skip:
             continue
+        if p.kind is inspect.Parameter.VAR_KEYWORD:
+            continue
         annotation = hints.get(name, p.annotation)
         schema = type_to_json_schema(annotation)
         entry: Dict[str, Any] = dict(schema)

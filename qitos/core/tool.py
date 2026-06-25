@@ -520,7 +520,12 @@ def build_tool_spec(func: Callable[..., Any], meta: ToolMeta) -> ToolSpec:
             "process_ops",
         }:
             continue
-        params[name] = {"type": _type_to_json(p.annotation), "description": ""}
+        if p.kind is inspect.Parameter.VAR_KEYWORD:
+            continue
+        json_type = _type_to_json(p.annotation)
+        params[name] = {"description": ""}
+        if json_type != "any":
+            params[name]["type"] = json_type
         if p.default is inspect.Parameter.empty:
             required.append(name)
 

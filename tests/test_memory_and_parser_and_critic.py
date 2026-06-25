@@ -103,6 +103,45 @@ No additional notes.
     assert decision.meta["parser_diagnostics"]["salvage_applied"] is True
 
 
+def test_react_parser_accepts_common_action_variants_from_issue_18():
+    parser = ReActTextParser()
+
+    langchain = parser.parse(
+        'Thought: I need to inspect the file.\n'
+        'Action: read_file\n'
+        'Action Input: {"filename": "buggy_module.py"}'
+    )
+    assert langchain.mode == "act"
+    assert langchain.actions[0] == {
+        "name": "read_file",
+        "args": {"filename": "buggy_module.py"},
+    }
+    assert langchain.rationale == "I need to inspect the file."
+
+    xml = parser.parse(
+        "<thought>\n"
+        "Let me first read buggy_module.py to understand the bug.\n"
+        "</thought>\n\n"
+        "<action>\n"
+        "list_files\n"
+        "</action>"
+    )
+    assert xml.mode == "act"
+    assert xml.actions[0] == {"name": "list_files", "args": {}}
+    assert xml.rationale == "Let me first read buggy_module.py to understand the bug."
+
+    fenced_json = parser.parse(
+        '```json\n'
+        '{"name": "read_file", "args": {"filename": "buggy_module.py"}}\n'
+        '```'
+    )
+    assert fenced_json.mode == "act"
+    assert fenced_json.actions[0] == {
+        "name": "read_file",
+        "args": {"filename": "buggy_module.py"},
+    }
+
+
 def test_func_parser_handles_nested_and_truncated_calls():
     s = "a=1, payload={'x':[1,2,3], 'y':'k,v'}, html='<div>(x)</div>', flag=true"
     parts = split_args_robust(s)

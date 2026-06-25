@@ -15,6 +15,13 @@ How to update:
 - Move `Unreleased` notes into a dated or versioned section when publishing a release
 - Prefer user-facing changes, upgrade notes, and important engineering changes over low-level edit logs
 
+## Unreleased
+
+### Fixed
+
+- Fixed OpenAI-compatible tool schema export so `Any` and `**kwargs` no longer produce invalid `{"type": "any"}` entries in native `tools=` payloads.
+- Fixed `ReActTextParser` so common ReAct variants such as `Action Input` blocks, XML-style action tags, and fenced JSON tool calls no longer fall into parser repair loops.
+
 ## v0.8.0 (2026-06-18)
 
 ### Added

@@ -727,6 +727,10 @@ def setup(self, context: Optional[Dict[str, Any]] = None) -> None
 def teardown(self, context: Optional[Dict[str, Any]] = None) -> None
 ```
 
+`get_all_specs()` returns OpenAI-compatible function specs for native tool delivery.
+Unbounded `**kwargs` parameters are omitted from the exported schema, and `Any`
+parameters are rendered without the invalid JSON Schema type `any`.
+
 **Example**
 
 ```python

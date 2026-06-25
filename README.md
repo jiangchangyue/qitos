@@ -16,6 +16,11 @@ QitOS core is the small framework. Product-grade applications and showcase agent
 
 [Quickstart](https://qitor.mintlify.app/quickstart) · [Tutorial Track](https://qitor.mintlify.app/tutorials) · [Benchmarks](https://qitor.mintlify.app/benchmarks/overview) · [CLI Reference](https://qitor.mintlify.app/reference/cli) · [Changelog](CHANGELOG.md) · [Chinese README](README.zh.md)
 
+## Latest Updates
+
+- **Native tool schema hardening**: OpenAI-compatible `tools=` payloads no longer export invalid `type: any` schemas for `Any` or `**kwargs` parameters.
+- **ReAct parser compatibility**: `ReActTextParser` now accepts common `Action Input`, XML-style action tags, and fenced JSON tool-call variants that some OpenAI-compatible models emit.
+
 ## What's New in v0.8.0
 
 - **Architecture-clean stable release**: v0.8.0 documents package ownership, large-file hotspots, optional dependency boundaries, and release guardrails for contributors.

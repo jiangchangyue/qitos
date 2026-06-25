@@ -9,8 +9,11 @@ from qitos.engine.parser import BaseParser, parser_wait_decision
 from qitos.kit.parser.parser_utils import (
     extract_labeled_blocks,
     first_block_value,
+    first_xml_text,
     norm,
     parse_action_any,
+    parse_xml_action,
+    parse_xml_root,
 )
 
 
@@ -75,7 +78,31 @@ class ReActTextParser(BaseParser[dict[str, Any]]):
         if final_answer:
             return Decision.final(answer=final_answer, rationale=thought, meta=meta)
 
-        action = parse_action_any(action_blob or text)
+        if "<" in text and ">" in text:
+            try:
+                root = parse_xml_root(text)
+            except Exception:
+                root = None
+            if root is not None:
+                xml_thought = thought or first_xml_text(root, self.thought_keys)
+                xml_reflection = reflection or first_xml_text(
+                    root, self.reflection_keys
+                )
+                xml_meta = {"reflection": xml_reflection} if xml_reflection else {}
+                xml_final = first_xml_text(root, self.final_keys)
+                if xml_final:
+                    return Decision.final(
+                        answer=xml_final, rationale=xml_thought, meta=xml_meta
+                    )
+                xml_action = parse_xml_action(root, self.action_keys)
+                if xml_action is not None:
+                    return Decision.act(
+                        actions=[xml_action], rationale=xml_thought, meta=xml_meta
+                    )
+
+        action = parse_action_any(text)
+        if action is None and action_blob:
+            action = parse_action_any(action_blob)
         if action is not None:
             return Decision.act(actions=[action], rationale=thought, meta=meta)
         return parser_wait_decision(

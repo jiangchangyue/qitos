@@ -75,6 +75,7 @@ from qitos.harness import build_harness_policy, build_model_for_preset
 <Accordion title="ReActTextParser">
 
 用于解析带 `Thought:`、`Action:`、`Final Answer:` 标记的 ReAct 文本。
+同时兼容常见 action 变体，例如 `Action Input: {...}`、XML 风格的 `<action>...</action>` 标签，以及围栏 JSON tool-call 对象。
 
 ```python
 from qitos.kit import ReActTextParser
